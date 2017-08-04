@@ -12,7 +12,9 @@ class Coordinate {
 
 public:
 	myTYPE origin[3], euler[3];
+	//Matrix1<myTYPE> origin, euler;
 	myTYPE Ttransf[3][3], Etransf[3][3];
+	//Matrix2<myTYPE> Transf, Etransf;
 	const Coordinate* base;
 
 	Coordinate() {
@@ -127,28 +129,29 @@ public:
 	template <class Type, class Coordinate> void Transfer(Type t12[3][3], Type r12[3], const Coordinate &coord1, const Coordinate &coord2) {
 		const Type *origin1_ptr = coord1.origin;
 		const Type *origin2_ptr = coord2.origin;
-		Type temp[3][3];
+		Matrix2<Type> temp(3, 3), t12_temp(3, 3);
 
 		if (coord1.base == coord2.base) {
 			for (int i = 2; i >= 0; --i) {
 				r12[i] = *(origin2_ptr + i) - *(origin1_ptr + i);
 				for (int j = 2; j >= 0; --j) {
-					t12[i][j] = coord2.Ttransf[i][j];
-					temp[i][j] = coord1.Ttransf[i][j];
+					t12_temp(i, j) = coord2.Ttransf[i][j];
+					temp(i, j) = coord1.Ttransf[i][j];
 				}
 
 			}
 			//cout << typeid(t12).name() << endl;
 			//cout << typeid(temp).name() << endl;
 
-			Msolver(*temp, *t12, 3, 3);
+			Msolver(temp.v_p, t12_temp.v_p, 3, 3);
 		}
 		else { wrong_comp_coordinate_diff_base(); }
-
+		for (int i = 2; i >= 0; --i) {
+			for (int j = 2; j >= 0; --j) {
+				t12[i][j] = t12_temp(i, j);
+			}
+		}
 	}
-
-	
-	
 	
 	void SetBase(const Coordinate *C) {
 		base = C;

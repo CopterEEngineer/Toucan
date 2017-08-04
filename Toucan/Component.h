@@ -54,6 +54,7 @@
 
 #define SITA_COLL_MAX PI/6
 #define SITA_CYCL_MAX PI/12
+#define EULER_MAX PI/9
 
 #define TIP
 //#define ROT
@@ -136,6 +137,7 @@ public:
 	//myTYPE sita[4];
 	myTYPE rho, vsound;
 	myTYPE mass, inmatx[3][3];
+	Matrix2<myTYPE> inmatx_M;
 
 	myTYPE vel_g[3], omg_g[3], dvel_g[3], domg_g[3];
 	Coordinate refcoord;
@@ -152,12 +154,19 @@ private:
 		Type temp_cross_v[3] = { 0 };
 		Type temp_cross_o[3] = { 0 };
 		Type temp_omg[3] = { 0 };
+		Type temp = 0;
 
-#ifdef USE_DOUBLE
-		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *inmatx, 3, omg_c, 1, 0, temp_omg, 1);
-#else
-		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *inmatx, 3, omg_c, 1, 0, temp_omg, 1);
-#endif // USE_DOUBLE
+		for (int i = 2; i >= 0; --i) {
+			for (int j = 2; j >= 0; --j) {
+				temp_omg[i] += inmatx[i][j] * omg_c[j];
+			}
+		}
+
+//#ifdef USE_DOUBLE
+//		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *inmatx, 3, omg_c, 1, 0, temp_omg, 1);
+//#else
+//		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *inmatx, 3, omg_c, 1, 0, temp_omg, 1);
+//#endif // USE_DOUBLE
 
 		Cross(temp_cross_o, omg_c, temp_omg);
 		Cross(temp_cross_v, omg_c, vel_c);
@@ -166,8 +175,8 @@ private:
 			dv[i] = f[i] / (mass/SLUG_CONST) + C.Ttransf[i][2] * 32.144 - temp_cross_v[i];
 			dw[i] = m[i] - temp_cross_o[i];
 		}
-
-		Msolver(*inmatx, dw, 3, 1);
+		
+		Msolver(inmatx_M.v_p, dw, 3, 1);
 
 	}
 
@@ -287,7 +296,8 @@ private:
 	template <class Type> void _assemble(Type f[3], Type m[3], const std::vector<std::unique_ptr<Component>> & C, const Coordinate *base) {
 		Type ftemp[3] = { 0,0,0 };
 		Type mtemp[3] = { 0,0,0 };
-
+		f[0] = f[1] = f[2] = 0;
+		m[0] = m[1] = m[2] = 0;
 		for (int i = C.size() - 1; i >= 0; --i) {
 			//cout << C[i].refcoord.base << endl;
 			C[i]->SetAirfm_cg(base);
@@ -321,25 +331,35 @@ private:
 		Cross(_vel, wc, refcoord.origin);
 		Cross(temp_dv, wc, _vel); // w x (w x r)
 		Cross(_dvel, dwc, refcoord.origin); // e x r
-		for (int i = 2; i >= 0; --i) {
-			temp_w[i] = wc[i];
-			temp_dw[i] = dwc[i]; // simplify $e = e_e + e_r + w_e x w_r$ when w_r parallel with w_e, and e_r = 0;
-			temp_dv[i] += dvc[i] + _dvel[i];
-		}
-#ifdef USE_DOUBLE
-		vdAdd(3, _vel, vc, temp_v);
-		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_v, 1, 0, _vel, 1); // cannot set b and y THE same variable
-		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_w, 1, 0, _omg, 1);
-		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_dv, 1, 0, _dvel, 1);
-		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_dw, 1, 0, _domg, 1);
 
-#else
-		vsAdd(3, vel, Copter::vel_c, vel);
-		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_v, 1, 1, _vel, 1);
-		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_w, 1, 0, _omg, 1);
-		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_dv, 1, 0, _dvel, 1);
-		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_dw, 1, 0, _domg, 1);
-#endif // USE_DOUBLE
+		for (int i = 2; i >= 0; --i) {
+			for (int j = 2; j >= 0; --j) {
+				_vel[i] += refcoord.Ttransf[i][j] * (_vel[j] + vc[j]);
+				_omg[i] += refcoord.Etransf[i][j] * wc[j];
+				_dvel[i] += refcoord.Ttransf[i][j] * (temp_dv[j] + dvc[j] + _dvel[j]);
+				_domg[i] += refcoord.Etransf[i][j] * dwc[j];
+			}
+		}
+
+//		for (int i = 2; i >= 0; --i) {
+//			temp_w[i] = wc[i];
+//			temp_dw[i] = dwc[i]; // simplify $e = e_e + e_r + w_e x w_r$ when w_r parallel with w_e, and e_r = 0;
+//			temp_dv[i] += dvc[i] + _dvel[i];
+//		}
+//#ifdef USE_DOUBLE
+//		vdAdd(3, _vel, vc, temp_v);
+//		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_v, 1, 0, _vel, 1); // cannot set b and y THE same variable
+//		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_w, 1, 0, _omg, 1);
+//		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_dv, 1, 0, _dvel, 1);
+//		cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_dw, 1, 0, _domg, 1);
+//
+//#else
+//		vsAdd(3, vel, Copter::vel_c, vel);
+//		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_v, 1, 0, _vel, 1);
+//		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_w, 1, 0, _omg, 1);
+//		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, temp_dv, 1, 0, _dvel, 1);
+//		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, temp_dw, 1, 0, _domg, 1);
+//#endif // USE_DOUBLE
 	}
 
 
@@ -404,7 +424,7 @@ private:
 	myTYPE sita[4];
 
 	Matrix2<myTYPE> cltc, cdtc, cmtc; //
-	myTYPE lambdi_ag, lambdh_ag, lambdt_ag;
+	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
 	myTYPE power, torque;
 	Matrix2<myTYPE> bflap, dbflap, sfth;
 	Matrix2<myTYPE> ut, un, up, ua, ma_n;
@@ -450,9 +470,6 @@ private:
 		_az.setvalue(ia);
 		_ra = rastation(0, id_ns);
 
-		//lambdh.allocate(nf, ns);
-		//lambdh.input("lambdh.txt");
-		//azstation.output();
 		_lambdh = lambdh.interplinear_fast(azstation(id_nf, 0), _ra, _az, _ra);
 #ifdef OUTPUT_MODE
 		_lambdh.outputs("_lambdh.output", 4);
@@ -460,11 +477,11 @@ private:
 
 
 		// air velocity
-		_ut = (_ra - eflap) * cos(b) + eflap + sin(ia) * mul;
+		_ut = (_ra - eflap) * cos(b) + eflap + sin(ia) * vel[0] / vtipa;
 		//_ut *= mcos(sweep(0, id_ns));
 		_ut *= mcos(sweep);
 
-		_up = (_ra - eflap) * db / omega + cos(ia) * sin(b) * mul + _lambdh * cos(b);
+		_up = (_ra - eflap) * db / omega + cos(ia) * sin(b) * vel[0] / vtipa + _lambdh * cos(b);
 
 
 	}
@@ -505,18 +522,19 @@ private:
 			}
 		}
 
-		//_az.setvalue(ia);
-		//_sfth = mcos(_az)*sita[1] + msin(_az)*sita[2] + sita[0];
-		//_sfth.setvalue(sita[0] + sita[1] * cos(ia) + sita[2] * sin(ia));
 		_sfth = sita[0] + sita[1] * cos(ia) + sita[2] * sin(ia);
-		//_sfth.output();
+
 		// aoa
 		_inflow = atan2(_up, _ut);
 		//_incidn = _sfth + twist(0, id_ns) - _inflow;
 		_incidn = twist - _inflow + _sfth;
 		for (int i = ns - 1; i >= 0; --i) {
-			if (_incidn.v_p[i] > PI) { _incidn.v_p[i] -= 2 * PI; }
-			else if (_incidn.v_p[i] < -PI) { _incidn.v_p[i] += 2 * PI; }
+			for (;;) {
+				if (_incidn.v_p[i] > PI) { _incidn.v_p[i] -= 2 * PI; }
+				else if (_incidn.v_p[i] < -PI) { _incidn.v_p[i] += 2 * PI; }
+				else { break; }
+			}
+			
 		}
 
 		// air coefficients
@@ -541,7 +559,7 @@ private:
 		_inflow.outputs("_inflow.output", 4);
 
 		//_sfth.output("_sfth.output", 4);
-		twist.output("_twist.output", 4);
+		//twist.output("_twist.output", 4);
 
 		//cout << "_sfth" << endl;
 		//_sfth.output(4);
@@ -555,7 +573,7 @@ private:
 
 		//cout << "_ua" << endl;
 		//_ua.output(4);
-		//_ua.output("ma.output", 4);
+		_ua.outputs("_ma.output", 4);
 #endif // OUTPUT_MODE
 
 		//cout << "*********************************************************" << endl;
@@ -578,10 +596,69 @@ private:
 		_cl *= _factor;
 		_cd *= _factor;
 
+#ifdef OUTPUT_MODE
+		_cl.outputs("_dL.output", 4);
+		_cd.outputs("_dD.output", 4);
+#endif // OUTPUT_MODE
+
 		_dfx = _cl * msin(_inflow) + _cd * mcos(_inflow);
 		_dfz = _cl * mcos(_inflow) - _cd * msin(_inflow);
 		_dfr = _dfz * (sin(b)) * (-1);
 
+	}
+
+
+	template <class Type> void _setairfm_sp(Type f[3], Type m[3]) {
+		Type it = 0;
+		Type ia = 0;
+		Type b = 0;
+		Type db = 0;
+		Matrix1<Type> _dt(ns), _yf(ns), _hf(ns);
+		Matrix1<Type> _dfx(ns), _dfz(ns), _dfr(ns), ra(ns), ra2(ns), ra1(ns);
+		Matrix1<int> id_ns = step(0, ns - 1);
+		ra = rastation(0, id_ns);
+
+		f[0] = f[1] = f[2] = 0.0;
+		m[0] = m[1] = m[2] = 0.0;
+
+		for (int i = 0; i < nf; ++i) {
+			ia = i * 2 * PI / nf;
+			it = ia / omega;
+			b = beta[0] + beta[1] * cos(ia) + beta[2] * sin(ia);
+			db = (-beta[1] * sin(ia) + beta[2] * cos(ia)) * omega;
+
+			_setairfm(_dfx, _dfz, _dfr, it, b, db);
+#ifdef OUTPUT_MODE
+			_dfx.outputs("_dfx.output", 4);
+			_dfz.outputs("_dfz.output", 4);
+			_dfr.outputs("_dfr.output", 4);
+#endif // OUTPUT_MODE
+
+			_dt = _dfz*cos(b);
+			_yf = _dfx*cos(ia) - _dfr*sin(ia);
+			_hf = _dfx*sin(ia) + _dfr*cos(ia);
+
+			f[0] -= _hf.sum()*NBLADE / nf;
+			f[1] -= _yf.sum()*NBLADE / nf;
+			f[2] -= _dt.sum()*NBLADE / nf;
+
+#ifdef OUTPUT_MODE
+			cout << i << endl;
+			cout << "F[2]: " << f[2] << endl << endl;
+#endif // OUTPUT_MODE
+
+			ra2 = (ra - eflap)*sin(b);
+			ra1 = (ra - eflap)*cos(b) + eflap;
+#ifdef TEETER
+			m[0] = m[1] = 0.0;
+#else
+			m[0] -= (_dt * ra1 * sin(ia) + _yf * ra2).sum()*radius*NBLADE / nf;
+			m[1] -= (_dt * ra1 * cos(ia) + _hf * ra2).sum()*radius*NBLADE / nf;
+#endif // TEETER
+
+
+			m[2] += (_dfx * ra1).sum()*radius*NBLADE / nf;
+		}
 	}
 
 
@@ -631,12 +708,12 @@ private:
 		_setairfm(dfx, dfz, dfr, 0.0, q0, dq0);
 		qt0 = 4 * iflap * omega*(omg[0] * cos(0) - omg[1] * sin(0)) + 2 * iflap*(domg[0] * sin(0) + domg[1] * cos(0));
 #ifdef TEETER
-			//Matrix1<Type> dfx2(ns), dfz2(ns), dfr2(ns);
+		//Matrix1<Type> dfx2(ns), dfz2(ns), dfr2(ns);
 		_setairfm(dfx2, dfz2, dfr2, PI / omega, -q0, -dq0);
-			//dfx -= dfx2;
-			//dfz -= dfz2;
-			//dfr -= dfr2;
-			//qt0 += ((dfz - dfz2)*ra).sum()*radius;
+		//dfx -= dfx2;
+		//dfz -= dfz2;
+		//dfr -= dfr2;
+		//qt0 += ((dfz - dfz2)*ra).sum()*radius;
 		qt0 += ((dfz - dfz2)*ra).sum()*radius;
 #else
 		qt0 += (dfz*ra).sum()*radius;
@@ -657,7 +734,7 @@ private:
 
 			_setairfm(dfx, dfz, dfr, t, q, dq);
 #ifdef TEETER
-				//Matrix1<Type> dfx2(ns), dfz2(ns), dfr2(ns);
+			//Matrix1<Type> dfx2(ns), dfz2(ns), dfr2(ns);
 			_setairfm(dfx2, dfz2, dfr2, t + PI / omega, -q, -dq);
 			qt += ((dfz - dfz2)*ra).sum()*radius;
 
@@ -702,18 +779,18 @@ private:
 
 			/*b[1] = b[2] = 0;
 			for (int j = nperd-1; j >= 2; --j) {
-				val3 = sol.v_p[j];
-				val2 = sol.v_p[j - 1];
-				val1 = sol.v_p[j - 2];
+			val3 = sol.v_p[j];
+			val2 = sol.v_p[j - 1];
+			val1 = sol.v_p[j - 2];
 
 
-				if (val1 > 0 && val2 < 0) { beta[1] = -(val1 + val2) / 2; }
-				if (val1 == 0 && val2 > 0) { beta[1] = val1; }
-				if (val1 == 0 && val2 < 0) { beta[1] = -val1; }
-				if (val1 < 0 && val2>0) { beta[1] = (val1 + val2) / 2; }
+			if (val1 > 0 && val2 < 0) { beta[1] = -(val1 + val2) / 2; }
+			if (val1 == 0 && val2 > 0) { beta[1] = val1; }
+			if (val1 == 0 && val2 < 0) { beta[1] = -val1; }
+			if (val1 < 0 && val2>0) { beta[1] = (val1 + val2) / 2; }
 
-				if (val1<val2 && val2>val3) { beta[2] = val2; }
-				if (val1 > val2 && val2 < val3) { beta[2] = -val2; }
+			if (val1<val2 && val2>val3) { beta[2] = val2; }
+			if (val1 > val2 && val2 < val3) { beta[2] = -val2; }
 
 			}*/
 		}
@@ -723,8 +800,8 @@ private:
 		/*c_temp = 0;
 		s_temp = 0;
 		for (int j = 0; j < nperd; ++j) {
-			c_temp += cos(omega*(dt + t) + (j - nperd + 1)*dff/180*PI/omega) * sol(niter + j - nperd + 1);
-			s_temp += sin(omega*(dt + t) + (j - nperd + 1)*dff/180*PI/omega) * sol(niter + j - nperd + 1);
+		c_temp += cos(omega*(dt + t) + (j - nperd + 1)*dff/180*PI/omega) * sol(niter + j - nperd + 1);
+		s_temp += sin(omega*(dt + t) + (j - nperd + 1)*dff/180*PI/omega) * sol(niter + j - nperd + 1);
 		}
 		if(TEETER){ b[0] = precone; }
 		else { print_wrong_msg("Undefined when solving flap."); }
@@ -732,57 +809,8 @@ private:
 		b[1] = 2 * c_temp;
 		b[2] = 2 * s_temp;*/
 	}
-
-
-	template <class Type> void _setairfm_sp(Type f[3], Type m[3]) {
-		Type it = 0;
-		Type ia = 0;
-		Type b = 0;
-		Type db = 0;
-		Matrix1<Type> _dt(ns), _yf(ns), _hf(ns);
-		Matrix1<Type> _dfx(ns), _dfz(ns), _dfr(ns), ra(ns), ra2(ns), ra1(ns);
-		Matrix1<int> id_ns = step(0, ns - 1);
-		ra = rastation(0, id_ns);
-
-		f[0] = f[1] = f[2] = 2.0;
-		m[0] = m[1] = m[2] = 1.0;
-
-		for (int i = 0; i < nf; ++i) {
-			ia = i * 2 * PI / nf;
-			it = ia / omega;
-			b = beta[0] + beta[1] * cos(ia) + beta[2] * sin(ia);
-			db = (-beta[1] * sin(ia) + beta[2] * cos(ia)) * omega;
-
-			_setairfm(_dfx, _dfz, _dfr, it, b, db);
-#ifdef OUTPUT_MODE
-			_dfx.outputs("_dfx.output", 4);
-			_dfz.outputs("_dfz.output", 4);
-			_dfr.outputs("_dfr.output", 4);
-#endif // OUTPUT_MODE
-
-			_dt = _dfz*cos(b);
-			_yf = _dfx*cos(ia) - _dfr*sin(ia);
-			_hf = _dfx*sin(ia) + _dfr*cos(ia);
-
-			f[0] -= _hf.sum()*NBLADE / nf;
-			f[1] -= _yf.sum()*NBLADE / nf;
-			f[2] -= _dt.sum()*NBLADE / nf;
-
-			ra2 = (ra - eflap)*sin(b);
-			ra1 = (ra - eflap)*cos(b) + eflap;
-#ifdef TEETER
-			m[0] = m[1] = 0.0;
-#else
-			m[0] -= (_dt * ra1 * sin(ia) + _yf * ra2).sum()*radius*NBLADE / nf;
-			m[1] -= (_dt * ra1 * cos(ia) + _hf * ra2).sum()*radius*NBLADE / nf;
-#endif // TEETER
-
-
-			m[2] += (_dfx * ra1).sum()*radius*NBLADE / nf;
-		}
-	}
-
-
+	
+	
 	template<class Type> void _elementKMgenerete(Matrix3<Type> &mele, Matrix3<Type> &kele, const Matrix1<Type> &elegrid, const int dof) {
 		//mele.allocate(eleid.Nv, dof, dof);
 		//kele.allocate(eleid.Nv, dof, dof);

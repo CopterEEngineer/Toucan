@@ -15,6 +15,11 @@ Copter::Copter() :System()
 	inmatx[1][1] = 3098 * 0.73696;
 	inmatx[2][2] = 2655 * 0.73696;
 
+	inmatx_M.allocate(3, 3);
+	inmatx_M(0, 0) = inmatx[0][0];
+	inmatx_M(1, 1) = inmatx[1][1];
+	inmatx_M(2, 2) = inmatx[2][2];
+
 	rho = 0.002378;
 	vsound = 1115.48;
 	for (int i = 2; i >= 0; --i) {
@@ -28,11 +33,12 @@ Copter::Copter() :System()
 		domg_g[i] = 0;
 		//sita[i] = 0;
 	}
-	//sita[0] = 10. / 180 * PI;
-	//sita[1] = 2. / 180 * PI;
-	//sita[3] = 0.0;
 	myTYPE origin[3] = { 0,0,0 };
 	myTYPE euler[3] = { 0,0,0 };
+#ifdef TEST_DATA
+	euler[1] = -0.78*PI / 180;
+#endif // TEST_DATA
+
 	/* read config files */
 	Coordinate *base_ptr = NULL;
 	refcoord.SetCoordinate(origin, euler, base_ptr);
@@ -47,7 +53,7 @@ Copter::Copter() :System()
 	}
 	//cout << refcoord.base << endl;
 #ifdef TEST_DATA
-	vel_g[0] = 0.12*632.2455;
+	vel_g[0] = 0.0;// 0.12*632.2455;
 	vel_g[1] = 0*632.2455;
 	vel_g[2] = 0*632.2455;
 #endif // TEST_DATA
@@ -64,6 +70,7 @@ Copter::Copter(const Copter &H) :System(H)
 			inmatx[i][j] = H.inmatx[i][j];
 		}
 	}
+	inmatx_M = H.inmatx_M;
 
 	rho = H.rho;
 	vsound = H.vsound;
@@ -93,6 +100,8 @@ Copter::~Copter()
 			inmatx[i][j] = 0;
 		}
 	}
+	inmatx_M.deallocate();
+
 	rho = 0;
 	vsound = 0;
 	for (int i = 2; i >= 0; --i) {
@@ -119,19 +128,20 @@ Copter::~Copter()
 void Copter::SetStates(void) {
 	// will update class members
 
-	//for (int i = 2; i >= 0; --i) {
-	//	vel_c[i] = vel_g[i];
-	//	omg_c[i] = omg_g[i];
-	//	dvel_c[i] = dvel_g[i];
-	//	domg_c[i] = domg_g[i];
-	//}
-#ifdef USE_DOUBLE
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, vel_c, 1);
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, omg_c, 1);
-#else
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, vel_c, 1);
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, omg_c, 1);
-#endif // USE_DOUBLE
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			vel_c[i] += refcoord.Ttransf[i][j] * vel_g[j];
+			omg_c[i] += refcoord.Etransf[i][j] * omg_g[j];
+		}
+	}
+
+//#ifdef USE_DOUBLE
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, vel_c, 1);
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, omg_c, 1);
+//#else
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, vel_c, 1);
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, omg_c, 1);
+//#endif // USE_DOUBLE
 
 #ifdef FLIGHT_TRIM
 	dvel_c[0] = dvel_c[1] = dvel_c[2] = 0;
@@ -162,13 +172,21 @@ void Copter::SetStates(myTYPE v[3], myTYPE w[3], myTYPE dv[3], myTYPE dw[3]) {
 	for (int i = 2; i >= 0; --i) {
 		v[i] = w[i] = dv[i] = dw[i] = 0;
 	}
-#ifdef USE_DOUBLE
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, v, 1);
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, w, 1);
-#else
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, v, 1);
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, w, 1);
-#endif // USE_DOUBLE
+
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			v[i] += refcoord.Ttransf[i][j] * vel_g[j];
+			w[i] += refcoord.Etransf[i][j] * omg_g[j];
+		}
+	}
+
+//#ifdef USE_DOUBLE
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, v, 1);
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, w, 1);
+//#else
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Ttransf, 3, vel_g, 1, 0, v, 1);
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *refcoord.Etransf, 3, omg_g, 1, 0, w, 1);
+//#endif // USE_DOUBLE
 
 #ifdef FLIGHT_TRIM
 	dv[0] = dv[1] = dv[2] = 0;
@@ -177,12 +195,6 @@ void Copter::SetStates(myTYPE v[3], myTYPE w[3], myTYPE dv[3], myTYPE dw[3]) {
 	;
 #endif // FLIGHT_TRIM
 
-	//for (int i = 2; i >= 0; --i) {
-	//	vel_c[i] = v[i];
-	//	omg_c[i] = w[i];
-	//	dvel_c[i] = dv[i];
-	//	domg_c[i] = dw[i];
-	//}
 
 #ifdef TEST_MODE
 	printf("Copter states.\n");
@@ -225,7 +237,7 @@ void Copter::SetDerivs(void)
 {
 	// will update class member
 	_setderivs(dvel_c, domg_c, airforce_sigma, airmoment_sigma, refcoord);
-#ifdef TEST_MODE
+#ifndef TEST_MODE
 	printf("%f, %f, %f\n", dvel_c[0], dvel_c[1], dvel_c[2]);
 	printf("%f, %f, %f\n", domg_c[0], domg_c[1], domg_c[2]);
 
@@ -328,22 +340,36 @@ void Component::SetAirfm_cg(const Coordinate *base) {
 	myTYPE rcb[3];
 	myTYPE temp_cross[3] = { 0,0,0 };
 
+	for (int i = 2; i >= 0; --i) { airforce_cg[i] = airmoment_cg[i] = 0; }
+
 	refcoord.Transfer(tcb, rcb, refcoord, *base);
 
-#ifdef USE_DOUBLE
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airforce, 1, 0, airforce_cg, 1);
-	
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			airforce_cg[i] += tcb[i][j] * airforce[j];
+		}
+	}
 	Cross(airmoment_cg, airforce_cg, rcb);
-	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airmoment, 1, 1, airmoment_cg, 1);
-	//vdAdd(3, temp_cross, airmoment_cg, airmoment_cg);
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			airmoment_cg[i] += tcb[i][j] * airmoment[j];
+		}
+	}
 
-#else
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airforce, 1, 0, airforce_cg, 1);
-
-	Cross(airmoment_cg, airforce_cg, rcb);
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airmoment, 1, 1, airmoment_cg, 1);
-
-#endif // USE_DOUBLE
+//#ifdef USE_DOUBLE
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airforce, 1, 0, airforce_cg, 1);
+//	
+//	Cross(airmoment_cg, airforce_cg, rcb);
+//	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airmoment, 1, 1, airmoment_cg, 1);
+//	//vdAdd(3, temp_cross, airmoment_cg, airmoment_cg);
+//
+//#else
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airforce, 1, 0, airforce_cg, 1);
+//
+//	Cross(airmoment_cg, airforce_cg, rcb);
+//	cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airmoment, 1, 1, airmoment_cg, 1);
+//
+//#endif // USE_DOUBLE
 }
 
 
@@ -518,7 +544,7 @@ Rotor::Rotor(const char *s) :Component() {
 	a0 = 5.7;
 	if (!strcmp(s, "main")) {
 		nf = 72;
-		ns = 41;
+		ns = 40;
 		ni = 10;
 
 		if (DISABLE_REVISE_SIZE) {
@@ -554,9 +580,6 @@ Rotor::Rotor(const char *s) :Component() {
 		sigma = 0.0309;
 		gama = 5.01 * rho / 0.002378; //
 
-		//chord.allocate(nf, ns);
-		//sweep.allocate(nf, ns);
-		//twist.allocate(nf, ns);
 		chord.allocate(ns);
 		sweep.allocate(ns);
 		twist.allocate(ns);
@@ -564,10 +587,7 @@ Rotor::Rotor(const char *s) :Component() {
 		rastation.allocate(nf, ns);
 		chord.setvalue(0.558);
 		sweep.setvalue(0);
-		//chord.input("chord.txt");
-		//twist.input("twist.txt");
-		//azstation.input("azstation.txt");
-		//rastation.input("rastation.txt");
+
 		myTYPE temp_twist, temp_azimuth, temp_station;
 		for (int j = ns - 1; j >= 0; --j) {
 			temp_station = rroot + j*(1.0 - rroot) / (ns - 1); // uniform seperated accepted so far.
@@ -650,20 +670,20 @@ Rotor::Rotor(const char *s) :Component() {
 		sita[0] = sita[1] = sita[2] = sita[3] = 0.0;
 
 #ifdef TEST_DATA
-		mul = 0.1765;
-		vel[0] = mul * vtipa;
-		vel[1] = vel[2] = 0;
+		//mul = 0.0;
+		//vel[0] = mul * vtipa;
+		//vel[1] = vel[2] = 0;
 		//lambdh.setvalue(-0.0725);
-		lambdh.input("lambdh.txt");
-		lambdh.output("lambdh.output", 4);
-		sita[0] = 24.1403 * PI / 180;
-		sita[1] = 0.5731 * PI / 180;
-		sita[2] = -5.7843 * PI / 180;
+		//lambdh.input("lambdh.txt");
+		//lambdh.output("lambdh.output", 4);
+		sita[0] = 12.7 * PI / 180;
+		sita[1] = 1.24 * PI / 180;
+		sita[2] = 3.41 * PI / 180;
 		sita[3] = 0.0;
-		beta[1] = 1.5647*PI / 180;
-		beta[2] = 0.5840*PI / 180;
+		beta[1] = 0*PI / 180;
+		beta[2] = 0*PI / 180;
 		for (int j = ns - 1; j >= 0; --j) {
-			twist(j) = (-22 * PI / 180) * j / (ns - 1);
+			twist(j) = (-8.0 * PI / 180) * j / (ns - 1);
 		}
 #endif // TEST_DATA
 	}
@@ -694,9 +714,6 @@ Rotor::Rotor(const char *s) :Component() {
 		sigma = 0.1636;
 		gama = 0; //
 
-		//chord.allocate(nf, ns);
-		//sweep.allocate(nf, ns);
-		//twist.allocate(nf, ns);
 		chord.allocate(ns);
 		sweep.allocate(ns);
 		twist.allocate(ns);
@@ -707,7 +724,7 @@ Rotor::Rotor(const char *s) :Component() {
 		myTYPE origin[3], euler[3];
 		origin[0] = -13.48;
 		origin[1] = 0;
-		origin[2] = 1;
+		origin[2] = -1;
 		euler[0] = PI / 2;
 		euler[1] = 0;
 		euler[2] = 0;
@@ -768,7 +785,7 @@ Rotor::Rotor(const char *s) :Component() {
 
 		sita[0] = sita[1] = sita[2] = sita[3] = 0.0;
 #ifdef TEST_DATA
-		sita[3] = 10 * PI / 180;
+		sita[3] = 10.7 * PI / 180;
 #endif // TEST_DATA
 
 	}
@@ -1067,59 +1084,62 @@ void Rotor::AvrgInducedVel(void)
 {
 	int itermax = 20;
 	int i = 0;
-	Matrix1<myTYPE> lambtpp(itermax);
+	myTYPE lambtpp[20] = { 0 };
 	myTYPE err_w = 0.0001;
 	myTYPE veltpp[3] = { 0.0,0.0,0.0 };
 	//myTYPE velind[3] = { 0.0,0.0,0.0 };
 
 	if (!strcmp(type, "main")) {
 
-		lambtpp.v_p[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
-		//lambtpp.v_p[0] = lambdt_ag;
-		for (i = 1; i < itermax - 1; ++i) {
+		lambtpp[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
+		for (i = 1; i < itermax; ++i) {
 
 			BladeDynamics();
-#ifdef USE_DOUBLE
-			cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1.0, *tppcoord.Ttransf, 3, vel, 1, 0, veltpp, 1);
-#else
-			cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1.0, *tppcoord.Ttransf, 3, vel, 1, 0, veltpp, 1);
-#endif // USE_DOUBLE
-			mul = vel[0] / vtipa;
+			
+			veltpp[0] = veltpp[1] = veltpp[2] = 0;
+			for (int i = 2; i >= 0; --i) {
+				for (int j = 2; j >= 0; --j) {
+					veltpp[i] += tppcoord.Ttransf[i][j] * vel[j];
+				}
+			}
 
-			//SetAirfm();
+//#ifdef USE_DOUBLE
+//			cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1.0, *tppcoord.Ttransf, 3, vel, 1, 0, veltpp, 1);
+//#else
+//			cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1.0, *tppcoord.Ttransf, 3, vel, 1, 0, veltpp, 1);
+//#endif // USE_DOUBLE
+			mul = vel[0] / vtipa; 
 			_setairfm_sp(airforce, airmoment);
-			lambdi_ag = -airforce[2] / (2 * rho*PI*radius*radius*vtipa*vtipa);
-			lambdi_ag /= sqrt(mul * mul + lambtpp(i - 1)*lambtpp(i - 1)); 
-			lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
-			lambtpp(i) = lambdt_ag;
-
-			//velind[2] = lambdi_ag;
-			//Msolver(*temp, velind, 3, 1);
-			lambdh_ag = lambdi_ag * tppcoord.Ttransf[2][2] - vel[2] / vtipa;
+			// airforce at hub coord approx to tpp coord
+			lambdi_ag -= airforce[2] / (2 * rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp[i - 1] * lambtpp[i - 1]);
+			lambdi_ag /= 2.0;
+			// veltpp: tpp plane velocity with copter
+			lambdt_ag = lambdi_ag + veltpp[2] / vtipa;
+			lambtpp[i] = lambdt_ag;
+			// vel: hub velocity with copter
+			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) + vel[2] / vtipa;
 			lambdh.setvalue(lambdh_ag);
 
-			if (Abs(lambtpp(i) / lambtpp(i - 1) - 1) < err_w) { break; }
+			if (Abs(lambtpp[i] / lambtpp[i - 1] - 1) < err_w) { break; }
 
 		}
 		//lambtpp.outputs("_lambtpp.output", 4);
 	}
 	else {
-		//lambtpp.v_p[0] = lambdt_ag;
-		lambtpp.v_p[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
+		err_w = 5e-3;
+		lambtpp[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
 		mul = vel[0] / vtipa;
-		for (i = 1; i < itermax - 1; ++i) {
+		for (i = 1; i < itermax; ++i) {
 			
-			airforce[2] = sigma*a0*0.5*(sita[3] / 3 * (1 + 1.5*mul * mul) - 0.5*lambtpp(i - 1));
-			lambdi_ag = airforce[2] / (2 * sqrt(mul*mul + lambtpp(i - 1)*lambtpp(i - 1)));
-			lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
-			lambtpp(i) = lambdt_ag;
+			airforce[2] = sigma*a0*0.5*(sita[3] / 3 * (1 + 1.5*mul * mul) - 0.5*lambtpp[i - 1]);
+			lambdi_ag += airforce[2] / (2 * sqrt(mul*mul + lambtpp[i - 1]*lambtpp[i - 1]));
+			lambdi_ag /= 2.0;
+			lambdt_ag = lambdi_ag + veltpp[2] / vtipa;
+			lambtpp[i] = lambdt_ag;
 			
-			if (Abs(lambtpp(i) / lambtpp(i - 1) - 1) < err_w) { 
-				airforce[2] *= -rho*PI*radius*radius*vtipa*vtipa;//
-				lambdh_ag = lambdi_ag * tppcoord.Ttransf[2][2] - vel[2] / vtipa;
-
-				break; 
-			}
+			airforce[2] *= -rho*PI*radius*radius*vtipa*vtipa;//
+			lambdh_ag = lambdi_ag + vel[2] / vtipa;
+			if (Abs(lambtpp[i] / lambtpp[i - 1] - 1) < err_w) { break; }
 		}
 #ifdef OUTPUT_MODE
 		lambtpp.outputs("_tail_lambtpp.output", 4);
@@ -1127,11 +1147,21 @@ void Rotor::AvrgInducedVel(void)
 #endif // OUTPUT_MODE
 	}
 
-#ifdef OUTPUT_MODE
-	//if (!strcmp(type, "main")) {
-	printf("%s rotor induced velocity iter count: %d \n", type, i);
-	printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
-	//}
+#ifndef OUTPUT_MODE
+	if (!strcmp(type, "main")) {
+		cout << endl;
+		printf("%s rotor induced velocity iter count: %d \n", type, i-1);
+		printf("%s rotor flaps (degs): %f, %f\n", type, beta[1]/PI*180, beta[2]/PI*180);
+		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
+		cout << endl;
+	}
+	else {
+		cout << endl;
+		printf("%s rotor induced velocity iter count: %d \n", type, i-1);
+		printf("induced error: %f \n", Abs(lambtpp[i-1] / lambtpp[i - 2] - 1));
+		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
+		cout << endl;
+	}
 #endif // OUTPUT_MODE
 }
 

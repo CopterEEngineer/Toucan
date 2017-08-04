@@ -11,15 +11,8 @@
 #include <vector>
 #include <memory>
 #include <time.h>
+#include <omp.h>
 
-//void foo1(Rotor &r) {
-//	//按照基类类型传参时，不会进入派生类的复制构造函数
-//	r.hubrtcoord.origin[0] = 9;
-//}
-//
-//void foo2(Rotor &r) {
-//	cout << r.bladecoord.base->origin[0] << endl;
-//}
 
 int main()
 {
@@ -27,66 +20,8 @@ int main()
 	Copter helicopter;
 	Component component;
 	Coordinate *BASE_COORD = &helicopter.refcoord;
-
-	
-	//Fuselage fuselage;
-	//Wing wing("hor"), fin1("ver", 1), fin2("ver", 2);
-	//Rotor mrotor("main"), trotor("tail");
-	//std::vector<Component> comps;
 	std::vector<std::unique_ptr<Component>> comps;
-
-	
-	/*component.refcoord.SetBase(BASE_COORD);
-	fuselage.refcoord.SetBase(BASE_COORD);
-	wing.refcoord.SetBase(BASE_COORD);
-	fin1.refcoord.SetBase(BASE_COORD);
-	fin2.refcoord.SetBase(BASE_COORD);
-	
-	mrotor.refcoord.SetBase(BASE_COORD);
-	mrotor.hubfxcoord.SetBase(BASE_COORD);
-	mrotor.hubrtcoord.SetBase(&mrotor.hubfxcoord);
-	mrotor.bladecoord.SetBase(&mrotor.hubrtcoord);
-	mrotor.tppcoord.SetBase(&mrotor.hubfxcoord);
-
-	trotor.refcoord.SetBase(BASE_COORD);
-	trotor.hubfxcoord.SetBase(BASE_COORD);
-	trotor.hubrtcoord.SetBase(&trotor.hubfxcoord);
-	trotor.bladecoord.SetBase(&trotor.hubrtcoord);
-	trotor.tppcoord.SetBase(&trotor.hubfxcoord);*/
-
-	//myTYPE vtemp[3], wtemp[3], dvtemp[3], dwtemp[3];
-	//helicopter.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Fuselage ";
-	//fuselage.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Wing ";
-	//wing.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Fin1 ";
-	//fin1.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Fin2 ";
-	//fin2.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Main Rotor ";
-	//mrotor.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//cout << "Tail Rotor ";
-	//trotor.SetStates(vtemp, wtemp, dvtemp, dwtemp);
-	
-	//fuselage.SetAirfm();
-	//wing.SetAirfm();
-	//fin1.SetAirfm();
-	//fin2.SetAirfm();
-
-	/*comps.push_back(mrotor);
-	comps.push_back(fuselage);
-	comps.push_back(wing);
-	comps.push_back(fin1);
-	comps.push_back(fin2);
-	comps.push_back(trotor);
-	comps.push_back(component);*/
+	clock_t tStart;
 
 	// order fixed
 	comps.emplace_back(new Rotor("main"));
@@ -109,41 +44,117 @@ int main()
 
 #endif // FLIGHT_TRIM
 
-	//cout << BASE_COORD << endl;
-	//cout << comps.back().refcoord.base << endl;
-	//cout << comps[0]->refcoord.base << endl;
-	//cout << comps[3]->refcoord.base << endl;
-	//cout << comps[4]->refcoord.base << endl;
-
-
 	trimsolver.TrimSolver(helicopter, component, comps);
-	//comps.begin()->SetAirfm();
-	//comps[0].SetAirfm();
+	//comps[TROTOR]->SetAirfm();
+	//myTYPE jacob[6][6], t12[3][3], temp[3][3];
+	//myTYPE a0[6], b[3];
+	//Matrix2<myTYPE> jacob_M(6, 6), temp_M(3, 3), t12_M(3, 3);
+	//Matrix1<myTYPE> a0_M(6);
+	//int icount = 1;
+
+	//temp[0][0] = 1;
+	//temp[0][1] = 2;
+	//temp[0][2] = 3;
+	//temp[1][0] = 4;
+	//temp[1][1] = 5;
+	//temp[1][2] = 6;
+	//temp[2][0] = 8;
+	//temp[2][1] = 8;
+	//temp[2][2] = 9;
+
+	//t12[0][0] = 30;
+	//t12[0][1] = 20;
+	//t12[0][2] = 10;
+	//t12[1][0] = 99;
+	//t12[1][1] = 84;
+	//t12[1][2] = 69;
+	//t12[2][0] = 162;
+	//t12[2][1] = 138;
+	//t12[2][2] = 114;
+
+	//b[0] = t12[0][0];
+	//b[1] = t12[1][0];
+	//b[2] = t12[2][0];
+
+	//for (int i = 0; i < 3; ++i) {
+	//	for (int j = 0; j < 3; ++j) {
+	//		temp_M(i, j) = temp[i][j];
+	//	}
+	//}	
+	//for (int i = 0; i < 3; ++i) {
+	//	for (int j = 0; j < 3; ++j) {
+	//		t12_M(i, j) = t12[i][j];
+	//	}
+	//}
 	
+	//Msolver(*temp, *t12, 3);
+	//Msolver(*temp, b, 3);
 
-	//component.Assemble(comps, BASE_COORD);
-	//myTYPE ftemp[3], mtemp[3];
-	//component.GetAirfm_sg(ftemp, mtemp);
-	//helicopter.Assemble(ftemp, mtemp);
+	/*Msolver(temp_M.v_p, t12_M.v_p, 3, 3);
+
+	cout << b[0] << "\t" << b[1] << "\t" << b[2] << endl;
+
+	for (int i = 0; i < 3; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+			cout << t12[i][j] << "\t";
+		}
+		cout << endl;
+	}
+	cout << endl;
+	for (int i = 0; i < 3; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+			cout << t12_M(i,j) << "\t";
+		}
+		cout << endl;
+	}
+	
+	
+	*/
+	
+	
+	/*jacob_M.input("jacob_temp.txt");
+	for (int i = 0; i < 6; ++i) {
+		for (int j = 0; j < 6; ++j) {
+			jacob[i][j] = jacob_M(i, j);
+		}
+	}
+	a0_M(0) = 3.2234;
+	a0_M(1) = 2.8996;
+	a0_M(2) = -15.6208;
+	a0_M(3) = -0.4372;
+	a0_M(4) = -0.2065;
+	a0_M(5) = -0.24;
+	for (int i = 0; i < 6; ++i) {
+		a0[i] = a0_M(i);
+	}
+
+	Msolver(*jacob, a0, 6);
+	Msolver(jacob_M.v_p, a0_M.v_p, 6);
+
+	t12[2][2] = t12[3][3];
+	Msolver(*jacob, *t12, 6, 36);
+	for (int i = 0; i < FREEDOM; ++i) {
+		for (int j = 0; j < FREEDOM; ++j) {
+			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+			cout << t12[i][j] << "\t";
+		}
+		cout << endl;
+	}*/
+	/*for (int i = 0; i < 6; ++i) {
+		cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+		cout << a0[i] << "\t" << a0_M(i) << endl;
+	}*/
 
 
-	//helicopter.functest();
-	//mrotor.functest();
-
-
-	//foo2(mrotor);
-
-	//foo1(mrotor);
-
-	//foo2(mrotor);
-
-	//cout << "***********************************************" << endl;
-	//cout << helicopter.refcoord.base << endl;
-	//cout << component.refcoord.base << endl;
-	//cout << fuselage.refcoord.base << endl;
-	//cout << wing.refcoord.base << endl;
-	//cout << fin1.refcoord.base << endl;
-	//cout << fin2.refcoord.base << endl;
+	//const int size = 256;
+	//double sinTable[size];
+	//int count = 0;
+	//tStart = clock();
+	/*for (int n = 0; n<size; ++n)
+		sinTable[n] = std::sin(2 * PI * n / size);
+	printf("%f s", (double)(clock() - tStart) / CLOCKS_PER_SEC);*/
 
 	printf("\n");
 	printf("Completed.\n");
