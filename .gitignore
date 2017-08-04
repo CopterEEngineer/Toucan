@@ -7,6 +7,15 @@
 *.userosscache
 *.sln.docstates
 
+*.txt
+*.output
+*.doc
+*.docx
+*.pdf
+
+# add an exception (using !)
+!ReadMe.txt
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
