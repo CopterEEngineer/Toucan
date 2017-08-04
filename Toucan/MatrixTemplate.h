@@ -1,0 +1,4236 @@
+#pragma once
+#ifndef MatrixTemplate_h
+#define MatrixTemplate_h
+
+//define matrix template and simple operator
+#ifndef PI
+#define PI 3.141592653589793238462643383279502884197169
+#endif // !PI
+#ifndef Sign
+#define Sign(a) ((a) >= 0 ? 1 : -1)
+#endif // !sign
+#ifndef Max
+#define Max(a,b) ((a)>(b)?(a):(b))
+#endif // !max
+#ifndef Min
+#define Min(a,b) ((a)<(b)?(a):(b))
+#endif // !min
+#ifndef Abs
+#define Abs(a) ((a)>=0?(a):(-(a)))
+#endif // !abs
+
+#define INI 0
+
+#ifdef _DEBUG
+#define BOUNDS_CHECK
+#endif // bound check
+#ifdef USE_MKL
+#define _USE_MKL
+//#undef _USE_MKL
+#endif // USE_MKL
+
+#define USE_DOUBLE
+typedef double myTYPE; //float //
+
+
+#include <stdio.h>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include "mkl.h"
+#include "mkl_vml.h"
+#include "Algorithm.h"
+
+
+using std::cout;
+using std::endl;
+using std::cerr;
+using std::exception;
+using std::string;
+using std::ifstream;
+using std::ofstream;
+
+
+//define matrix template
+template<class Type> class Matrix1
+{
+public:
+	Type *v_p;
+	int I0, I1, Nv;
+
+	Matrix1(int i) {
+		Nv = i;
+		I0 = 0;
+		I1 = Nv - 1;
+		v_p = new Type[Nv];
+#if(INI)
+		for (int i = I0; i <= I1; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i <= I1; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	Matrix1(double v, const Matrix1<Type> &x);
+
+
+	Matrix1(int v, const Matrix1<Type> &x);
+
+
+	Matrix1() {
+		I0 = 0;
+		I1 = 0;
+		Nv = 0;
+		v_p = new Type[Nv];
+	}
+
+
+	Matrix1(const Matrix1<Type> &A) {
+		//cout << "Copy constructor." << endl;
+		Nv = A.Nv;
+		I0 = A.I0;
+		I1 = A.I1;
+		v_p = new Type[Nv];
+		*v_p = *A.v_p;
+		for (int i = I0; i <= I1; ++i) { v_p[i] = A.v_p[i]; }
+	}
+
+
+	~Matrix1() {
+		I0 = 0;
+		I1 = 0;
+		Nv = 0;
+		if (v_p != NULL) delete[] v_p;
+		//cout << "[] is Deleted." << endl;
+	}
+
+
+	inline void check_bound(int i) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((i < I0) || (i > I1)) throw i;
+		}
+		catch (int i) {
+			printf("Bound error: i = %d is out of [%d, %d]. \n", i, I0, I1);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(int x) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((x < v_p[0]) || (x > v_[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input value %d is out of [%f, %f]. \n", x, v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(float x) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((x < v_p[0]) || (x > v_[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input value %f is out of [%f, %f]. \n", x, v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(double x) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((x < v_p[0]) || (x > v_[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input value %f is out of [%f, %f]. \n", x, v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(const Matrix1<float> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((A.v_p[0] < v_p[0]) || (A.v_p[Nv - 1] > v_p[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input Matrix1 value bound [%f, %f] is out of [%f, %f]. \n", A.v_p[0], A.v_p[Nv - 1], v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(const Matrix1<double> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((A.v_p[0] < v_p[0]) || (A.v_p[Nv - 1] > v_p[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input Matrix1 value bound [%f, %f] is out of [%f, %f]. \n", A.v_p[0], A.v_p[Nv - 1], v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_bound_v_sorted(const Matrix1<int> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((A.v_p[0] < v_p[0]) || (A.v_p[Nv - 1] > v_p[I1])) throw 99;
+		}
+		catch (int i) {
+			printf("Bound error: input Matrix1 value bound [%d, %d] is out of [%f, %f]. \n", A.v_p[0], A.v_p[Nv - 1], v_p[0], v_p[Nv - 1]);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_shape(const Matrix1<Type> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (this->Nv != A.Nv) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error %d: shape = %d is assigned to %d. \n", i, A.Nv, this->Nv);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif
+	}
+
+
+	inline void check_shape(const Matrix1<Type> &A, const Matrix1<Type> &B) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (A.Nv != B.Nv) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+#endif // BOUNDS_CHECK
+	}
+
+
+	inline void allocate(int i) {
+		if (!Nv) {
+			delete[] v_p;
+			Nv = i;
+			I0 = 0;
+			I1 = Nv - 1;
+			v_p = new Type[Nv];
+		}
+		else {
+			cout << "Matrix has been allocated." << endl;
+			system("pause");
+			cout << "Go" << endl;
+		}
+#if(INI)
+		for (int i = I0; i <= I1; ++i) v_p[i] = NAN;
+#else
+		for (int i = I0; i <= I1; ++i) v_p[i] = Type(0);
+#endif
+	}
+
+
+	inline void deallocate() {
+		I0 = 0;
+		I1 = 0;
+		Nv = 0;
+		delete[] v_p;
+		v_p = new Type[0];
+	}
+
+
+	inline void setvalue(Type x) {
+		for (int i = I0; i <= I1; ++i) { v_p[i] = x; }
+	}
+
+
+	inline Type sum() {
+		Type s = 0.0;
+		for (int i = I0; i <= I1; ++i) { s += v_p[i]; }
+		return s;
+	}
+
+
+	inline Type sum(int i0, int i1) {
+		Type s = 0.0;
+		try { if (i0 > i1) throw 99; }
+		catch (int i) {
+			cerr << "Order error: " << i0 << " > " << i1 << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		check_bound(i0);
+		check_bound(i1);
+		for (int i = i0; i <= i1; ++i) { s += v_p[i - i0]; }
+		return s;
+	}
+
+
+	inline Matrix1<Type> msqrt(void) {
+		Matrix1<Type> temp(Nv);
+		for (int i = 0; i < Nv; ++i) {
+#if _DEBUG
+			if (v_p[i] < 0) {
+				cout << "Negitive number got in sqrt." << endl;
+				system("pause");
+			}
+#endif // _DEBUG
+			temp.v_p[i] = sqrt(v_p[i]);
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<int> step(int i0, int i1) {
+		try { if (i0 > i1) throw 99; }
+		catch (int i) {
+			cerr << "Order error: " << i0 << " > " << i1 << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		Matrix1<int> temp(i1 - i0 + 1);
+		for (int i = 0; i <= i1 - i0; ++i) {
+			temp.v_p[i] = i + i0;
+		}
+		return temp;
+	}
+
+
+	inline Type findmax(void) {
+		Type maxvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) > maxvalue) maxvalue = *(v_p + i);
+			}
+		}
+		return maxvalue;
+	}
+
+
+	inline Type findmin(void) {
+		Type minvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) < minvalue) minvalue = *(v_p + i);
+			}
+		}
+		return minvalue;
+	}
+
+
+	inline void findmaxmin2(Type &maxvalue, Type &minvalue) {
+		if (Nv == 1) {
+			maxvalue = *v_p;
+			minvalue = *v_p;
+		}
+		else if (Nv == 2) {
+			maxvalue = Max(*(v_p + Nv - 1), *(v_p + Nv - 2));
+			minvalue = Min(*(v_p + Nv - 1), *(v_p + Nv - 2));
+		}
+		else {
+			int istart = Nv - 2;
+			if (Nv % 2 == 0) {
+				maxvalue = Max(*(v_p + Nv - 1), *(v_p + Nv - 2));
+				minvalue = Min(*(v_p + Nv - 1), *(v_p + Nv - 2));
+				istart = Nv - 3;
+			}
+			else {
+				maxvalue = *(v_p + Nv - 1);
+				minvalue = *(v_p + Nv - 1);
+			}
+
+			for (int i = istart; i >= 0; i -= 2) {
+				if (*(v_p + i) > *(v_p + i - 1)) {
+					if (*(v_p + i) > maxvalue) maxvalue = *(v_p + i);
+					if (*(v_p + i - 1) < minvalue) minvalue = *(v_p + i - 1);
+				}
+				else {
+					if (*(v_p + i) < minvalue) minvalue = *(v_p + i);
+					if (*(v_p + i - 1) > maxvalue) maxvalue = *(v_p + i - 1);
+				}
+			}
+		}
+
+	}
+
+
+	inline void findmaxmin(Type &maxvalue, Type &minvalue) {
+		maxvalue = *(v_p + Nv - 1);
+		minvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) < minvalue) minvalue = *(v_p + i);
+				if (*(v_p + i) > maxvalue) maxvalue = *(v_p + i);
+			}
+		}
+	}
+
+
+	inline Type interplinear(Matrix1<Type> &X, Type xs) {
+		Type v = 0;
+		Type drhs, dlhs, maxvalue, minvalue;
+		int  icount = 0;
+
+#ifdef BOUNDS_CHECK
+		check_shape(X);
+		X.findmaxmin(maxvalue, minvalue);
+		if ((xs > maxvalue) || (xs < minvalue)) {
+			cout << "Bound error: " << xs << " is out of [" << minvalue << ", " << maxvalue << "]." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		for (int i = Nv - 1; i >= 1; --i) {
+			icount++;
+			if (X.v_p[i] == X.v_p[i - 1]) {
+				cout << "Warning: linear may be unsteady near " << X.v_p[i] << endl;
+				system("pause");
+			}
+			drhs = X.v_p[i] - xs;
+			dlhs = X.v_p[i - 1] - xs;
+			if (drhs * dlhs <= 0) {
+				v = (v_p[i] - v_p[i - 1]) / (X.v_p[i] - X.v_p[i - 1]) * (xs - X.v_p[i - 1]) + v_p[i - 1];
+				break;
+			}
+		}
+		if (drhs * dlhs > 0) {
+			X.findmaxmin(maxvalue, minvalue);
+			cout << "Bound error: " << xs << " is out of [" << minvalue << ", " << maxvalue << "]." << endl;
+			system("pause");
+		}
+		//printf("%d\n", icount);
+		return v;
+	}
+
+
+	inline Type interplinear_fast(Matrix1<Type> &X, Type xs) {
+		Type v = 0;
+		Type drhs, dlhs, maxvalue, minvalue;
+		int li = 0;
+		int ri = X.Nv - 1;
+		int m, index;
+		int icount = 0;
+
+#ifdef BOUNDS_CHECK
+		check_shape(X);
+		X.findmaxmin(maxvalue, minvalue);
+		if ((xs > maxvalue) || (xs < minvalue)) {
+			cout << "Bound error: " << xs << " is out of [" << minvalue << ", " << maxvalue << "]." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		for (int i = Nv - 1; i >= 0; --i) {
+			icount++;
+			if (li > ri) {
+				v = (v_p[li] - v_p[ri]) / (X.v_p[li] - X.v_p[ri]) * (xs - X.v_p[ri]) + v_p[ri];
+				break;
+			}
+			else {
+				m = (li + ri) / 2;
+				if (*(X.v_p + m) < xs) li = m + 1;
+				else if (*(X.v_p + m) > xs) ri = m - 1;
+				else {
+					v = v_p[m];
+					break;
+				}
+			}
+		}
+		if ((ri < 0) || (li > X.Nv)) {
+			X.findmaxmin(maxvalue, minvalue);
+			cout << "Bound error: " << xs << " is out of [" << minvalue << ", " << maxvalue << "]." << endl;
+			system("pause");
+		}
+		//printf("%d\n", icount);
+
+		return v;
+	}
+
+
+	inline Matrix1<Type> interplinear(Matrix1<Type> &X, Matrix1<Type> &XN) {
+		Matrix1<Type> temp(XN.Nv);
+		Type x_max, x_min, xn_max, xn_min;
+		Type xs, drhs, dlhs;
+
+#ifdef BOUNDS_CHECK
+		check_shape(X);
+		X.findmaxmin(x_max, x_min);
+		XN.findmaxmin(xn_max, xn_min);
+		if ((xn_max > x_max) || (xn_min < x_min)) {
+			cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		for (int j = XN.Nv - 1; j >= 0; --j) {
+			//temp.v_p[i] = this->interplinear(X, XN.v_p[i]);
+			xs = XN.v_p[j];
+			for (int i = Nv - 1; i >= 1; --i) {
+				if (X.v_p[i] == X.v_p[i - 1]) {
+					cout << "Warning: linear may be unsteady near " << X.v_p[i] << endl;
+					system("pause");
+				}
+				drhs = X.v_p[i] - xs;
+				dlhs = X.v_p[i - 1] - xs;
+				if (drhs * dlhs <= 0) {
+					temp.v_p[j] = (v_p[i] - v_p[i - 1]) / (X.v_p[i] - X.v_p[i - 1]) * (xs - X.v_p[i - 1]) + v_p[i - 1];
+					break;
+				}
+			}
+
+			if (drhs * dlhs > 0) {
+				X.findmaxmin(x_max, x_min);
+				XN.findmaxmin(xn_max, xn_min);
+				cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+				system("pause");
+			}
+
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<Type> interplinear_fast(Matrix1<Type> &X, Matrix1<Type> &XN) {
+		Matrix1<Type> temp(XN.Nv);
+		Type x_max, x_min, xn_max, xn_min, xs;
+		int li, ri, m, jsize;
+
+#ifdef BOUNDS_CHECK
+		check_shape(X);
+		X.findmaxmin(x_max, x_min);
+		XN.findmaxmin(xn_max, xn_min);
+		if ((xn_max > x_max) || (xn_min < x_min)) {
+			cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		jsize = XN.Nv;
+		for (int j = jsize - 1; j >= 0; --j) {
+			xs = XN.v_p[j];
+			li = 0;
+			ri = X.Nv - 1;
+			for (int i = Nv - 1; i >= 0; --i) {
+				if (li <= ri) {
+					m = (li + ri) / 2;
+					if (*(X.v_p + m) < xs) li = m + 1;
+					else if (*(X.v_p + m) > xs) ri = m - 1;
+					else {
+						temp.v_p[j] = v_p[m];
+						break;
+					}
+				}
+				else {
+					temp.v_p[j] = (v_p[li] - v_p[ri]) / (X.v_p[li] - X.v_p[ri]) * (xs - X.v_p[ri]) + v_p[ri];
+					break;
+				}
+			}
+			if ((ri < 0) || (li > X.Nv)) {
+				X.findmaxmin(x_max, x_min);
+				XN.findmaxmin(xn_max, xn_min);
+				cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+				system("pause");
+			}
+		}
+		return temp;
+	}
+
+
+	inline void output(int presc = 2) {
+		cout.precision(presc);
+		cout << "[";
+		for (int i = I0; i <= I1; ++i) { cout << v_p[i] << " "; }
+		cout << "]";
+		cout << endl << endl;
+	}
+
+
+	inline void output(int i0, int i1, int presc = 2) {
+		cout.precision(presc);
+		cout << "[";
+		for (int i = i0; i <= i1; ++i) { cout << v_p[i] << " "; }
+		cout << "]";
+		cout << endl << endl;
+	}
+
+
+	inline void output(string filename, int presc = 2) {
+		ofstream OutFile(filename);
+		if (OutFile) {
+			OutFile.precision(presc);
+			for (int i = I0; i <= I1; ++i) {
+				OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+				OutFile << v_p[i] << '\t';
+			}
+			OutFile << endl;
+			OutFile.close();
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+
+
+		OutFile.close();
+	}
+
+
+	inline void outputs(string filename, int presc = 2) {
+		ofstream OutFile(filename, std::ios::app);
+		if (OutFile) {
+			OutFile.precision(presc);
+			for (int i = I0; i <= I1; ++i) {
+				OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+				OutFile << v_p[i] << '\t';
+			}
+			OutFile << endl;
+			OutFile.close();
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+
+
+		OutFile.close();
+	}
+
+
+	inline void input(string filename);
+
+
+	inline void output(ofstream &outfile) {
+		for (int i = I0; i <= I1; ++i) { outfile << v_p[i] << "\t"; }
+		outfile.close();
+	}
+
+
+	inline void output(int i0, int i1, string filename) {
+		check_bound(i0);
+		check_bound(i1);
+		ofstream OutFile(filename);
+		OutFile.precision(10);
+		for (int i = i0; i <= i1; ++i) { OutFile << v_p[i - I0] << "\t"; }
+		OutFile.close();
+	}
+
+
+	inline void output(int i0, int i1, ofstream &outfile) {
+		check_bound(i0);
+		check_bound(i1);
+		for (int i = i0; i <= i1; ++i) { outfile << v_p[i - I0] << "\t"; }
+	}
+
+
+	inline Type dot(const Matrix1<Type> &Y) {
+		check_shape(Y);
+		Type temp = 0;
+		int isize = Y.Nv;
+		for (int i = 0; i < isize; ++i) {
+			temp += (*this)(i) * Y.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Type dotP(const Matrix1<Type> &Y) {
+		check_shape(Y);
+		Type temp = 0;
+		Type *X_p, *Y_p;
+		int isize = Y.Nv;
+		X_p = (this->v_p);
+		Y_p = Y.v_p;
+		for (int i = 0; i < isize; ++i) {
+			temp += (*(X_p++))*(*(Y_p++));
+		}
+		return temp;
+	}
+
+
+
+
+	// operator overloading
+	inline Matrix1<Type> & operator=(const Matrix1<Type> &A) {
+		if (this->Nv != A.Nv) {
+			if (this->Nv != 0) {
+				cout << "Warning: inconsistency of matrix size." << endl;
+				//system("pause");
+			}
+
+			this->deallocate();
+			this->allocate(A.Nv);
+		}
+
+		int isize = A.Nv;
+		for (int i = isize - 1; i >= 0; --i) {
+			this->v_p[i] = A.v_p[i];
+		}
+
+		return (*this);
+	}
+
+
+	inline Type & operator()(int i) {
+		check_bound(i);
+		return *(v_p + (i - I0));
+	}
+
+
+	inline Matrix1<Type> operator()(const Matrix1<int> &A);
+
+
+	inline Matrix1<Type> & operator+=(const Matrix1<Type> &A) {
+		check_shape(A);
+		int isize = Nv;
+		for (int i = isize - 1; i >= 0; --i) {
+			this->v_p[i] += A.v_p[i];
+		}
+		return (*this);
+	}
+
+
+	inline Matrix1<Type> & operator-=(const Matrix1<Type> &A) {
+		check_shape(A);
+		int isize = Nv;
+		for (int i = isize - 1; i >= 0; --i) {
+			this->v_p[i] -= A.v_p[i];
+		}
+		return (*this);
+	}
+
+
+	inline Matrix1<Type> & operator*=(const Matrix1<Type> &A) {
+		check_shape(A);
+		int isize = Nv;
+		for (int i = isize - 1; i >= 0; --i) {
+			this->v_p[i] *= A.v_p[i];
+		}
+		return (*this);
+	}
+
+
+
+
+
+	inline Matrix1<Type> & operator/=(const Matrix1<Type> &A) {
+		check_shape(A);
+		int isize = Nv;
+		try {
+			for (int i = isize - 1; i >= 0; --i) {
+				this->v_p[i] /= A.v_p[i];
+			}
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return (*this);
+	}
+
+
+	inline Matrix1<Type> operator+(const Matrix1<Type> &A);
+
+
+	inline Matrix1<Type> operator-(const Matrix1<Type> &A);
+
+
+	inline Matrix1<Type> operator*(const Matrix1<Type> &A);
+
+
+	inline Matrix1<Type> operator/(const Matrix1<Type> &A);
+
+
+	inline Matrix1<Type> operator+(const Type x) {
+		Matrix1<Type> temp(Nv);
+		for (int i = I0; i <= I1; ++i) { temp.v_p[i] = v_p[i] + x; }
+		return temp;
+	}
+
+
+	inline Matrix1<Type> operator-(const Type x) {
+		Matrix1<Type> temp(Nv);
+		for (int i = I0; i <= I1; ++i) { temp.v_p[i] = v_p[i] - x; }
+		return temp;
+	}
+
+
+	inline Matrix1<Type> operator*(const Type x) {
+		Matrix1<Type> temp(Nv);
+		for (int i = I0; i <= I1; ++i) { temp.v_p[i] = v_p[i] * x; }
+		return temp;
+	}
+
+
+	inline Matrix1<Type> operator/(const Type x) {
+		Matrix1<Type> temp(Nv);
+		try {
+			for (int i = I0; i <= I1; ++i) { temp.v_p[i] = v_p[i] / x; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+
+};
+
+
+template<class Type> class Matrix2
+{
+public:
+	int I0, I1, J0, J1, NI, NJ, Nv;
+	Type *v_p;
+
+	Matrix2(int i, int j) {
+		NI = i;
+		NJ = j;
+		I0 = 0;
+		J0 = 0;
+		I1 = NI - 1;
+		J1 = NJ - 1;
+		Nv = NI * NJ;
+		v_p = new Type[Nv];
+#if(INI)
+		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i < Nv; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	Matrix2(double v, const Matrix2<Type> &x);
+
+
+	Matrix2(int v, const Matrix2<Type> &x);
+
+
+	Matrix2() {
+		NI = 0;
+		NJ = 0;
+		I0 = 0;
+		J0 = 0;
+		I1 = 0;
+		J1 = 0;
+		Nv = 0;
+		v_p = new Type[Nv];
+	}
+
+
+	Matrix2(const Matrix2<Type> &A) {
+		//cout << "Copy constructor." << endl;
+		NI = A.NI;
+		NJ = A.NJ;
+		I0 = A.I0;
+		I1 = A.I1;
+		J0 = A.J0;
+		J1 = A.J1;
+		Nv = A.Nv;
+		v_p = new Type[Nv];
+		*v_p = *A.v_p;
+		for (int i = I0; i < Nv; ++i) { v_p[i] = A.v_p[i]; }
+	}
+
+
+	~Matrix2() {
+		NI = 0;
+		NJ = 0;
+		I0 = 0;
+		J0 = 0;
+		I1 = 0;
+		J1 = 0;
+		Nv = 0;
+		if (v_p != NULL) delete[] v_p;
+		//cout << "[] is deleted." << endl;
+	}
+
+
+	inline void check_bound(int i, int j) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((i < I0) || (i > I1) || (j < J0) || (j > J1)) throw 99;
+		}
+		catch (int id) {
+			printf("Bound error: i, j = %d, %d is out of [%d,%d, %d,%d]. \n", i, j, I0, I1, J0, J1);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+	}
+
+
+	inline void check_shape(const Matrix2<Type> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (this->Nv != A.Nv) throw 99;
+			else if (this->NI != A.NI) throw 99;
+			else if (this->NJ != A.NJ) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: %d %d is not consisten with %d %d. \n", NI, NJ, A.NI, A.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif	
+	}
+
+
+	inline void check_shape(const Matrix2<Type> &A, const Matrix2<Type> &B) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (B.Nv != A.Nv) throw 99;
+			else if (B.NI != A.NI) throw 99;
+			else if (B.NJ != A.NJ) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: %d %d is not consisten with %d %d. \n", NI, NJ, A.NI, A.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+	}
+
+
+	inline void allocate(int i, int j) {
+		if (!Nv) {
+			delete[] v_p;
+			NI = i;
+			NJ = j;
+			I0 = 0;
+			J0 = 0;
+			I1 = NI - 1;
+			J1 = NJ - 1;
+			Nv = NI * NJ;
+			v_p = new Type[Nv];
+		}
+		else {
+			//cout << "Matrix has been allocated." << endl;
+			//system("pause");
+			//cout << "Go" << endl;
+		}
+#if(INI)
+		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i < Nv; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	inline void deallocate() {
+		I0 = 0;
+		I1 = 0;
+		I1 = 0;
+		J1 = 0;
+		NI = 0;
+		NJ = 0;
+		Nv = 0;
+		delete[] v_p;
+		v_p = new Type[0];
+	}
+
+
+	inline void setvalue(Type x) {
+		int isize = Nv;
+		for (int i = isize - 1; i >= 0; --i) { v_p[i] = x; }
+	}
+
+
+	inline Type sum(void) {
+		Type s = 0;
+		int isize = Nv;
+		for (int i = isize - 1; i >= 0; --i) { s += v_p[i]; }
+		return s;
+	}
+
+
+	inline Matrix1<Type> sum(int index0, int index1, int axis);
+
+
+	inline Matrix2<Type> transpose(void) {
+		int isize, jsize;
+		isize = NI;
+		jsize = NJ;
+		Matrix2<Type> temp(jsize, isize);
+		for (int j = jsize - 1; j >= 0; --j) {
+			for (int i = isize - 1; i >= 0; --i) {
+				temp(j, i) = (*this)(i, j);
+			}
+		}
+		return temp;
+	}
+
+
+	inline Matrix2<Type> transpose(const Matrix2<Type> &A) {
+		int isize, jsize;
+		isize = A.NI;
+		jsize = A.NJ;
+		Matrix2<Type> temp(jsize, isize);
+		for (int j = jsize - 1; j >= 0; --j) {
+			for (int i = isize - 1; i >= 0; --i) {
+				temp(j, i) = A.v_p(i, j);
+			}
+		}
+		return temp;
+	}
+
+
+	inline Matrix2<Type> msqrt(void) {
+		Matrix2<Type> temp(NI, NJ);
+		for (int i = Nv - 1; i >= 0; --i) {
+#if _DEBUG
+			if (v_p[i] < 0) {
+				cout << "Negitive number got in sqrt." << endl;
+				system("pause");
+			}
+#endif // _DEBUG
+			temp.v_p[i] = sqrt(v_p[i]);
+		}
+		return temp;
+	}
+
+
+	inline Type findmax(void) {
+		Type maxvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) > maxvalue) maxvalue = *(v_p + i);
+			}
+		}
+		return maxvalue;
+	}
+
+
+	inline Matrix1<Type> findmax(int axis) {
+		Matrix1<Type> temp;
+		Matrix1<int> id;
+
+		if (axis == 0) {
+			// row max
+			id = id.step(0, NJ - 1);
+			temp.allocate(NI);
+			for (int i = NI - 1; i >= 0; --i) {
+				temp(i) = (*this)(i, id).findmax();
+			}
+		}
+		else if (axis == 1) {
+			// column max
+			id = id.step(0, NI - 1);
+			temp.allocate(NJ);
+			for (int j = NJ - 1; j >= 0; --j) {
+				temp(j) = (*this)(id, j).findmax();
+			}
+		}
+		else {
+			printf("Error axis: %d", axis);
+			system("pause");
+		}
+		return temp;
+	}
+
+
+	inline Type findmin(void) {
+		Type minvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) < minvalue) minvalue = *(v_p + i);
+			}
+		}
+		return minvalue;
+	}
+
+
+	inline Matrix1<Type> findmin(int axis) {
+		Matrix1<Type> temp;
+		Matrix1<int> id;
+
+		if (axis == 0) {
+			// row max
+			id = id.step(0, NJ - 1);
+			temp.allocate(NI);
+			for (int i = NI - 1; i >= 0; --i) {
+				temp(i) = (*this)(i, id).findmin();
+			}
+		}
+		else if (axis == 1) {
+			// column max
+			id = id.step(0, NI - 1);
+			temp.allocate(NJ);
+			for (int j = NJ - 1; j >= 0; --j) {
+				temp(j) = (*this)(id, j).findmin();
+			}
+		}
+		else {
+			printf("Error axis: %d", axis);
+			system("pause");
+		}
+		return temp;
+	}
+
+
+	inline void findmaxmin(Type &maxvalue, Type &minvalue) {
+		maxvalue = *(v_p + Nv - 1);
+		minvalue = *(v_p + Nv - 1);
+
+		if (Nv > 1) {
+			for (int i = Nv - 2; i >= 0; --i) {
+				if (*(v_p + i) < minvalue) minvalue = *(v_p + i);
+				if (*(v_p + i) > maxvalue) maxvalue = *(v_p + i);
+			}
+		}
+	}
+
+
+	inline Type interplinear(Matrix1<Type> &X, Matrix1<Type> &Y, Type xs, Type ys) {
+		//:param X: row
+		//:param Y: col
+		Type v, x1, x0, y1, y0;
+		Type f00, f01, f10, f11, drhs_x, dlhs_x, drhs_y, dlhs_y;
+		Type x_max, x_min, y_max, y_min;
+		int ix, iy;
+#ifdef BOUNDS_CHECK
+		if ((NI != X.Nv) || (NJ != Y.Nv)) {
+			printf("Shape error: Z(%d, %d) is inconsistent with X %d, Y %d. \n", NI, NJ, X.Nv, Y.Nv);
+			system("pause");
+		}
+
+		X.findmaxmin(x_max, x_min);
+		Y.findmaxmin(y_max, y_min);
+
+		if ((xs > x_max) || (xs < x_min)) {
+			cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+			system("pause");
+		}
+		if ((ys > y_max) || (ys < y_min)) {
+			cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		for (int i = NI - 1; i >= 1; --i) {
+			if (X.v_p[i] == X.v_p[i - 1]) {
+				cout << "Warning: linear may be unsteady near " << X.v_p[i] << endl;
+				system("pause");
+			}
+			drhs_x = X.v_p[i] - xs;
+			dlhs_x = X.v_p[i - 1] - xs;
+			if (drhs_x * dlhs_x <= 0) {
+				x1 = X.v_p[i];
+				x0 = X.v_p[i - 1];
+				ix = i;
+				break;
+			}
+		}
+
+
+		for (int j = NJ - 1; j >= 1; --j) {
+			if (Y.v_p[j] == Y.v_p[j - 1]) {
+				cout << "Warning: linear may be unsteady near " << Y.v_p[j] << endl;
+				system("pause");
+			}
+			drhs_y = Y.v_p[j] - ys;
+			dlhs_y = Y.v_p[j - 1] - ys;
+			if (drhs_y * dlhs_y <= 0) {
+				y1 = Y.v_p[j];
+				y0 = Y.v_p[j - 1];
+				iy = j;
+				break;
+			}
+		}
+
+		if ((drhs_x * dlhs_x > 0) || (drhs_y * dlhs_y > 0)) {
+			X.findmaxmin(x_max, x_min);
+			Y.findmaxmin(y_max, y_min);
+			cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+			cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+			system("pause");
+		}
+
+		f00 = (*this)(ix - 1, iy - 1);
+		f01 = (*this)(ix - 1, iy);
+		f10 = (*this)(ix, iy - 1);
+		f11 = (*this)(ix, iy);
+
+		v = ((x1 - xs) * f00 + (xs - x0) * f10) * (y1 - ys);
+		v += (f01*(x1 - xs) + f11 * (xs - x0)) * (ys - y0);
+		v /= (x1 - x0) * (y1 - y0);
+
+		return v;
+	}
+
+
+	inline Type interplinear_fast(Matrix1<Type> &X, Matrix1<Type> &Y, Type xs, Type ys) {
+		//:param X: row
+		//:param Y: col
+		Type v, x1, x0, y1, y0;
+		Type f00, f01, f10, f11;
+		Type x_max, x_min, y_max, y_min;
+		int li, ri, m, index_r, index_c;
+#ifdef BOUNDS_CHECK
+		if ((NI != X.Nv) || (NJ != Y.Nv)) {
+			printf("Shape error: Z(%d, %d) is inconsistent with X %d, Y %d. \n", NI, NJ, X.Nv, Y.Nv);
+			system("pause");
+		}
+
+		X.findmaxmin(x_max, x_min);
+		Y.findmaxmin(y_max, y_min);
+
+		if ((xs > x_max) || (xs < x_min)) {
+			cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+			system("pause");
+		}
+		if ((ys > y_max) || (ys < y_min)) {
+			cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		li = 0;
+		ri = X.Nv - 1;
+		index_r = X.Nv;
+		for (int i = NI - 1; i >= 0; --i) {
+			if (li > ri) {
+				index_r = ri;
+				break;
+			}
+			else {
+				m = (li + ri) / 2;
+				if (*(X.v_p + m) < xs) li = m + 1;
+				else if (*(X.v_p + m) > xs) ri = m - 1;
+				else {
+					index_r = m;
+					break;
+				}
+			}
+		}
+		li = 0;
+		ri = Y.Nv - 1;
+		index_c = Y.Nv;
+		for (int j = NJ - 1; j >= 0; --j) {
+			if (li > ri) {
+				index_c = ri;
+				break;
+			}
+			else {
+				m = (li + ri) / 2;
+				if (*(Y.v_p + m) < ys) li = m + 1;
+				else if (*(Y.v_p + m) > ys) ri = m - 1;
+				else {
+					index_c = m;
+					break;
+				}
+			}
+		}
+
+		if ((index_r > X.Nv - 1) || (index_c > Y.Nv - 1)) {
+			X.findmaxmin(x_max, x_min);
+			Y.findmaxmin(y_max, y_min);
+			cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+			cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+			system("pause");
+		}
+
+		f00 = (*this)(index_r, index_c);
+		f01 = (*this)(index_r, index_c + 1);
+		f10 = (*this)(index_r + 1, index_c);
+		f11 = (*this)(index_r + 1, index_c + 1);
+		x0 = X.v_p[index_r];
+		x1 = X.v_p[index_r + 1];
+		y0 = Y.v_p[index_c];
+		y1 = Y.v_p[index_c + 1];
+
+		v = ((x1 - xs) * f00 + (xs - x0) * f10) * (y1 - ys);
+		v += (f01*(x1 - xs) + f11 * (xs - x0)) * (ys - y0);
+		v /= (x1 - x0) * (y1 - y0);
+
+		return v;
+	}
+
+
+	inline Matrix2<Type> interplinear(Matrix1<Type> &X, Matrix1<Type> &Y, Matrix2<Type> &XN, Matrix2<Type> &YN) {
+		Matrix2<Type> temp(XN.NI, YN.NJ);
+		Type v, x1, x0, y1, y0;
+		Type xs, ys, drhs_x, dlhs_x, drhs_y, dlhs_y;
+		Type f00, f01, f10, f11, x_max, x_min, y_max, y_min, xn_max, xn_min, yn_max, yn_min;
+		int ix, iy, ni, nj;
+#ifdef BOUNDS_CHECK
+		if ((NI != X.Nv) || (NJ != Y.Nv)) {
+			printf("Shape error: Z(%d, %d) is inconsistent with X %d, Y %d. \n", NI, NJ, X.Nv, Y.Nv);
+			system("pause");
+		}
+
+		check_shape(XN, YN);
+
+		X.findmaxmin(x_max, x_min);
+		Y.findmaxmin(y_max, y_min);
+		XN.findmaxmin(xn_max, xn_min);
+		YN.findmaxmin(yn_max, yn_min);
+
+		if ((xn_max > x_max) || (xn_min < x_min)) {
+			cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+			system("pause");
+		}
+		if ((yn_max > y_max) || (yn_min < y_min)) {
+			cout << "Bound error: " << yn_max << ", " << yn_min << " is out of " << y_max << ", " << y_min << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		ni = NI;
+		nj = NJ;
+		for (int k = XN.Nv - 1; k >= 0; --k) {
+			xs = XN.v_p[k];
+			ys = YN.v_p[k];
+			for (int i = ni - 1; i >= 1; --i) {
+				if (X.v_p[i] == X.v_p[i - 1]) {
+					cout << "Warning: linear may be unsteady near " << X.v_p[i] << endl;
+					system("pause");
+				}
+				drhs_x = X.v_p[i] - xs;
+				dlhs_x = X.v_p[i - 1] - xs;
+				if (drhs_x * dlhs_x <= 0) {
+					x1 = X.v_p[i];
+					x0 = X.v_p[i - 1];
+					ix = i;
+					break;
+				}
+			}
+
+			for (int j = nj - 1; j >= 1; --j) {
+				if (Y.v_p[j] == Y.v_p[j - 1]) {
+					cout << "Warning: linear may be unsteady near " << Y.v_p[j] << endl;
+					system("pause");
+				}
+				drhs_y = Y.v_p[j] - ys;
+				dlhs_y = Y.v_p[j - 1] - ys;
+				if (drhs_y * dlhs_y <= 0) {
+					y1 = Y.v_p[j];
+					y0 = Y.v_p[j - 1];
+					iy = j;
+					break;
+				}
+			}
+
+			if ((drhs_x * dlhs_x > 0) || (drhs_y * dlhs_y > 0)) {
+				X.findmaxmin(x_max, x_min);
+				Y.findmaxmin(y_max, y_min);
+				XN.findmaxmin(xn_max, xn_min);
+				YN.findmaxmin(yn_max, yn_min);
+				cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+				cout << "Bound error: " << yn_max << ", " << yn_min << " is out of " << y_max << ", " << y_min << endl;
+				system("pause");
+			}
+
+			f00 = (*this)(ix - 1, iy - 1);
+			f01 = (*this)(ix - 1, iy);
+			f10 = (*this)(ix, iy - 1);
+			f11 = (*this)(ix, iy);
+
+			v = ((x1 - xs) * f00 + (xs - x0) * f10) * (y1 - ys);
+			v += (f01*(x1 - xs) + f11 * (xs - x0)) * (ys - y0);
+			v /= (x1 - x0) * (y1 - y0);
+			temp.v_p[k] = v;
+		}
+
+
+		return temp;
+	}
+
+
+	inline Matrix2<Type> interplinear_fast(Matrix1<Type> &X, Matrix1<Type> &Y, Matrix2<Type> &XN, Matrix2<Type> &YN) {
+		Matrix2<Type> temp(XN.NI, YN.NJ);
+		Type v, x1, x0, y1, y0;
+		Type xs, ys;
+		Type f00, f01, f10, f11, x_max, x_min, y_max, y_min, xn_max, xn_min, yn_max, yn_min;
+		int li, ri, m, index_r, index_c, ni, nj;
+#ifdef BOUNDS_CHECK
+		if ((NI != X.Nv) || (NJ != Y.Nv)) {
+			printf("Shape error: Z(%d, %d) is inconsistent with X %d, Y %d. \n", NI, NJ, X.Nv, Y.Nv);
+			system("pause");
+		}
+
+		check_shape(XN, YN);
+
+		X.findmaxmin(x_max, x_min);
+		Y.findmaxmin(y_max, y_min);
+		XN.findmaxmin(xn_max, xn_min);
+		YN.findmaxmin(yn_max, yn_min);
+
+		if ((xn_max > x_max) || (xn_min < x_min)) {
+			cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+			system("pause");
+		}
+		if ((yn_max > y_max) || (yn_min < y_min)) {
+			cout << "Bound error: " << yn_max << ", " << yn_min << " is out of " << y_max << ", " << y_min << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		ni = NI;
+		nj = NJ;
+		for (int k = XN.Nv - 1; k >= 0; --k) {
+			xs = XN.v_p[k];
+			ys = YN.v_p[k];
+
+			li = 0;
+			ri = X.Nv - 1;
+			index_r = X.Nv;
+			for (int i = ni - 1; i >= 0; --i) {
+				if (li > ri) {
+					index_r = ri;
+					break;
+				}
+				else {
+					m = (li + ri) / 2;
+					if (*(X.v_p + m) < xs) li = m + 1;
+					else if (*(X.v_p + m) > xs) ri = m - 1;
+					else {
+						index_r = m;
+						break;
+					}
+				}
+			}
+			li = 0;
+			ri = Y.Nv - 1;
+			index_c = Y.Nv;
+			for (int j = nj - 1; j >= 0; --j) {
+				if (li > ri) {
+					index_c = ri;
+					break;
+				}
+				else {
+					m = (li + ri) / 2;
+					if (*(Y.v_p + m) < ys) li = m + 1;
+					else if (*(Y.v_p + m) > ys) ri = m - 1;
+					else {
+						index_c = m;
+						break;
+					}
+				}
+			}
+
+			if ((index_r > X.Nv - 1) || (index_c > Y.Nv - 1)) {
+				X.findmaxmin(x_max, x_min);
+				Y.findmaxmin(y_max, y_min);
+				cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+				cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+				system("pause");
+			}
+
+			f00 = (*this)(index_r, index_c);
+			f01 = (*this)(index_r, index_c + 1);
+			f10 = (*this)(index_r + 1, index_c);
+			f11 = (*this)(index_r + 1, index_c + 1);
+			x0 = X.v_p[index_r];
+			x1 = X.v_p[index_r + 1];
+			y0 = Y.v_p[index_c];
+			y1 = Y.v_p[index_c + 1];
+
+			v = ((x1 - xs) * f00 + (xs - x0) * f10) * (y1 - ys);
+			v += (f01*(x1 - xs) + f11 * (xs - x0)) * (ys - y0);
+			v /= (x1 - x0) * (y1 - y0);
+			temp.v_p[k] = v;
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<Type> interplinear_fast(Matrix1<Type> &X, Matrix1<Type> &Y, Matrix1<Type> &XN, Matrix1<Type> &YN) {
+		Matrix1<Type> temp(XN.Nv);
+		Type v, x1, x0, y1, y0;
+		Type xs, ys;
+		Type f00, f01, f10, f11, x_max, x_min, y_max, y_min, xn_max, xn_min, yn_max, yn_min;
+		int li, ri, m, index_r, index_c, ni, nj;
+		Type *x_ptr = X.v_p;
+		Type *y_ptr = Y.v_p;
+#ifdef BOUNDS_CHECK
+		if ((NI != X.Nv) || (NJ != Y.Nv)) {
+			printf("Shape error: Z(%d, %d) is inconsistent with X %d, Y %d. \n", NI, NJ, X.Nv, Y.Nv);
+			system("pause");
+		}
+
+		XN.check_shape(XN, YN);
+
+		X.findmaxmin(x_max, x_min);
+		Y.findmaxmin(y_max, y_min);
+		XN.findmaxmin(xn_max, xn_min);
+		YN.findmaxmin(yn_max, yn_min);
+
+		if ((xn_max > x_max) || (xn_min < x_min)) {
+			cout << "Bound error: " << xn_max << ", " << xn_min << " is out of " << x_max << ", " << x_min << endl;
+			system("pause");
+		}
+		if ((yn_max > y_max) || (yn_min < y_min)) {
+			cout << "Bound error: " << yn_max << ", " << yn_min << " is out of " << y_max << ", " << y_min << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		ni = NI;
+		nj = NJ;
+		for (int k = XN.Nv - 1; k >= 0; --k) {
+			xs = XN.v_p[k];
+			ys = YN.v_p[k];
+
+			li = 0;
+			//ri = X.Nv - 1;
+			//index_r = X.Nv;
+			ri = ni - 1;
+			index_r = ni;
+			for (int i = ni - 1; i >= 0; --i) {
+				if (li > ri) {
+					index_r = ri;
+					break;
+				}
+				else {
+					m = (li + ri) / 2;
+					//if (*(X.v_p + m) < xs) li = m + 1;
+					//else if (*(X.v_p + m) > xs) ri = m - 1;
+					//else {
+					//	index_r = m;
+					//	break;
+					//}
+					if (*(x_ptr + m) < xs) { li = m + 1; }
+					else if (*(x_ptr + m) > xs) { ri = m - 1; }
+					else {
+						index_r = m;
+						break;
+					}
+				}
+			}
+			li = 0;
+			/*ri = Y.Nv - 1;
+			index_c = Y.Nv;*/
+			ri = nj - 1;
+			index_c = nj;
+			for (int j = nj - 1; j >= 0; --j) {
+				if (li > ri) {
+					index_c = ri;
+					break;
+				}
+				else {
+					m = (li + ri) / 2;
+					/*if (*(Y.v_p + m) < ys) li = m + 1;
+					else if (*(Y.v_p + m) > ys) ri = m - 1;
+					else {
+						index_c = m;
+						break;
+					}*/
+					if (*(y_ptr + m) < ys) { li = m + 1; }
+					else if (*(y_ptr + m) > ys) { ri = m - 1; }
+					else {
+						index_c = m;
+						break;
+					}
+				}
+			}
+
+			if ((index_r > ni - 1) || (index_c > nj - 1)) {
+				X.findmaxmin(x_max, x_min);
+				Y.findmaxmin(y_max, y_min);
+				cout << "Bound error: " << xs << " is out of [" << x_min << ", " << x_max << "]." << endl;
+				cout << "Bound error: " << ys << " is out of [" << y_min << ", " << y_max << "]." << endl;
+				system("pause");
+			}
+
+			// deal with boundary
+			if (index_c == nj - 1) { --index_c; }
+			if (index_c == -1) { ++index_c; }
+			if (index_r == ni - 1) { --index_r; }
+			if (index_r == -1) { ++index_r; }
+
+			f00 = (*this)(index_r, index_c);
+			f01 = (*this)(index_r, index_c + 1);
+			f10 = (*this)(index_r + 1, index_c);
+			f11 = (*this)(index_r + 1, index_c + 1);
+			x0 = *(x_ptr + index_r);// X.v_p[index_r];
+			x1 = *(x_ptr + index_r + 1);// X.v_p[index_r + 1];
+			y0 = *(y_ptr + index_c);// Y.v_p[index_c];
+			y1 = *(y_ptr + index_c + 1);// Y.v_p[index_c + 1];
+
+			v = ((x1 - xs) * f00 + (xs - x0) * f10) * (y1 - ys);
+			v += (f01*(x1 - xs) + f11 * (xs - x0)) * (ys - y0);
+			v /= (x1 - x0) * (y1 - y0);
+			temp.v_p[k] = v;
+		}
+		return temp;
+	}
+
+
+	inline void output(int presc = 2) {
+		int ni = NI;
+		int nj = NJ;
+		cout.precision(presc);
+		cout << "[";
+		for (int i = 0; i < ni; ++i) {
+			for (int j = 0; j < nj; ++j) {
+				cout << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+				cout << (*this)(i, j) << " ";
+			}
+			cout << endl;
+		}
+		cout << "]";
+		cout << endl << endl;
+	}
+
+
+	inline void output(string filename, int presc = 2) {
+		ofstream OutFile(filename);
+		int ni = NI;
+		int nj = NJ;
+		if (OutFile) {
+			OutFile.precision(presc);
+			for (int i = 0; i < ni; ++i) {
+				for (int j = 0; j < nj; ++j) {
+					OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+					OutFile << (*this)(i, j) << "\t";
+				}
+				OutFile << endl;
+			}
+			OutFile.close();
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline void output(ofstream &outfile) {
+		int ni = NI;
+		int nj = NJ;
+		if (outfile) {
+			for (int i = 0; i < ni; ++i) {
+				for (int j = 0; j < nj; ++j) {
+					outfile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+					outfile << (*this)(i, j) << "\t";
+				}
+				outfile << endl;
+			}
+			outfile.close();
+		}
+		else {
+			cout << "File open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline void output(int i0, int i1, int j0, int j1, string filename);
+
+
+	inline void output(int i0, int i1, int j0, int j1, ofstream &outfile);
+
+
+	inline void input(string filename) {
+		int m, n;
+		ifstream InFile(filename);
+		InFile >> m;
+		InFile >> n;
+#ifdef BOUNDS_CHECK
+		try {
+			if (!((m == NI) && (n == NJ))) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: input %d %d is not consistent with %d %d. \n", m, n, NI, NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+		if (InFile) {
+			for (int i = 0; i < m; ++i) {
+				for (int j = 0; j < n; ++j) {
+					InFile >> this->v_p[j*NI + i];
+				}
+			}
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline void input(string filename, Matrix2<Type> &A) {
+		int m, n;
+		ifstream InFile(filename);
+		InFile >> m;
+		InFile >> n;
+#ifdef BOUNDS_CHECK
+		try {
+			if (!((m == A.NI) && (n == A.NJ))) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: input %d %d is not consistent with %d %d. \n", m, n, A.NI, A.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+		if (InFile) {
+			A.deallocate();
+			A.allocate(m, n);
+			for (int i = 0; i < m; ++i) {
+				for (int j = 0; j < n; ++j) {
+					InFile >> A(i, j);
+				}
+			}
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+
+	}
+
+
+	inline Matrix1<Type> matrixmultiply(const Matrix1<Type> &b) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != b.Nv) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape %d. \n", NI, NJ, b.Nv);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		Matrix1<Type> temp(NI);
+		Type btemp;
+		for (int j = NJ - 1; j >= 0; --j) {
+			btemp = b.v_p[j];
+			for (int i = NI - 1; i >= 0; --i) {
+				temp(i) += (*this)(i, j) * btemp;
+			}
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<Type> matrixmultiplyP(const Matrix1<Type> &b) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != b.Nv) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape %d. \n", NI, NJ, b.Nv);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+
+
+		}
+#endif // BOUNDS_CHECK
+		Matrix1<Type> temp(NI);
+		Type *b_p = &b.v_p[0];
+		Type *A_p = &(this->v_p[0]);
+		int ni = NI;
+		int nj = NJ;
+		for (int j = 0; j < nj; ++j) {
+			for (int i = 0; i < ni; ++i) {
+				temp(i) += (*(A_p++)) * (*b_p);
+			}
+			++b_p;
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<Type> matrixmultiplyP2(const Matrix1<Type> &b) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != b.Nv) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape %d. \n", NI, NJ, b.Nv);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		int ni = NI;
+		int nj = NJ;
+		Matrix1<Type> temp(ni);
+		Matrix2<Type> AT(nj, ni);
+
+		AT = this->transpose();
+		Type *A_p = &(AT.v_p[0]);
+		for (int i = 0; i < ni; ++i) {
+			Type temptemp = 0;
+			Type *b_p = &b.v_p[0];
+			for (int j = 0; j < nj; ++j) {
+				temptemp += (*A_p++) * (*b_p);
+				++b_p;
+			}
+
+			temp(i) = temptemp;
+		}
+		return temp;
+	}
+
+
+	inline Matrix1<Type> matrixmultiplyPB(const Matrix1<Type> &b);
+
+
+	inline Matrix2<Type> matrixmultiply(const Matrix2<Type> &B) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != B.NI) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape (%d, %d). \n", NI, NJ, B.NI, B.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		int ni = NI;
+		int nj = NJ;
+		int bnj = B.NJ;
+		Matrix2<Type> temp(ni, bnj);
+		Type temptemp = 0;
+		for (int j = bnj - 1; j >= 0; --j) {
+			for (int i = ni - 1; i >= 0; --i) {
+				temptemp = 0;
+				for (int k = nj - 1; k >= 0; --k) {
+					temptemp += (*this)(i, k) * B.v_p[j*bnj + k]; // B(k, j)
+				}
+				temp(i, j) = temptemp;
+			}
+		}
+		return temp;
+	}
+
+
+	inline Matrix2<Type> matrixmultiplyT(const Matrix2<Type> &B) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != B.NI) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape (%d, %d). \n", NI, NJ, B.NI, B.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		int ni = NI;
+		int nj = NJ;
+		int bnj = B.NJ;
+		int bni = B.NI;
+		Matrix2<Type> temp(ni, bnj), AT(nj, ni);
+		Type temptemp = 0;
+		AT = this->transpose();
+		for (int j = bnj - 1; j >= 0; --j) {
+			for (int i = ni - 1; i >= 0; --i) {
+				temptemp = 0;
+				for (int k = nj - 1; k >= 0; --k) {
+					temptemp += AT(k, i) * B.v_p[j*bni + k];
+				}
+				temp(i, j) = temptemp;
+			}
+		}
+		return temp;
+	}
+
+
+	inline Matrix2<Type> matrixmultiplyTP(const Matrix2<Type> &B) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (NJ != B.NI) throw 99;
+		}
+		catch (int i) {
+			printf("shape error: shape = (%d, %d) multiplies shape (%d, %d). \n", NI, NJ, B.NI, B.NJ);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+		int ni = NI;
+		int nj = NJ;
+		int bnj = B.NJ;
+		int bni = B.NI;
+		Type *A_p, *B_p;
+		Matrix2<Type> temp(ni, bnj), AT(nj, ni);
+		Type temptemp = 0;
+		AT = this->transpose();
+		for (int j = 0; j < bnj; ++j) {
+			A_p = &AT.v_p[0];
+			for (int i = 0; i < ni; ++i) {
+				temptemp = 0;
+				B_p = &B.v_p[j*bni];
+				for (int k = 0; k < nj; ++k) {
+					temptemp += (*(A_p++)) * (*(B_p++));
+				}
+				temp(i, j) = temptemp; //左边是地址递增或递减
+			}
+		}
+		return temp;
+	}
+
+
+
+	//Matrix3<Type> reshape(int ni, int nj, int nk)
+	//	{
+	//		Matrix3<Type> temp(ni, nj, nk);
+	//#ifdef BOUNDS_CHECK
+	//		if (Nv != ni*nj*nk) {
+	//			cout << "Shape error when reshape Matrix2 to Matrix3." << endl;
+	//			system("pause");
+	//		}
+	//#endif // BOUNDS_CHECK
+	//		for (int k = 0; k < nk; ++k) {
+	//			for (int j = 0; j < ni*nj; ++j) {
+	//				temp(j / nk, j % nk, k) = (*this)(j, k);
+	//			}
+	//		}
+	//		return temp;
+	//	}
+
+
+	// operator overloading
+	inline Type & operator()(int i, int j) {
+		check_bound(i, j);
+		return *(v_p + j*NI + i);
+	}
+
+
+	inline Matrix1<Type> operator()(int i, const Matrix1<int> &A);
+
+
+	inline Matrix1<Type> operator()(const Matrix1<int> &A, int j);
+
+
+	inline Matrix2<Type> & operator=(const Matrix2<Type> &A) {
+		//check_shape(A);	
+		if (~((this->Nv == A.Nv) && (this->NI == A.NI))) {
+			this->deallocate();
+			this->allocate(A.NI, A.NJ);
+		}
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] = A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix2<Type> & operator+=(const Matrix2<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] += A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix2<Type> & operator-=(const Matrix2<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] -= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix2<Type> & operator*=(const Matrix2<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] *= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix2<Type> & operator/=(const Matrix2<Type> &A) {
+		check_shape(A);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] /= A.v_p[i]; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return (*this);
+	}
+
+
+	inline Matrix2<Type> operator+(const Matrix2<Type> &A);
+
+
+	inline Matrix2<Type> operator-(const Matrix2<Type> &A);
+
+
+	inline Matrix2<Type> operator*(const Matrix2<Type> &A);
+
+
+	inline Matrix2<Type> operator/(const Matrix2<Type> &A);
+
+
+	inline Matrix2<Type> operator+(const Type x) {
+		Matrix2<Type> temp(NI, NJ);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] + x; }
+		return temp;
+	}
+
+
+	inline Matrix2<Type> operator-(const Type x) {
+		Matrix2<Type> temp(NI, NJ);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] - x; }
+		return temp;
+	}
+
+
+	inline Matrix2<Type> operator*(const Type x) {
+		Matrix2<Type> temp(NI, NJ);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] * x; }
+		return temp;
+	}
+
+
+	inline Matrix2<Type> operator/(const Type x) {
+		Matrix2<Type> temp(NI, NJ);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] / x; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+
+
+};
+
+
+template<class Type> class Matrix3
+{
+public:
+	int I0, I1, J0, J1, K0, K1, NI, NJ, NK, Nv;
+	Type *v_p;
+
+	Matrix3(int i, int j, int k) {
+		NI = i;
+		NJ = j;
+		NK = k;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		I1 = NI - 1;
+		J1 = NJ - 1;
+		K1 = NK - 1;
+		Nv = NI * NJ * NK;
+		v_p = new Type[Nv];
+#if(INI)
+		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i < Nv; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	Matrix3() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		Nv = 0;
+		v_p = new Type[Nv];
+	}
+
+
+	Matrix3(const Matrix3<Type> &A) {
+		cout << "Copy constructor." << endl;
+		NI = A.NI;
+		NJ = A.NJ;
+		NK = A.NK;
+		I0 = A.I0;
+		I1 = A.I1;
+		J0 = A.J0;
+		J1 = A.J1;
+		K0 = A.K0;
+		K1 = A.K1;
+		Nv = A.Nv;
+		v_p = new Type[Nv];
+		*v_p = *A.v_p;
+		for (int i = I0; i < Nv; ++i) { v_p[i] = A.v_p[i]; }
+	}
+
+
+	~Matrix3() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		Nv = 0;
+		if (v_p != NULL) delete[] v_p;
+		//cout << "[] is deleted." << endl;
+	}
+
+
+	inline void check_bound(int i, int j, int k) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((i < I0) || (i > I1) || (j < J0) || (j > J1) || (k < K0) || (k > K1)) throw 99;
+		}
+		catch (int id) {
+			printf("Bound error: i, j, k = %d, %d, %d is out of [%d,%d, %d,%d, %d,%d]. \n", i, j, k, I0, I1, J0, J1, K0, K1);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+	}
+
+
+	inline void check_shape(const Matrix3<Type> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (this->Nv != A.Nv) throw 99;
+			else if (this->NI != A.NI) throw 99;
+			else if (this->NJ != A.NJ) throw 99;
+			else if (this->NK != A.NK) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: %d %d %d is not consisten with %d %d %d. \n", NI, NJ, NK, A.NI, A.NJ, A.NK);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif	
+	}
+
+
+	inline void allocate(int i, int j, int k) {
+		if (!Nv) {
+			delete[] v_p;
+			NI = i;
+			NJ = j;
+			NK = k;
+			I0 = 0;
+			J0 = 0;
+			K0 = 0;
+			I1 = NI - 1;
+			J1 = NJ - 1;
+			K1 = NK - 1;
+			Nv = NI * NJ * NK;
+			v_p = new Type[Nv];
+		}
+		else {
+			cout << "Matrix has been allocated." << endl;
+			//system("pause");
+			//cout << "Go" << endl;
+		}
+#if(INI)
+		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i < Nv; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	inline void deallocate() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		Nv = 0;
+		delete[] v_p;
+		v_p = new Type[0];
+	}
+
+
+	inline void setvalue(Type x) {
+		for (int i = Nv - 1; i >= 0; --i) { v_p[i] = x; }
+	}
+
+
+	inline Type sum(void) {
+		Type s = 0;
+		for (int i = Nv - 1; i >= 0; --i) { s += v_p[i]; }
+		return s;
+	}
+
+
+	inline Matrix3<Type> sum(int index0, int index1, int index3, int axis);
+
+
+	inline Matrix3<Type> transpose(int index0, int index1, int index2);
+
+
+	inline Matrix3<Type> msqrt(void) {
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) {
+#if _DEBUG
+			if (v_p[i] < 0) {
+				cout << "Negitive number got in sqrt." << endl;
+				system("pause");
+			}
+#endif // _DEBUG
+			temp.v_p[i] = sqrt(v_p[i]);
+		}
+		return temp;
+	}
+
+
+	inline void output(int presc = 2) {
+		int ni, nj, nk;
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		cout.precision(presc);
+		for (int k = 0; k < nk; ++k) {
+			printf("k = %d \n", k);
+			for (int i = 0; i < ni; ++i) {
+				for (int j = 0; j < nj; ++j) {
+					cout << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+					cout << (*this)(i, j, k) << " ";
+				}
+				cout << endl;
+			}
+			cout << endl << endl;
+		}
+		cout << endl;
+	}
+
+
+	inline void output(string filename, int presc = 2) {
+		int ni, nj, nk;
+		ofstream OutFile(filename);
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		if (OutFile) {
+			OutFile.precision(presc);
+			for (int k = 0; k < nk; ++k) {
+				printf("k = %d \n", k);
+				OutFile << "k = " << k << endl;
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+						OutFile << (*this)(i, j, k) << "\t";
+					}
+					OutFile << endl;
+				}
+				OutFile << endl << endl;
+			}
+			OutFile.close();
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline void output(ofstream &outfile) {
+		int ni, nj, nk;
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		if (outfile) {
+			for (int k = 0; k < nk; ++k) {
+				printf("k = %d \n", k);
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						outfile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+						outfile << (*this)(i, j, k) << "\t";
+					}
+					outfile << endl;
+				}
+				outfile << endl << endl;
+			}
+			outfile.close();
+		}
+		else {
+			cout << "File open failed." << endl;
+			system("pause");
+		}
+
+	}
+
+
+	inline void output(int i0, int i1, int j0, int j1, int k0, int k1, string filename);
+
+
+	inline void output(int i0, int i1, int j0, int j1, int k0, int k1, ofstream &outfile);
+
+
+	inline void input(string filename) {
+		int m, n, k;
+		ifstream InFile(filename);
+		InFile >> m;
+		InFile >> n;
+		InFile >> k;
+#ifdef BOUNDS_CHECK
+		try {
+			if (!((m == NI) && (n == NJ) && (k == NK))) throw 99;
+		}
+		catch (int id) {
+			printf("Shape error: input %d %d %d is not consistent with %d %d %d. \n", m, n, k, NI, NJ, NK);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+		if (InFile) {
+			for (int ik = 0; ik < k; ++ik) {
+				for (int ii = 0; ii < m; ++ii) {
+					for (int ij = 0; ij < n; ++ij) {
+						InFile >> (*this)(ii, ij, ik);
+					}
+				}
+			}
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline void input(string filename, Matrix3<Type> &A) {
+		int m, n, k;
+		ifstream InFile(filename);
+		InFile >> m;
+		InFile >> n;
+		InFile >> k;
+#ifdef BOUNDS_CHECK
+		try {
+			if (!((m == A.NI) && (n == A.NJ) && (k == A.NK))) throw 99;
+		}
+		catch (int id) {
+			printf("Shape error: input %d %d %d is not consistent with %d %d %d. \n", m, n, k, A.NI, A.NJ, A.NK);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+		if (InFile) {
+			A.deallocate();
+			A.allocate(m, n, k);
+			for (int ik = 0; ik < k; ++i) {
+				for (int ii = 0; ii < m; ++ii) {
+					for (int ij = 0; ij < n; ++ij) {
+						InFile >> A(ii, ij, ik);
+					}
+				}
+			}
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
+
+
+	inline Matrix2<Type> reshape(int aixs, int ni, int nj) {
+		Matrix2<Type> temp(ni, nj);
+#ifdef BOUNDS_CHECK
+		try {
+			if (ni*nj != Nv) throw 99;
+		}
+		catch (int id) {
+			printf("Shape error: reshape (%d, %d, %d) to (%d, %d).", NI, NJ, NK, ni, nj);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif // BOUNDS_CHECK
+
+		if (aixs == 3) {
+			for (int i = ni - 1; i >= 0; --i) {
+				for (int j = nj - 1; j >= 0; --j) {
+					temp(i, j) = *(v_p + i*nj + j);
+				}
+			}
+		}
+		return temp;
+	}
+
+
+	// operator overloading
+	inline Type & operator()(int i, int j, int k) {
+		check_bound(i, j, k);
+		return *(v_p + k*NI*NJ + j*NI + i);
+	}
+
+
+	inline Matrix1<Type> operator()(int axis, const Matrix1<int> &A);
+
+
+	inline Matrix2<Type> operator()(int axis0, int axis1, const Matrix2<int> &A);
+
+
+	inline Matrix3<Type> operator()(const Matrix3<int> &A);
+
+
+	inline Matrix3<Type> & operator=(const Matrix3<Type> &A) {
+		//check_shape(A);	
+		if (~((this->Nv == A.Nv) && (this->NI == A.NI) && (this->NJ == A.NJ))) {
+			this->deallocate();
+			this->allocate(A.NI, A.NJ, A.NK);
+		}
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] = A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix3<Type> & operator+=(const Matrix3<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] += A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix3<Type> & operator-=(const Matrix3<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] -= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix3<Type> & operator*=(const Matrix3<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] *= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix3<Type> & operator/=(const Matrix3<Type> &A) {
+		check_shape(A);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] /= A.v_p[i]; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return (*this);
+	}
+
+
+	inline Matrix3<Type> operator+(const Matrix3<Type> &A) {
+		check_shape(A);
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] + A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator-(const Matrix3<Type> &A) {
+		check_shape(A);
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] - A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator*(const Matrix3<Type> &A) {
+		check_shape(A);
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] * A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator/(const Matrix3<Type> &A) {
+		check_shape(A);
+		Matrix3<Type> temp(NI, NJ, NK);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) {
+				temp.v_p[i] = v_p[i] / A.v_p[i];
+			}
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator+(const Type x) {
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] + x; }
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator-(const Type x) {
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] - x; }
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator*(const Type x) {
+		Matrix3<Type> temp(NI, NJ, NK);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] * x; }
+		return temp;
+	}
+
+
+	inline Matrix3<Type> operator/(const Type x) {
+		Matrix3<Type> temp(NI, NJ, NK);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] / x; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+};
+
+
+template<class Type> class Matrix4
+{
+public:
+	int I0, I1, J0, J1, K0, K1, W0, W1, NI, NJ, NK, NW, Nv;
+	Type *v_p;
+
+	Matrix4(int i, int j, int k, int w) {
+		NI = i;
+		NJ = j;
+		NK = k;
+		NW = w;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		W0 = 0;
+		I1 = NI - 1;
+		J1 = NJ - 1;
+		K1 = NK - 1;
+		W1 = NW - 1;
+		Nv = NI * NJ * NK * NW;
+		v_p = new Type[Nv];
+#if(INI)
+		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
+#else
+		for (int i = I0; i < Nv; ++i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	Matrix4() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		NW = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		W0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		W1 = 0;
+		Nv = 0;
+		v_p = new Type[Nv];
+	}
+
+
+	Matrix4(const Matrix4<Type> &A) {
+		cout << "Copy constructor." << endl;
+		NI = A.NI;
+		NJ = A.NJ;
+		NK = A.NK;
+		NW = A.NW;
+		I0 = A.I0;
+		I1 = A.I1;
+		J0 = A.J0;
+		J1 = A.J1;
+		K0 = A.K0;
+		K1 = A.K1;
+		W0 = A.W0;
+		W1 = A.W1;
+		Nv = A.Nv;
+		v_p = new Type[Nv];
+		*v_p = *A.v_p;
+		for (int i = I0; i < Nv; ++i) { v_p[i] = A.v_p[i]; }
+	}
+
+
+	~Matrix4() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		NW = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		W0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		W1 = 0;
+		Nv = 0;
+		if (v_p != NULL) delete[] v_p;
+		//cout << "[] is deleted." << endl;
+	}
+
+
+	inline void check_bound(int i, int j, int k, int w) {
+#ifdef BOUNDS_CHECK
+		try {
+			if ((i < I0) || (i > I1) || (j < J0) || (j > J1) || (k < K0) || (k > K1) || (w < W0) || (w > W1)) throw 99;
+		}
+		catch (int id) {
+			printf("Bound error: i, j, k, w = %d, %d, %d, %d is out of [%d,%d, %d,%d, %d,%d, %d,%d]. \n", i, j, k, w, I0, I1, J0, J1, K0, K1, W0, W1);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+	}
+
+
+	inline void check_shape(const Matrix4<Type> &A) {
+#ifdef BOUNDS_CHECK
+		try {
+			if (this->Nv != A.Nv) throw 99;
+			else if (this->NI != A.NI) throw 99;
+			else if (this->NJ != A.NJ) throw 99;
+			else if (this->NK != A.NK) throw 99;
+			else if (this->NW != A.NW) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: %d %d %d %d is not consisten with %d %d %d %d. \n", NI, NJ, NK, NW, A.NI, A.NJ, A.NK, A.NW);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif	
+	}
+
+
+	inline void allocate(int i, int j, int k, int w) {
+		if (!Nv) {
+			delete[] v_p;
+			NI = i;
+			NJ = j;
+			NK = k;
+			NW = w;
+			I0 = 0;
+			J0 = 0;
+			K0 = 0;
+			W0 = 0;
+			I1 = NI - 1;
+			J1 = NJ - 1;
+			K1 = NK - 1;
+			W1 = NW - 1;
+			Nv = NI * NJ * NK * NW;
+			v_p = new Type[Nv];
+		}
+		else {
+			cout << "Matrix has been allocated." << endl;
+			//system("pause");
+			//cout << "Go" << endl;
+		}
+#if(INI)
+		for (int i = Nv - 1; i >= 0; --i) { v_p[i] = NAN; }
+#else
+		for (int i = Nv - 1; i >= 0; --i) { v_p[i] = Type(0); }
+#endif
+	}
+
+
+	inline void deallocate() {
+		NI = 0;
+		NJ = 0;
+		NK = 0;
+		NW = 0;
+		I0 = 0;
+		J0 = 0;
+		K0 = 0;
+		W0 = 0;
+		I1 = 0;
+		J1 = 0;
+		K1 = 0;
+		W1 = 0;
+		Nv = 0;
+		delete[] v_p;
+		v_p = new Type[0];
+	}
+
+
+	inline void setvalue(Type x) {
+		for (int i = Nv - 1; i >= 0; --i) { v_p[i] = x; }
+	}
+
+
+	inline Type sum(void) {
+		Type s = 0;
+		for (int i = Nv - 1; i >= 0; --i) { s += v_p[i]; }
+		return s;
+	}
+
+
+
+	inline Matrix4<Type> msqrt(void) {
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) {
+#if _DEBUG
+			if (v_p[i] < 0) {
+				cout << "Negitive number got in sqrt." << endl;
+				system("pause");
+			}
+#endif // _DEBUG
+			temp.v_p[i] = sqrt(v_p[i]);
+		}
+		return temp;
+	}
+
+
+	inline void output(int presc = 2) {
+		int ni, nj, nk, nw;
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		nw = NW;
+		cout.precision(presc);
+		for (int w = 0; w < nw; ++w) {
+			for (int k = 0; k < nk; ++k) {
+				printf("w = %d, k = %d \n", w, k);
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						cout << (*this)(i, j, k, w) << " ";
+					}
+					cout << endl;
+				}
+				cout << endl << endl;
+			}
+		}
+
+	}
+
+
+	inline void output(string filename) {
+		int ni, nj, nk, nw;
+		ofstream OutFile(filename);
+		OutFile.precision(10);
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		nw = NW;
+		for (int w = 0; w < nw; ++w) {
+			for (int k = 0; k < nk; ++k) {
+				printf("w = %d, k = %d \n", w, k);
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						OutFile << (*this)(i, j, k, w) << "\t";
+					}
+					OutFile << endl;
+				}
+				OutFile << endl << endl;
+			}
+		}
+
+
+		OutFile.close();
+	}
+
+
+	inline void output(ofstream &outfile) {
+		int ni, nj, nk, nw;
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		nw = NW;
+		for (int w = 0; w < nw; ++w) {
+			for (int k = 0; k < nk; ++k) {
+				printf("w = %d, k = %d \n", w, k);
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						OutFile << (*this)(i, j, k, w) << "\t";
+					}
+					outfile << endl;
+				}
+				outfile << endl << endl;
+			}
+		}
+
+		outfile.close();
+	}
+
+
+	inline void output(int i0, int i1, int j0, int j1, int k0, int k1, string filename);
+
+
+	inline void output(int i0, int i1, int j0, int j1, int k0, int k1, ofstream &outfile);
+
+
+	// operator overloading
+	inline Type & operator()(int i, int j, int k, int w) {
+		check_bound(i, j, k, w);
+		return *(v_p + w*NI*NJ*NK + k*NI*NJ + j*NI + i);
+	}
+
+
+	inline Matrix1<Type> operator()(int axis, const Matrix1<int> &A);
+
+
+	inline Matrix2<Type> operator()(int axis0, int axis1, const Matrix2<int> &A);
+
+
+	inline Matrix4<Type> operator()(const Matrix4<int> &A);
+
+
+	inline Matrix4<Type> & operator=(const Matrix4<Type> &A) {
+		//check_shape(A);	
+		if (~((this->Nv == A.Nv) && (this->NI == A.NI) && (this->NJ == A.NJ) && (this->NK == A.NK))) {
+			this->deallocate();
+			this->allocate(A.NI, A.NJ);
+		}
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] = A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix4<Type> & operator+=(const Matrix4<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] += A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix4<Type> & operator-=(const Matrix4<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] -= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix4<Type> & operator*=(const Matrix4<Type> &A) {
+		check_shape(A);
+		for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] *= A.v_p[i]; }
+		return (*this);
+	}
+
+
+	inline Matrix4<Type> & operator/=(const Matrix4<Type> &A) {
+		check_shape(A);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { this->v_p[i] /= A.v_p[i]; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return (*this);
+	}
+
+
+	inline Matrix4<Type> operator+(const Matrix4<Type> &A) {
+		check_shape(A);
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] + A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator-(const Matrix4<Type> &A) {
+		check_shape(A);
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] - A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator*(const Matrix4<Type> &A) {
+		check_shape(A);
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] * A.v_p[i];
+		}
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator/(const Matrix4<Type> &A) {
+		check_shape(A);
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) {
+				temp.v_p[i] = v_p[i] / A.v_p[i];
+			}
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator+(const Type x) {
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] + x; }
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator-(const Type x) {
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] - x; }
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator*(const Type x) {
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] * x; }
+		return temp;
+	}
+
+
+	inline Matrix4<Type> operator/(const Type x) {
+		Matrix4<Type> temp(NI, NJ, NK, NW);
+		try {
+			for (int i = Nv - 1; i >= 0; --i) { temp.v_p[i] = v_p[i] / x; }
+		}
+		catch (exception &e) {
+			cerr << "Exception caught: " << e.what() << endl;
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause"); //exit(EXIT_FAILURE);
+		}
+		return temp;
+	}
+};
+
+
+
+
+
+
+
+// operator overloading
+
+inline Matrix1<double> Matrix1<double>::operator+(const Matrix1<double> &A) {
+	check_shape(A);
+	Matrix1<double> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> Matrix1<double>::operator-(const Matrix1<double> &A) {
+	check_shape(A);
+	Matrix1<double> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> Matrix1<double>::operator*(const Matrix1<double> &A) {
+	check_shape(A);
+	Matrix1<double> temp(A.Nv);
+
+#ifdef _USE_MKL
+	vdMul(A.Nv, v_p, A.v_p, temp.v_p);
+#else
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+		//temp.v_p[i] = v_p[i] * A_p[i];
+	}
+#endif // _USE_MKL
+
+	return temp;
+
+}
+
+
+inline Matrix1<double> Matrix1<double>::operator/(const Matrix1<double> &A) {
+	check_shape(A);
+	Matrix1<double> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	try {
+		for (int i = i1; i >= i0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix1<int>::operator+(const Matrix1<int> &A) {
+	check_shape(A);
+	Matrix1<int> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix1<int>::operator-(const Matrix1<int> &A) {
+	check_shape(A);
+	Matrix1<int> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix1<int>::operator*(const Matrix1<int> &A) {
+	check_shape(A);
+	Matrix1<int> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix1<int>::operator/(const Matrix1<int> &A) {
+	check_shape(A);
+	Matrix1<int> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	try {
+		for (int i = i1; i >= i0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix1<float>::operator+(const Matrix1<float> &A) {
+	check_shape(A);
+	Matrix1<float> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix1<float>::operator-(const Matrix1<float> &A) {
+	check_shape(A);
+	Matrix1<float> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix1<float>::operator*(const Matrix1<float> &A) {
+	check_shape(A);
+	Matrix1<float> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	for (int i = i1; i >= i0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix1<float>::operator/(const Matrix1<float> &A) {
+	check_shape(A);
+	Matrix1<float> temp(A.Nv);
+	int i0 = I0;
+	int i1 = I1;
+	try {
+		for (int i = i1; i >= i0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> Matrix2<double>::operator+(const Matrix2<double> &A) {
+	check_shape(A);
+	Matrix2<double> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> Matrix2<double>::operator-(const Matrix2<double> &A) {
+	check_shape(A);
+	Matrix2<double> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> Matrix2<double>::operator*(const Matrix2<double> &A) {
+	check_shape(A);
+	Matrix2<double> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> Matrix2<double>::operator/(const Matrix2<double> &A) {
+	check_shape(A);
+	Matrix2<double> temp(NI, NJ);
+	int nv = Nv;
+	try {
+		for (int i = nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause");
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix2<int> Matrix2<int>::operator+(const Matrix2<int> &A) {
+	check_shape(A);
+	Matrix2<int> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<int> Matrix2<int>::operator-(const Matrix2<int> &A) {
+	check_shape(A);
+	Matrix2<int> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<int> Matrix2<int>::operator*(const Matrix2<int> &A) {
+	check_shape(A);
+	Matrix2<int> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<int> Matrix2<int>::operator/(const Matrix2<int> &A) {
+	check_shape(A);
+	Matrix2<int> temp(NI, NJ);
+	int nv = Nv;
+	try {
+		for (int i = nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause");
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix2<float> Matrix2<float>::operator+(const Matrix2<float> &A) {
+	check_shape(A);
+	Matrix2<float> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] + A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<float> Matrix2<float>::operator-(const Matrix2<float> &A) {
+	check_shape(A);
+	Matrix2<float> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] - A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<float> Matrix2<float>::operator*(const Matrix2<float> &A) {
+	check_shape(A);
+	Matrix2<float> temp(NI, NJ);
+	int nv = Nv;
+	for (int i = nv - 1; i >= 0; --i) {
+		temp.v_p[i] = v_p[i] * A.v_p[i];
+	}
+	return temp;
+}
+
+
+inline Matrix2<float> Matrix2<float>::operator/(const Matrix2<float> &A) {
+	check_shape(A);
+	Matrix2<float> temp(NI, NJ);
+	int nv = Nv;
+	try {
+		for (int i = nv - 1; i >= 0; --i) {
+			temp.v_p[i] = v_p[i] / A.v_p[i];
+		}
+	}
+	catch (exception &e) {
+		cerr << "Exception caught: " << e.what() << endl;
+		system("pause");
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix1<float>::operator()(const Matrix1<int> &A) {
+	check_bound(*(A.v_p));
+	check_bound(*(A.v_p + A.Nv - 1));
+	Matrix1<float> temp(A.Nv);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = *(v_p + (*(A.v_p + i))); }
+	return temp;
+}
+
+
+inline Matrix1<double> Matrix1<double>::operator()(const Matrix1<int> &A) {
+	check_bound(*(A.v_p));
+	check_bound(*(A.v_p + A.Nv - 1));
+	Matrix1<double> temp(A.Nv);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = *(v_p + (*(A.v_p + i))); }
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix1<int>::operator()(const Matrix1<int> &A) {
+	check_bound(*(A.v_p));
+	check_bound(*(A.v_p + A.Nv - 1));
+	Matrix1<int> temp(A.Nv);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = *(v_p + (*(A.v_p + i))); }
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix2<float>::operator()(int i, const Matrix1<int> &A) {
+	check_bound(i, *(A.v_p));
+	check_bound(i, *(A.v_p + A.Nv - 1));
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this)(i, A.v_p[k]); }
+	return temp;
+}
+
+
+inline Matrix1<double> Matrix2<double>::operator()(int i, const Matrix1<int> &A) {
+	check_bound(i, *(A.v_p));
+	check_bound(i, *(A.v_p + A.Nv - 1));
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this)(i, A.v_p[k]); }
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix2<int>::operator()(int i, const Matrix1<int> &A) {
+	check_bound(i, *(A.v_p));
+	check_bound(i, *(A.v_p + A.Nv - 1));
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this)(i, A.v_p[k]); }
+	return temp;
+}
+
+
+inline Matrix1<float> Matrix2<float>::operator()(const Matrix1<int> &A, int j) {
+	check_bound(*(A.v_p), j);
+	check_bound(*(A.v_p + A.Nv - 1), j);
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this) (A.v_p[k], j); }
+	return temp;
+}
+
+
+inline Matrix1<double> Matrix2<double>::operator()(const Matrix1<int> &A, int j) {
+	check_bound(*(A.v_p), j);
+	check_bound(*(A.v_p + A.Nv - 1), j);
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this) (A.v_p[k], j); }
+	return temp;
+}
+
+
+inline Matrix1<int> Matrix2<int>::operator()(const Matrix1<int> &A, int j) {
+	check_bound(*(A.v_p), j);
+	check_bound(*(A.v_p + A.Nv - 1), j);
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this) (A.v_p[k], j); }
+	return temp;
+}
+
+
+// function definition
+inline void check_shape(const Matrix1<double> &A, const Matrix1<double> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline void check_shape(const Matrix1<int> &A, const Matrix1<int> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline void check_shape(const Matrix1<float> &A, const Matrix1<float> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline void check_shape(const Matrix2<double> &A, const Matrix2<double> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline void check_shape(const Matrix2<int> &A, const Matrix2<int> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline void check_shape(const Matrix2<float> &A, const Matrix2<float> &B) {
+#ifdef BOUNDS_CHECK
+	try {
+		if (A.Nv != B.Nv) throw 99;
+	}
+	catch (int i) {
+		printf("Shape error %d: shape = %d is assigned to %d. \n", i, B.Nv, A.Nv);
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+#endif // BOUNDS_CHECK
+}
+
+
+inline Matrix1<int> step(int i0, int i1) {
+	try { if (i0 > i1) throw 99; }
+	catch (int i) {
+		cerr << "Order error: " << i0 << " > " << i1 << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	Matrix1<int> temp(i1 - i0 + 1);
+	for (int i = 0; i <= i1 - i0; ++i) {
+		temp.v_p[i] = i + i0;
+	}
+	return temp;
+}
+
+
+inline void step(int i0, int i1, Matrix1<float> &A) {
+	try { if (i0 > i1) throw 99; }
+	catch (int i) {
+		cerr << "Order error: " << i0 << " > " << i1 << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i <= i1 - i0; ++i) {
+		A.v_p[i] = i + i0;
+	}
+}
+
+
+inline void step(int i0, int i1, Matrix1<double> &A) {
+	try { if (i0 > i1) throw 99; }
+	catch (int i) {
+		cerr << "Order error: " << i0 << " > " << i1 << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i <= i1 - i0; ++i) {
+		A.v_p[i] = i + i0;
+	}
+}
+
+
+inline void step(int i0, int i1, Matrix1<int> &A) {
+	try { if (i0 > i1) throw 99; }
+	catch (int i) {
+		cerr << "Order error: " << i0 << " > " << i1 << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	catch (...) {
+		cerr << "Exception caught." << endl;
+		system("pause"); //exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i <= i1 - i0; ++i) {
+		A.v_p[i] = i + i0;
+	}
+}
+
+
+inline Matrix1<float> msin(const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = sin(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<float> mcos(const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = cos(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<float> mtan(const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = tan(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<double> msin(const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = sin(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<double> mcos(const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = cos(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<double> mtan(const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = tan(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix1<float> atan2(const Matrix1<float> &A, const Matrix1<float> &B) {
+	// -PI to +PI
+	check_shape(A, B);
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	float m, n;
+	for (int i = anv - 1; i >= 0; --i) {
+		m = A.v_p[i];
+		n = B.v_p[i];
+		temp.v_p[i] = Atan2(m, n);
+#ifdef _DEBUG
+		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
+			cerr << "Wrong atan." << endl;
+			system("pause");
+		}
+		//try {
+		//	if (~isdigit(temp.v_p[i])) throw 99;
+		//}
+		//catch (int i) {
+		//	cerr << "NON-digit." << endl;
+		//	system("pause");
+		//}
+#endif // _DEBUG
+
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> atan2(const Matrix1<double> &A, const Matrix1<double> &B) {
+	// -PI to +PI
+	check_shape(A, B);
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	float m, n;
+	for (int i = anv - 1; i >= 0; --i) {
+		m = A.v_p[i];
+		n = B.v_p[i];
+		temp.v_p[i] = Atan2(m, n);
+#ifdef _DEBUG
+		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
+			cerr << "Wrong atan." << endl;
+			system("pause");
+		}
+		//try {
+		//	if (~isdigit(temp.v_p[i])) throw 99;
+		//}
+		//catch (int i) {
+		//	cerr << "NON-digit." << endl;
+		//	system("pause");
+		//}
+#endif // _DEBUG
+
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> msqrt(const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) {
+#if _DEBUG
+		if (A.v_p[i] < 0) {
+			cout << "Negitive number got in sqrt." << endl;
+			system("pause");
+		}
+#endif // _DEBUG
+		temp.v_p[i] = sqrt(A.v_p[i]);
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> msqrt(const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) {
+#if _DEBUG
+		if (A.v_p[i] < 0) {
+			cout << "Negitive number got in sqrt." << endl;
+			system("pause");
+		}
+#endif // _DEBUG
+		temp.v_p[i] = sqrt(A.v_p[i]);
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> mmax(const Matrix1<double> &A, double x) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<float> mmax(const Matrix1<float> &A, float x) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<int> mmax(const Matrix1<int> &A, int x) {
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<double> mmin(const Matrix1<double> &A, double x) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<float> mmin(const Matrix1<float> &A, float x) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<int> mmin(const Matrix1<int> &A, int x) {
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<double> mmax(double x, const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<float> mmax(float x, const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<int> mmax(int x, const Matrix1<int> &A) {
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<double> mmin(double x, const Matrix1<double> &A) {
+	int anv = A.Nv;
+	Matrix1<double> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<float> mmin(float x, const Matrix1<float> &A) {
+	int anv = A.Nv;
+	Matrix1<float> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix1<int> mmin(int x, const Matrix1<int> &A) {
+	int anv = A.Nv;
+	Matrix1<int> temp(anv);
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<float> msin(const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = sin(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<float> mcos(const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = cos(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<float> mtan(const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = tan(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<double> msin(const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = sin(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<double> mcos(const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = cos(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<double> mtan(const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = tan(A.v_p[i]); }
+	return temp;
+}
+
+
+inline Matrix2<float> atan2(const Matrix2<float> &A, const Matrix2<float> &B) {
+	// -PI to +PI
+	check_shape(A, B);
+	Matrix2<float> temp(A.NI, A.NJ);
+	float m, n;
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) {
+		m = A.v_p[i];
+		n = B.v_p[i];
+		temp.v_p[i] = Atan2(m, n);
+#ifdef _DEBUG
+		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
+			cerr << "Wrong atan." << endl;
+			system("pause");
+		}
+		//try {
+		//	if (~isdigit(temp.v_p[i])) throw 99;
+		//}
+		//catch (int i) {
+		//	cerr << "NON-digit." << endl;
+		//	system("pause");
+		//}
+#endif // _DEBUG
+
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> atan2(const Matrix2<double> &A, const Matrix2<double> &B) {
+	// -PI to +PI
+	check_shape(A, B);
+	Matrix2<double> temp(A.NI, A.NJ);
+	float m, n;
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) {
+		m = A.v_p[i];
+		n = B.v_p[i];
+		temp.v_p[i] = Atan2(m, n);
+#ifdef _DEBUG
+		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
+			cerr << "Wrong atan." << endl;
+			system("pause");
+		}
+		//try {
+		//	if (~isdigit(temp.v_p[i])) throw 99;
+		//}
+		//catch (int i) {
+		//	cerr << "NON-digit." << endl;
+		//	system("pause");
+		//}
+#endif // _DEBUG
+
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> msqrt(const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) {
+#if _DEBUG
+		if (A.v_p[i] < 0) {
+			cout << "Negitive number got in sqrt." << endl;
+			system("pause");
+		}
+#endif // _DEBUG
+		temp.v_p[i] = sqrt(A.v_p[i]);
+	}
+	return temp;
+}
+
+
+inline Matrix2<float> msqrt(const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) {
+#if _DEBUG
+		if (A.v_p[i] < 0) {
+			cout << "Negitive number got in sqrt." << endl;
+			system("pause");
+		}
+#endif // _DEBUG
+		temp.v_p[i] = sqrt(A.v_p[i]);
+	}
+	return temp;
+}
+
+
+inline Matrix2<double> mmax(const Matrix2<double> &A, double x) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<float> mmax(const Matrix2<float> &A, float x) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<int> mmax(const Matrix2<int> &A, int x) {
+	Matrix2<int> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<double> mmin(const Matrix2<double> &A, double x) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<float> mmin(const Matrix2<float> &A, float x) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<int> mmin(const Matrix2<int> &A, int x) {
+	Matrix2<int> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<double> mmax(double x, const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<float> mmax(float x, const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<int> mmax(int x, const Matrix2<int> &A) {
+	Matrix2<int> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Max(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<double> mmin(double x, const Matrix2<double> &A) {
+	Matrix2<double> temp(A.NI, A.NJ);
+	int anv = A.Nv;
+	for (int i = anv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<float> mmin(float x, const Matrix2<float> &A) {
+	Matrix2<float> temp(A.NI, A.NJ);
+	for (int i = A.Nv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<int> mmin(int x, const Matrix2<int> &A) {
+	Matrix2<int> temp(A.NI, A.NJ);
+	for (int i = A.Nv - 1; i >= 0; --i) { temp.v_p[i] = Min(A.v_p[i], x); }
+	return temp;
+}
+
+
+inline Matrix2<double> Arr2Mat(double **B, int m, int n) {
+	Matrix2<double> temp(m, n);
+	for (int j = m - 1; j >= 0; --j)
+	{
+		for (int i = n - 1; i >= 0; --i) {
+			temp(i, j) = B[i][j];
+		}
+	}
+	return temp;
+}
+
+
+inline Matrix1<double> Arr2Mat(double *B, int n) {
+	Matrix1<double> temp(n);
+	for (int i = n - 1; i >= 0; --i) { temp.v_p[i] = B[i]; }
+	return temp;
+}
+
+
+inline Matrix2<int> Arr2Mat(int **B, int m, int n) {
+	Matrix2<int> temp(m, n);
+	for (int j = m - 1; j >= 0; --j)
+	{
+		for (int i = n - 1; i >= 0; --i) {
+			temp(i, j) = B[i][j];
+		}
+	}
+	return temp;
+}
+
+
+inline Matrix1<int> Arr2Mat(int *B, int n) {
+	Matrix1<int> temp(n);
+	for (int i = n - 1; i >= 0; --i) { temp.v_p[i] = B[i]; }
+	return temp;
+}
+
+
+inline Matrix2<float> Arr2Mat(float **B, int m, int n) {
+	Matrix2<float> temp(m, n);
+	for (int j = m - 1; j >= 0; --j)
+	{
+		for (int i = n - 1; i >= 0; --i) {
+			temp(i, j) = B[i][j];
+		}
+	}
+	return temp;
+}
+
+
+inline Matrix1<float> Arr2Mat(float *B, int n) {
+	Matrix1<float> temp(n);
+	for (int i = n - 1; i >= 0; --i) { temp.v_p[i] = B[i]; }
+	return temp;
+}
+
+// Matrix computation
+
+
+
+
+//template<class Type> Type glinear1(const Matrix1<double> &A, const Matrix1<double> &B, Type x) {
+//	check_shape(A, B);
+//	check_bound(A, x);
+//	
+//}
+
+
+inline void cross(double A[3], const double &x1, const double &y1, const double &z1, const double &x2, const double &y2, const double &z2) {
+	A[0] = y1*z2 - y2*z1;
+	A[1] = z1*x2 - x1*z2;
+	A[2] = x1*y2 - y1*x2;
+}
+
+
+inline void cross(float A[3], const float &x1, const float &y1, const float &z1, const float &x2, const float &y2, const float &z2) {
+	A[0] = y1*z2 - y2*z1;
+	A[1] = z1*x2 - x1*z2;
+	A[2] = x1*y2 - y1*x2;
+}
+
+
+inline double norm(const double &x, const double &y, const double &z) {
+	return sqrt(x*x + y*y + z*z);
+}
+
+
+inline float norm(const float &x, const float &y, const float &z) {
+	return sqrt(x*x + y*y + z*z);
+}
+
+
+inline double dot(const double &x1, const double &y1, const double &z1, const double &x2, const double &y2, const double &z2) {
+
+	return x1*x2 + y1*y2 + z1*z2;
+}
+
+
+inline float dot(const float &x1, const float &y1, const float &z1, const float &x2, const float &y2, const float &z2) {
+
+	return x1*x2 + y1*y2 + z1*z2;
+}
+
+
+
+
+#endif
+
+
