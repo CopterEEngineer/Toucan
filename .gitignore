@@ -13,8 +13,8 @@
 *.docx
 *.pdf
 *.vsps
-.*csv
-.*xlsx
+*.csv
+*.xlsx
 
 # add an exception (using !)
 !ReadMe.txt
