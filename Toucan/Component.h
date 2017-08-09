@@ -84,7 +84,9 @@
 
 #define MAX_SIZE 21600
 
-
+const int CASE_NUM = 13;
+const myTYPE INI_PITCH[CASE_NUM] = {0.78, 0.99, 1.43, 2.12, 3.04, 4.33, 5.66, 7.11, 8.73, 10.32, 12.0, 14.0, 16.0 };
+const myTYPE INI_MU[CASE_NUM] = { 0.00, 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.22, 0.24 };
 
 class System
 {
@@ -172,7 +174,7 @@ private:
 		Cross(temp_cross_v, omg_c, vel_c);
 
 		for (int i = 2; i >= 0; --i) {
-			dv[i] = f[i] / (mass/SLUG_CONST) + C.Ttransf[i][2] * 32.144 - temp_cross_v[i];
+			dv[i] = f[i] / (mass/SLUG_CONST) + C.Ttransf[i][2] * UNIT_CONST * SLUG_CONST - temp_cross_v[i];
 			dw[i] = m[i] - temp_cross_o[i];
 		}
 		
@@ -206,6 +208,8 @@ public:
 	void SetDerivs(void);
 
 	//void SetDerivs(myTYPE dv[3], myTYPE dw[3]);
+
+	void SetInit(const int ic);
 
 	void GetStates(myTYPE v[3], myTYPE w[3], myTYPE dv[3], myTYPE dw[3]) {
 		for (int i = 2; i >= 0; --i) {
@@ -293,17 +297,55 @@ public:
 
 private:
 
+	template <class Type> void _setairfm_cg(Type f[3], Type m[3], const Coordinate *base)
+	{
+		myTYPE rcb[3];
+		const myTYPE *origin1_ptr = refcoord.origin;
+		const myTYPE *origin2_ptr = base->origin;
+
+		for (int j = 2; j >= 0; --j) { f[j] = m[j] = 0; }
+
+		//refcoord.Transfer(tcb, rcb, refcoord, *base);
+		if (refcoord.base == base) {
+			for (int i = 2; i >= 0; --i) {
+				rcb[i] = *(origin2_ptr + i) - *(origin1_ptr + i);
+			}
+			for (int i = 2; i >= 0; --i) {
+				for (int j = 2; j >= 0; --j) {
+					// give a transpose by j i swap of Ttransf[][]
+					//airforce_cg[i] += refcoord.Ttransf[j][i] * airforce[j];
+					// index friendly
+					airforce_cg[j] += refcoord.Ttransf[i][j] * airforce[i];
+				}
+			}
+			Cross(airmoment_cg, airforce_cg, rcb);
+			for (int i = 2; i >= 0; --i) {
+				for (int j = 2; j >= 0; --j) {
+					// give a transpose by j i swap of Ttransf[][]
+					//airmoment_cg[i] += refcoord.Ttransf[j][i] * airmoment[j];
+					// index friendly
+					airmoment_cg[j] += refcoord.Ttransf[i][j] * airmoment[i];
+				}
+			}
+		}
+		else { wrong_comp_coordinate_diff_base(); }
+
+	}
+
+
 	template <class Type> void _assemble(Type f[3], Type m[3], const std::vector<std::unique_ptr<Component>> & C, const Coordinate *base) {
 		Type ftemp[3] = { 0,0,0 };
 		Type mtemp[3] = { 0,0,0 };
 		f[0] = f[1] = f[2] = 0;
 		m[0] = m[1] = m[2] = 0;
-		for (int i = C.size() - 1; i >= 0; --i) {
+		//for (int i = C.size() - 1; i >= 0; --i) 
+		for (int i = 0; i < C.size(); ++i) {
+			 
 			//cout << C[i].refcoord.base << endl;
 			C[i]->SetAirfm_cg(base);
 			C[i]->GetAirfm_cg(ftemp, mtemp);
 
-#ifdef OUTPUT_MODE
+#ifndef OUTPUT_MODE
 			printf("Component %d aerodynamics at CG: \n", i);
 			printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 			printf("M: %f, %f, %f \n", mtemp[0], mtemp[1], mtemp[2]);
@@ -362,7 +404,6 @@ private:
 //#endif // USE_DOUBLE
 	}
 
-
 };
 
 
@@ -412,6 +453,8 @@ class Rotor :public Component
 {
 private:
 	char *type;
+	bool teeter;
+	int niter_w, niter_a;
 	int kwtip, kwrot, nk, nf, ns, ni, nbn, naf, nnr;
 	myTYPE eflap, khub, del, pitchroot, radius, bt, rroot;
 	myTYPE precone, omega;
@@ -662,7 +705,176 @@ private:
 	}
 
 
-	template<class Type> void GenArf(Matrix1<Type> &sol, Type b[3], int &niter, const Type &m, const Type &c, const Type &k, const Type &q0, const Type &dq0, const Type &dff, int Nitermax, Type pho, Type err)
+	template<class Type> void GenArf_fx_hg(Matrix2<Type> &sol, Type b[3], int &niter, const Type &dff, int Nitermax, Type pho, Type err)
+	{
+		Type af, am, bt, r, dt, temp;
+		Type ck, c0, c1, c2, c3, c4, c5, _sum;
+		Type sita_temp[3] = { 0 };
+
+		const int dim = 3;
+		Matrix2<Type> m22(dim, dim), k22(dim, dim), d22(dim, dim), kk(dim, dim);
+		Matrix2<Type> f_temp(dim, 4);
+		Matrix1<Type> c_temp(4);
+		Matrix1<Type> f22(dim), dq0(dim), q0(dim), temp_M(dim);
+		Matrix1<Type> ddq2(dim), ddq(dim), dq(dim), q(dim), qq(dim);
+		Type p2, k1, sb, mb, twistt;
+		int nperd = 0;
+
+		m22(0, 0) = m22(1, 1) = m22(2, 2) = 1.0;
+
+		d22(0, 0) = omega*gama*(0.125 - 1.0 / 3.0*eflap + 0.25*eflap*eflap);
+		d22(0, 1) = 0;
+		d22(0, 2) = -0.25*omega*gama*mul*(1.0 / 3.0 - eflap + eflap*eflap);
+		d22(1, 0) = 0;
+		d22(1, 1) = omega*gama*(0.125 - 1.0 / 3.0*eflap + 0.25*eflap*eflap);
+		d22(1, 2) = 2 * omega;
+		d22(2, 0) = -0.5*omega*mul*(1.0 / 3.0 - eflap + eflap*eflap);
+		d22(2, 1) = -2 * omega;
+		d22(2, 2) = omega*gama*(0.125 - 1.0 / 3.0*eflap + 0.25*eflap*eflap);
+				
+		//可以把操纵都放在前3个位置，因为sita现在是rotor的私有成员了
+		if (!strcmp(type, "main")) {
+			sita_temp[0] = sita[0];
+			sita_temp[1] = sita[1];
+			sita_temp[2] = sita[2];
+			twistt = twist(ns - 1) - twist(0);
+		}
+		else {
+			sita_temp[0] = sita[3];
+			twistt = twist(ns - 1) - twist(0);
+		}
+
+		k1 = tan(del*PI / 180);
+		mb = m1*radius;
+		p2 = 1 + khub / iflap / omega / omega + eflap*mb / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
+		mul = vel[0] / vtipa;
+
+		k22(0, 0) = omega*omega*(p2 + 0.25*gama*k1*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+		k22(0, 1) = omega*omega*(-0.25*gama*mul)*eflap*(0.5 - eflap);
+		k22(0, 2) = omega*omega*(-0.25*gama*k1*mul)*(2.0 / 3.0 - eflap);
+		k22(1, 0) = omega*omega*(-0.5*gama*mul)*(1.0 / 3.0 - 0.5*eflap);
+		k22(1, 1) = omega*omega*(p2 - 1 + 0.125*gama*mul*mul*k1*(0.5 - eflap + 0.5*eflap*eflap));
+		k22(1, 2) = omega*omega*((0.5*gama)*(0.25 - 2.0 / 3.0*eflap + 0.5*eflap*eflap) + (0.125*gama*mul*mul)*(0.5 - eflap + 0.5*eflap*eflap));
+		k22(2, 0) = omega*omega*(-0.5*gama*k1*mul)*(2.0 / 3.0 - eflap);
+		k22(2, 1) = omega*omega*(-0.5*gama*(0.25 - 2.0 / 3.0*eflap + 0.5*eflap*eflap) + 0.125*gama*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+		k22(2, 2) = omega*omega*(p2 - 1 + 3.0 / 8.0*gama*k1*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+
+		c_temp(0) = sita_temp[0];
+		c_temp(1) = twistt;
+		c_temp(2) = -sita_temp[1];
+		c_temp(3) = -sita_temp[2];
+		
+		f_temp(0, 0) = 0.5*gama*(0.25 - 1.0 / 3.0*eflap + 0.5*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+		f_temp(0, 1) = 0.5*gama*(0.2 - 0.25*eflap + 0.5*mul*mul*(1.0 / 3.0 - 0.5*eflap));
+		f_temp(0, 2) = 0;
+		f_temp(0, 3) = -0.5*gama*mul*(1.0 / 3.0 - 0.5*eflap);
+		f_temp(1, 0) = 0;
+		f_temp(1, 1) = 0;
+		f_temp(1, 3) = 0;
+		f_temp(1,2)= 0.5*gama*(0.25 - 1.0 / 3.0*eflap + 0.25*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+		f_temp(2, 0) = -0.5*gama*mul*(2.0 / 3.0 - eflap);
+		f_temp(2, 1) = -0.5*gama*mul*(0.5 - 2.0 / 3.0*eflap);
+		f_temp(2, 2) = 0;
+		f_temp(2, 3)= 0.5*gama*(0.25 - 1.0 / 3.0*eflap + 0.75*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
+
+		/*cout << endl << endl;
+		f_temp.output(4);
+		cout << endl << endl;
+		c_temp.output(4);
+		cout << endl << endl;*/
+		
+		f22 = (f_temp.matrixmultiplyP2(c_temp)) * omega*omega;
+
+		c_temp(0) = omg[0];
+		c_temp(1) = omg[1];
+		c_temp(2) = domg[0];
+		c_temp(3) = domg[1];
+
+		f_temp(0, 0) = 0.125*gama*mul / omega*(2.0 / 3.0 - eflap);
+		f_temp(0, 1) = f_temp(0, 2) = f_temp(0, 3) = 0;
+		f_temp(1, 0) = -2.0 / omega*(1.0 + eflap*mb / iflap);
+		f_temp(1, 1) = -0.5*gama / omega*(0.25 - 1.0 / 3.0*eflap);
+		f_temp(1, 2) = 0;
+		f_temp(1, 3) = -1.0 / omega / omega;
+		f_temp(2, 0) = -0.5*gama / omega*(0.25 - 1.0 / 3.0*eflap);
+		f_temp(2, 1) = 2.0 / omega*(1.0 + eflap*mb / iflap);
+		f_temp(2, 2) = 1.0 / omega / omega;
+		f_temp(2, 3) = 0;
+
+		f22 += (f_temp.matrixmultiplyP2(c_temp)) * omega*omega;
+		f22.v_p[0] += omega*omega*0.5*gama*(1.0 / 3.0 - 0.5*eflap)*lambdh_ag;
+		f22.v_p[2] += omega*omega*(-0.5*gama*mul)*(0.5 - eflap + 0.5*eflap*eflap)*lambdh_ag;
+
+		_sum = 0;
+		temp = 0;
+		dt = dff / 180 * PI / omega;
+
+		af = pho / (pho + 1.0);
+		am = (2.0 * pho - 1) / (pho + 1);
+		bt = (1.0 - am + af)*(1.0 - am + af) / 4.0;
+		r = 0.5 - am + af;
+
+		ck = 1.0 - af;
+		c0 = (1.0 - am) / bt / dt / dt;
+		c1 = ck*r / bt / dt;
+		c2 = dt*c0;
+		c3 = c2*dt / 2.0 - 1.0;
+		c4 = ck*r / bt - 1.0;
+		c5 = ck*(r / 2.0 / bt - 1.0)*dt;
+
+		sb = 8.0*(p2 - 1.0) / gama;
+		q0(1) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[1] - sita_temp[2] + (sb*16.0 / gama - 1)*omg[0] + (sb + 16.0 / gama)*omg[1]);
+		q0(2) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[2] + sita_temp[1] + (sb + 16.0 / gama)*omg[0] - (sb*16.0 / gama - 1)*omg[1]);
+		q0(0) = gama / p2*(sita_temp[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sita_temp[2]) - lambdh_ag / 6.0);
+
+		dq0.v_p[0] = 0.0;
+		dq0.v_p[1] = 0;
+		dq0.v_p[2] = omega*q0(2);
+
+		temp_M = d22.matrixmultiplyP2(dq0) + k22.matrixmultiplyP2(q0) - f22;
+		Msolver(m22.v_p, temp_M.v_p, dim);
+		ddq = temp_M*(-1);
+		dq = dq0;
+		q(0) = q0(0);
+		q(1) = q0(1);
+		q(2) = q0(2);
+
+		for (int i = 0; i < Nitermax - 1; ++i) {
+			qq = f22 - (k22.matrixmultiplyP2(q)) * af;
+			qq += m22.matrixmultiplyP2(q*c0 + dq*c2 + ddq*c3);
+			qq += d22.matrixmultiplyP2(q*c1 + dq*c4 + ddq*c5);
+			kk = k22*ck + m22*c0 + d22*c1;
+			Msolver(kk.v_p, qq.v_p, dim);
+			q = qq;
+			for (int j = 0; j < dim; ++j) {
+				ddq2(j) = (q(j) - sol(j, i)) / bt / dt / dt - dq(j) / bt / dt - ddq(j)*(1.0 / bt / 2.0 - 1.0);
+			}
+			dq += ddq*(1.0 - r)*dt + ddq2*r*dt;
+			ddq = ddq2;
+			sol(0, i + 1) = q(0);
+			sol(1, i + 1) = q(1);
+			sol(2, i + 1) = q(2);
+
+			// exit condition
+			_sum = 0;
+			for (int j = 0; j < dim; ++j) {
+				//temp = sol(j, i + 1) / sol(j, i) - 1.0;
+				temp = (sol(j, i + 1) - sol(j, i)) / sol(0, i);// in case of 0/0
+				temp *= temp;
+				_sum += temp;
+			}
+			niter = i + 1;
+			b[0] = sol(0, niter);
+			b[1] = -sol(1, niter);
+			b[2] = -sol(2, niter);
+			if (_sum < err*err) { break; }
+		}
+
+
+	}
+
+
+	template<class Type> void GenArf_rt(Matrix1<Type> &sol, Type b[3], int &niter, const Type &m, const Type &c, const Type &k, const Type &q0, const Type &dq0, const Type &dff, int Nitermax, Type pho, Type err)
 	{
 		Type af, am, bt, r, qq, kk, dt, temp;
 		Type ck, c0, c1, c2, c3, c4, c5, _sum, c_temp, s_temp;
@@ -748,7 +960,7 @@ private:
 			//kk = ck*k + c0*m + c1*c;
 			q = qq / kk;
 			sol(i + 1) = q;
-			ddq2 = (q - sol.v_p[i]) / bt / dt / dt - dq / bt / dt - (1 / bt / 2 - 1)*ddq;
+			ddq2 = (q - sol.v_p[i]) / bt / dt / dt - dq / bt / dt - (1.0 / bt / 2.0 - 1.0)*ddq;
 			dq += (1 - r)*ddq*dt + r*ddq2*dt;
 			ddq = ddq2;
 
@@ -773,9 +985,9 @@ private:
 			int val1 = niter%nperd;
 			int val2 = nperd / 4;
 			b[0] = precone;
-			beta[1] = sol(niter - val1);
-			if (val1 < val2) { beta[2] = -sol(niter - val1 - val2); }
-			else { beta[2] = sol(niter - val1 + val2); }
+			b[1] = sol(niter - val1);
+			if (val1 < val2) { b[2] = -sol(niter - val1 - val2); }
+			else { b[2] = sol(niter - val1 + val2); }
 
 			/*b[1] = b[2] = 0;
 			for (int j = nperd-1; j >= 2; --j) {
@@ -811,6 +1023,121 @@ private:
 	}
 	
 	
+	template<class Type> void GenArf_fx_tr(Matrix2<Type> &sol, Type b[3], int &niter, const Type &dff, int Nitermax, Type pho, Type err)
+	{
+		Type af, am, bt, r, dt, temp;
+		Type ck, c0, c1, c2, c3, c4, c5, _sum;
+		Type sita_temp[3] = { 0 };
+		Type twistt;
+
+#ifdef TEETER
+		const int dim = 2;
+#else
+		const int dim = 3;
+#endif // TEETER
+		Matrix2<Type> m22(dim, dim), k22(dim, dim), d22(dim, dim), kk(dim, dim);
+		Matrix1<Type> f22(dim), dq0(dim), q0(dim), temp_M(dim);	
+		Matrix1<Type> ddq2(dim), ddq(dim), dq(dim), q(dim), qq(dim);
+		Type p2, k1, mul, sb;
+		int nperd = 0;
+		
+		m22(0, 0) = m22(1, 1) = 1.0;
+		
+		d22(0, 0) = omega*gama / 8.0;
+		d22(0, 1) = 2 * omega;
+		d22(1, 0) = -2 * omega;
+		d22(1, 1) = omega*gama / 8.0;
+
+		if (!strcmp(type, "main")) {
+			sita_temp[0] = sita[0];
+			sita_temp[1] = sita[1];
+			sita_temp[2] = sita[2];
+			twistt = twist(ns-1) - twist(0);
+		}
+		else{
+			sita_temp[0] = sita[3];
+			twistt = 0.0;
+		}
+
+		k1 = tan(del*PI / 180);
+		p2 = 1 + khub / iflap / omega / omega + eflap*m1*radius / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
+		mul = vel[0] / vtipa;
+		k22(0, 0) = omega*omega*(p2 - 1 + gama*k1*mul*mul / 16.0);
+		k22(0, 1) = omega*omega*gama / 8.0*(1 + 0.5*mul*mul);
+		k22(1, 0) = -omega*omega*gama / 8.0*(1 - 0.5*mul*mul);
+		k22(1, 1) = omega*omega*(p2 - 1 + 3.0 / 16.0*gama*k1*mul*mul);
+
+		f22.v_p[0] = -omega*omega*(gama / 8.0*sita_temp[1] * (1 + 0.5*mul*mul));
+		f22.v_p[1] = omega*omega*(-1.0 / 3.0*gama*mul*sita_temp[0] - 1.0 / 4.0*gama*mul*(twistt) - gama / 8.0*sita_temp[2] * (1 + 1.5*mul*mul));
+
+		f22.v_p[0] += omega*omega*(-2.0 / omega*omg[0] - gama / 8.0 / omega*omg[1] - 1.0 / omega / omega*domg[1]);
+		f22.v_p[1] += omega*omega*(-gama / 8.0 / omega*omg[0] + 2.0 / omega*omg[1] - 1.0 / omega / omega*domg[0]);
+
+		f22.v_p[1] += omega*omega*(-0.25*gama*mul)*lambdh_ag;
+				
+		_sum = 0;
+		temp = 0;
+		dt = dff / 180 * PI / omega;
+
+		af = pho / (pho + 1.0);
+		am = (2.0 * pho - 1) / (pho + 1);
+		bt = (1.0 - am + af)*(1.0 - am + af) / 4.0;
+		r = 0.5 - am + af;
+
+		ck = 1.0 - af;
+		c0 = (1.0 - am) / bt / dt / dt;
+		c1 = ck*r / bt / dt;
+		c2 = dt*c0;
+		c3 = c2*dt / 2.0 - 1.0;
+		c4 = ck*r / bt - 1.0;
+		c5 = ck*(r / 2.0 / bt - 1.0)*dt;
+
+		sb = 8.0*(p2 - 1.0) / gama;
+		q0(0) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[1] - sita_temp[2] + (sb*16.0 / gama - 1)*omg[0] + (sb + 16.0 / gama)*omg[1]);
+		q0(1) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[2] + sita_temp[1] + (sb + 16.0 / gama)*omg[0] - (sb*16.0 / gama - 1)*omg[1]);
+		dq0.v_p[0] = 0.0;
+		dq0.v_p[1] = omega*sol(1, 0);
+
+		
+		temp_M = d22.matrixmultiplyP2(dq0) + k22.matrixmultiplyP2(q0) - f22;
+		Msolver(m22.v_p, temp_M.v_p, 2);
+		ddq = temp_M*(-1);
+		dq = dq0;
+		q(0) = q0(0);
+		q(1) = q0(1);
+
+		for (int i = 0; i < Nitermax - 1; ++i) {
+			qq = f22 - (k22.matrixmultiplyP2(q)) * af;
+			qq += m22.matrixmultiplyP2(q*c0 + dq*c2 + ddq*c3);
+			qq += d22.matrixmultiplyP2(q*c1 + dq*c4 + ddq*c5);
+			kk = k22*ck + m22*c0 + d22*c1;
+			Msolver(kk.v_p, qq.v_p, 2);
+			q = qq;
+			for (int j = 0; j < dim; ++j) {
+				ddq2(j)= (q(j) - sol(j, i)) / bt / dt / dt - dq(j) / bt / dt - ddq(j)*(1.0 / bt / 2.0 - 1.0);
+			}
+			dq += ddq*(1.0 - r)*dt + ddq2*r*dt;
+			ddq = ddq2;
+			sol(0, i + 1) = q(0);
+			sol(1, i + 1) = q(1);
+			
+			// exit condition
+			_sum = 0;
+			for (int j = 0; j < dim; ++j) {
+				//temp = sol(j, i + 1) / sol(j, i) - 1.0;
+				temp = (sol(j, i + 1) - sol(j, i)) / precone;// in case of 0/0
+				temp *= temp;
+				_sum += temp;
+			}
+			if (TEETER) { b[0] = precone; }
+			niter = i + 1;
+			b[1] = -sol(0, niter);
+			b[2] = -sol(1, niter);
+			if (_sum < err*err) { break; }
+		}
+	}
+	
+	
 	template<class Type> void _elementKMgenerete(Matrix3<Type> &mele, Matrix3<Type> &kele, const Matrix1<Type> &elegrid, const int dof) {
 		//mele.allocate(eleid.Nv, dof, dof);
 		//kele.allocate(eleid.Nv, dof, dof);
@@ -834,6 +1161,7 @@ private:
 
 	void _flapmotionrt(void);
 
+	void _flapmotionfx(void);
 
 	void _bladeCSD(void);
 
@@ -850,7 +1178,7 @@ public:
 
 	void SetCoordBase(void);
 
-	void BladeDynamics(void);
+	void BladeDynamics(const char *t);
 
 	void AvrgInducedVel(void);
 

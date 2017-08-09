@@ -6,6 +6,7 @@ Copter::Copter() :System()
 	print_cons_on_screen("Copter");
 	/* read config files */
 	mass = 915;
+	omega = 525 * PI / 30;
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
 			inmatx[i][j] = 0;
@@ -36,7 +37,7 @@ Copter::Copter() :System()
 	myTYPE origin[3] = { 0,0,0 };
 	myTYPE euler[3] = { 0,0,0 };
 #ifdef TEST_DATA
-	euler[1] = -0.78*PI / 180;
+	euler[1] = 0.78*PI / 180; // positive means nose down in cpp
 #endif // TEST_DATA
 
 	/* read config files */
@@ -53,7 +54,7 @@ Copter::Copter() :System()
 	}
 	//cout << refcoord.base << endl;
 #ifdef TEST_DATA
-	vel_g[0] = 0.0;// 0.12*632.2455;
+	vel_g[0] = 0.0*632.2455;
 	vel_g[1] = 0*632.2455;
 	vel_g[2] = 0*632.2455;
 #endif // TEST_DATA
@@ -127,7 +128,8 @@ Copter::~Copter()
 
 void Copter::SetStates(void) {
 	// will update class members
-
+	vel_c[0] = vel_c[1] = vel_c[2] = 0;
+	omg_c[0] = omg_c[1] = omg_c[2] = 0;
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
 			vel_c[i] += refcoord.Ttransf[i][j] * vel_g[j];
@@ -246,6 +248,16 @@ void Copter::SetDerivs(void)
 }
 
 
+void Copter::SetInit(const int ic)
+{
+	myTYPE euler[3] = { 0,0,0 };
+	vel_g[0] = omega*11.5 * INI_MU[ic];
+	euler[1] = INI_PITCH[ic] * PI / 180;
+	refcoord.SetCoordinate(euler, "euler");
+	
+}
+
+
 //void Copter::SetDerivs(myTYPE dv[3], myTYPE dw[3])
 //{
 //	dv[0] = dv[1] = dv[2] = 0;
@@ -336,25 +348,37 @@ void Component::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc,
 
 
 void Component::SetAirfm_cg(const Coordinate *base) {
-	myTYPE tcb[3][3];
 	myTYPE rcb[3];
-	myTYPE temp_cross[3] = { 0,0,0 };
+	const myTYPE *origin1_ptr = refcoord.origin;
+	const myTYPE *origin2_ptr = base->origin;
 
-	for (int i = 2; i >= 0; --i) { airforce_cg[i] = airmoment_cg[i] = 0; }
+	for (int j = 2; j >= 0; --j) { airforce_cg[j] = airmoment_cg[j] = 0; }
 
-	refcoord.Transfer(tcb, rcb, refcoord, *base);
-
-	for (int i = 2; i >= 0; --i) {
-		for (int j = 2; j >= 0; --j) {
-			airforce_cg[i] += tcb[i][j] * airforce[j];
+	//refcoord.Transfer(tcb, rcb, refcoord, *base);
+	if (refcoord.base == base) {
+		for (int i = 2; i >= 0; --i) {
+			rcb[i] = *(origin2_ptr + i) - *(origin1_ptr + i);			
+		}
+		for (int i = 2; i >= 0; --i) {
+			for (int j = 2; j >= 0; --j) {
+				// give a transpose by j i swap of Ttransf[][]
+				//airforce_cg[i] += refcoord.Ttransf[j][i] * airforce[j];
+				// index friendly
+				airforce_cg[j] += refcoord.Ttransf[i][j] * airforce[i];
+			}
+		}
+		Cross(airmoment_cg, airforce_cg, rcb);
+		for (int i = 2; i >= 0; --i) {
+			for (int j = 2; j >= 0; --j) {
+				// give a transpose by j i swap of Ttransf[][]
+				//airmoment_cg[i] += refcoord.Ttransf[j][i] * airmoment[j];
+				// index friendly
+				airmoment_cg[j] += refcoord.Ttransf[i][j] * airmoment[i];
+			}
 		}
 	}
-	Cross(airmoment_cg, airforce_cg, rcb);
-	for (int i = 2; i >= 0; --i) {
-		for (int j = 2; j >= 0; --j) {
-			airmoment_cg[i] += tcb[i][j] * airmoment[j];
-		}
-	}
+	else { wrong_comp_coordinate_diff_base(); }
+	
 
 //#ifdef USE_DOUBLE
 //	cblas_dgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, *tcb, 3, airforce, 1, 0, airforce_cg, 1);
@@ -380,10 +404,14 @@ void Component::Assemble(const std::vector<std::unique_ptr<Component>> &C, const
 
 
 Fuselage::Fuselage() :Component() {
+	myTYPE origin[3], euler[3];
 	print_cons_on_screen("Fuselage");
 	// read config file
 #ifdef UL496
 	dragA = 0.0315*DISK_A;
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	refcoord.SetCoordinate(origin, euler, refcoord.base);
 
 #endif // UL496
 	//cout << refcoord.base << endl;
@@ -409,6 +437,14 @@ inline void Fuselage::SetAirfm(void) {
 	airforce[0] = -0.5*vel[0] * vel[0] * rho * dragA;
 	airforce[1] = airforce[2] = 0;
 	airmoment[0] = airmoment[1] = airmoment[2] = 0;
+
+#ifdef OUTPUT_MODE
+	cout << endl;
+	printf("Fuselage airdynamics: \n");
+	printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
+	printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
+	cout << endl;
+#endif // OUTPUT_MODE
 }
 
 
@@ -428,7 +464,7 @@ Wing::Wing(char *s, int num) :Component() {
 		origin[1] = 0;
 		origin[2] = 0;
 		euler[0] = 0;
-		euler[1] = -4 * PI / 180;
+		euler[1] = 4 * PI / 180;
 		euler[2] = 0;
 		refcoord.SetCoordinate(origin, euler, refcoord.base); // base copy constructor give correct base if no need to revise
 
@@ -512,6 +548,8 @@ Wing::~Wing() {
 inline void Wing::SetAirfm(void) {
 	myTYPE stot, ar, a03d;
 	myTYPE aoa, cl, cd, vel2;
+	myTYPE f[3] = { 0 };
+	myTYPE m[3] = { 0 };
 #ifdef UL496
 	stot = span * chord * (1 + taper) / 2;
 	ar = span*span / stot;
@@ -525,13 +563,29 @@ inline void Wing::SetAirfm(void) {
 	cd = cd0 + aoa * (cd1 + aoa*cd2);
 
 	vel2 = vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2];
-	airforce[0] = -0.5 * rho * stot * vel2 * cd;
+	// freestream direction forces and moments, not refcoord
+	f[0] = -0.5 * rho * stot * vel2 * cd;
+	f[1] = 0;
+	f[2] = 0.5 * rho * stot * vel2 * cl;
+	m[0] = 0;
+	m[1] = 0;
+	m[2] = 0;
+	// forces and moments at refcoord
+	airforce[0] = f[0] * cos(aoa) + f[2] * sin(aoa);
+	airforce[2] = -f[0] * sin(aoa) + f[2] * cos(aoa);
 	airforce[1] = 0;
-	airforce[2] = 0.5 * rho * stot * vel2 * cl;
-	airmoment[0] = 0;
-	airmoment[1] = 0;
-	airmoment[2] = 0;
+	airmoment[0] = m[0] * cos(aoa) + m[2] * sin(aoa);
+	airmoment[1] = -m[0] * sin(aoa) + m[2] * cos(aoa);
 #endif
+#ifdef OUTPUT_MODE
+	cout << endl;
+	printf("%s wing airdynamics: \n", type);
+	printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
+	printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
+	cout << endl;
+#endif // OUTPUT_MODE
+
+
 }
 
 
@@ -540,9 +594,11 @@ Rotor::Rotor(const char *s) :Component() {
 	// read config file
 	type = new char[10];
 	strcpy(type, s);
-
+	niter_a = -1;
+	niter_w = -1;
 	a0 = 5.7;
 	if (!strcmp(s, "main")) {
+		teeter = true;
 		nf = 72;
 		ns = 40;
 		ni = 10;
@@ -605,7 +661,7 @@ Rotor::Rotor(const char *s) :Component() {
 		origin[1] = 0;
 		origin[2] = -4.217;
 		euler[0] = 0;
-		euler[1] = -3.0 * PI / 180;
+		euler[1] = 3.0 * PI / 180;
 		euler[2] = 0;
 		hubfxcoord.SetCoordinate(origin, euler, refcoord.base);
 		refcoord.SetCoordinate(origin, euler, refcoord.base);
@@ -613,7 +669,7 @@ Rotor::Rotor(const char *s) :Component() {
 		// referred to hubfxcoord
 		origin[0] = origin[1] = origin[2] = 0;
 		euler[0] = 0;
-		euler[1] = -PI;
+		euler[1] = PI;
 		euler[2] = 0;
 		hubrtcoord.SetCoordinate(origin, euler, refcoord.base);
 		// referred to hubrtcoord
@@ -621,12 +677,12 @@ Rotor::Rotor(const char *s) :Component() {
 		origin[1] = 0;
 		origin[2] = 0;
 		euler[0] = 0;
-		euler[1] = -precone - beta[1];
+		euler[1] = precone + beta[1];
 		euler[2] = 0;
 		bladecoord.SetCoordinate(origin, euler, refcoord.base);
 		// referred to hubfxcoord
 		origin[0] = 0;
-		origin[1] = precone * (1 - eflap);
+		origin[1] = -precone * (1 - eflap);
 		origin[2] = 0;
 		euler[0] = euler[1] = euler[2] = 0;
 		tppcoord.SetCoordinate(origin, euler, refcoord.base);
@@ -661,6 +717,10 @@ Rotor::Rotor(const char *s) :Component() {
 		lambdh.allocate(nf, ns);
 		lambdt.allocate(nf, ns);
 
+		lambdi.setvalue(lambdi_ag);
+		lambdh.setvalue(lambdh_ag);
+		lambdt.setvalue(lambdt_ag);
+
 		tipgeometry.allocate(nk, nf, 3);
 		bladedeform.allocate(nf, ns, 3);
 
@@ -676,9 +736,9 @@ Rotor::Rotor(const char *s) :Component() {
 		//lambdh.setvalue(-0.0725);
 		//lambdh.input("lambdh.txt");
 		//lambdh.output("lambdh.output", 4);
-		sita[0] = 12.7 * PI / 180;
-		sita[1] = 1.24 * PI / 180;
-		sita[2] = 3.41 * PI / 180;
+		sita[0] = 12.1 * PI / 180;
+		sita[1] = 1.18 * PI / 180;
+		sita[2] = 3.12 * PI / 180;
 		sita[3] = 0.0;
 		beta[1] = 0*PI / 180;
 		beta[2] = 0*PI / 180;
@@ -688,6 +748,8 @@ Rotor::Rotor(const char *s) :Component() {
 #endif // TEST_DATA
 	}
 	else if (!strcmp(s, "tail")) {
+		teeter = false;
+
 		nf = 1;
 		ns = 1;
 		kwtip = 0;
@@ -712,7 +774,7 @@ Rotor::Rotor(const char *s) :Component() {
 		iflap = 0.0027;
 		m1 = 0.00312;
 		sigma = 0.1636;
-		gama = 0; //
+		gama = 2.2265;
 
 		chord.allocate(ns);
 		sweep.allocate(ns);
@@ -734,7 +796,7 @@ Rotor::Rotor(const char *s) :Component() {
 		// referred to hubfxcoord
 		origin[0] = origin[1] = origin[2] = 0;
 		euler[0] = 0;
-		euler[1] = -PI;
+		euler[1] = PI;
 		euler[2] = 0;
 		hubrtcoord.SetCoordinate(origin, euler, refcoord.base);
 		// referred to hubrtcoord
@@ -742,12 +804,12 @@ Rotor::Rotor(const char *s) :Component() {
 		origin[1] = 0;
 		origin[2] = 0;
 		euler[0] = 0;
-		euler[1] = -precone;
+		euler[1] = precone;
 		euler[2] = 0;
 		bladecoord.SetCoordinate(origin, euler, refcoord.base);
 		// referred to hubfxcoord
 		origin[0] = 0;
-		origin[1] = precone * (1 - eflap);
+		origin[1] = -precone * (1 - eflap);
 		origin[2] = 0;
 		euler[0] = euler[1] = euler[2] = 0;
 		tppcoord.SetCoordinate(origin, euler, refcoord.base);
@@ -755,7 +817,8 @@ Rotor::Rotor(const char *s) :Component() {
 
 		// initialize member variables to zero
 		mul = 0;
-		lambdi_ag = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI/radius / radius / vtipa / vtipa);
+		lambdi_ag = 0.01;
+			//sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI/radius / radius / vtipa / vtipa);
 		lambdt_ag = lambdh_ag = lambdi_ag;
 		power = 0;
 		torque = 0;
@@ -779,13 +842,19 @@ Rotor::Rotor(const char *s) :Component() {
 		lambdi.allocate(nf, ns);// induced velocity
 		lambdx.allocate(nf, ns);
 		lambdy.allocate(nf, ns);
+		lambdh.allocate(nf, ns);
+		lambdt.allocate(nf, ns);
+
+		lambdi.setvalue(lambdi_ag);
+		lambdh.setvalue(lambdh_ag);
+		lambdt.setvalue(lambdt_ag);
 
 		tipgeometry.allocate(nk, nf, 3);
 		bladedeform.allocate(nf, ns, 3);
 
 		sita[0] = sita[1] = sita[2] = sita[3] = 0.0;
 #ifdef TEST_DATA
-		sita[3] = 10.7 * PI / 180;
+		sita[3] = 10.1 * PI / 180;
 #endif // TEST_DATA
 
 	}
@@ -799,7 +868,10 @@ Rotor::Rotor(const char *s) :Component() {
 
 Rotor::Rotor(const Rotor &R) {
 	cout << "Rotor copy construtor." << endl;
+	teeter = R.teeter;
 	strcpy(type, R.type);
+	niter_a = R.niter_a;
+	niter_w = R.niter_w;
 	kwtip = R.kwtip;
 	kwrot = R.kwrot;
 	nk = R.nk;
@@ -881,7 +953,10 @@ Rotor::Rotor(const Rotor &R) {
 
 Rotor::~Rotor() {
 	cout << "Rotor destructor." << endl;
+	teeter = false;
 	delete[] type;
+	niter_a = -1;
+	niter_w = -1;
 	kwtip = kwrot = nk = nf = ns = ni = nbn = naf = nnr = 0;
 	eflap = khub = del = pitchroot = radius = bt = rroot = 0;
 	precone = omega = 0;
@@ -979,7 +1054,7 @@ void Rotor::_flapmotionrt(void) {
 	//err_b = 0;
 #endif // TEST_MODE
 
-	GenArf(sol, beta, niter, m, c, k, q0, dq0, dff, nitermax, pho, err_b);
+	GenArf_rt(sol, beta, niter, m, c, k, q0, dq0, dff, nitermax, pho, err_b);
 
 #ifdef OUTPUT_MODE
 	cout << (niter*dff/360) << endl;
@@ -993,6 +1068,30 @@ void Rotor::_flapmotionrt(void) {
 #endif // OUTPUT_MODE
 
 }
+
+
+void Rotor::_flapmotionfx(void) {
+	myTYPE pho, dff, err_b;
+	int nitermax, niter;
+	Matrix2<myTYPE> sol;
+
+	niter = 0;
+	dff = 15;
+	nitermax = 30 * 360 / dff;
+	pho = 1;
+	err_b = 0.001;
+
+	if (teeter) { 
+		sol.allocate(2, nitermax);
+		GenArf_fx_tr(sol, beta, niter, dff, nitermax, pho, err_b); 
+	}
+	else { 
+		sol.allocate(3, nitermax);
+		GenArf_fx_hg(sol, beta, niter, dff, nitermax, pho, err_b); 
+		//sol.output("sol.output", 6);
+	}
+}
+
 
 
 void Rotor::_bladeCSD(void)
@@ -1018,7 +1117,7 @@ void Rotor::SetCtrl(myTYPE * xctrl, const int n)
 		if (n != 1) { print_wrong_msg("Undefined Control variations for tail rotor."); }
 #endif // _DEBUG
 		for (int i = 0; i < n; ++i) {
-			sita[i+3] = xctrl[i];
+			sita[i+3] = xctrl[i+3];
 		}
 		sita[0] = sita[1] = sita[2] = 0;
 	}
@@ -1068,13 +1167,17 @@ void Rotor::SetCoordBase(void)
 }
 
 
-void Rotor::BladeDynamics(void)
+void Rotor::BladeDynamics(const char *t)
 {
 	myTYPE euler_temp[3];
-	_flapmotionrt();
-	
+	if (!strcmp(t, "main")) { 
+		//_flapmotionrt(); 
+		_flapmotionfx();
+	}
+	else { _flapmotionfx(); }
+
 	euler_temp[0] = -beta[2];
-	euler_temp[1] = -beta[1];
+	euler_temp[1] = beta[1];
 	euler_temp[2] = 0.0;
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
@@ -1082,19 +1185,23 @@ void Rotor::BladeDynamics(void)
 
 void Rotor::AvrgInducedVel(void)
 {
-	int itermax = 20;
+	const int itermax = 20;
 	int i = 0;
-	myTYPE lambtpp[20] = { 0 };
+	int iter = 0;
+	myTYPE lambtpp[itermax] = { 0 };
 	myTYPE err_w = 0.0001;
 	myTYPE veltpp[3] = { 0.0,0.0,0.0 };
-	//myTYPE velind[3] = { 0.0,0.0,0.0 };
+	myTYPE ct, ch_tpp, cy_tpp, twistt;
 
 	if (!strcmp(type, "main")) {
 
-		lambtpp[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
-		for (i = 1; i < itermax; ++i) {
+		lambtpp[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);					 
+		lambdi_ag = lambtpp[0];
+		lambdh_ag = lambdi_ag;
+		lambdh.setvalue(lambdh_ag);
+		for (int i = 1; i < itermax; ++i) {
 
-			BladeDynamics();
+			BladeDynamics(type);
 			
 			veltpp[0] = veltpp[1] = veltpp[2] = 0;
 			for (int i = 2; i >= 0; --i) {
@@ -1114,55 +1221,62 @@ void Rotor::AvrgInducedVel(void)
 			lambdi_ag -= airforce[2] / (2 * rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp[i - 1] * lambtpp[i - 1]);
 			lambdi_ag /= 2.0;
 			// veltpp: tpp plane velocity with copter
-			lambdt_ag = lambdi_ag + veltpp[2] / vtipa;
+			lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
 			lambtpp[i] = lambdt_ag;
 			// vel: hub velocity with copter
-			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) + vel[2] / vtipa;
+			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
 			lambdh.setvalue(lambdh_ag);
 
-			if (Abs(lambtpp[i] / lambtpp[i - 1] - 1) < err_w) { break; }
+			iter = i;
+			if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) { break; }
 
 		}
 		//lambtpp.outputs("_lambtpp.output", 4);
 	}
 	else {
 		err_w = 5e-3;
-		lambtpp[0] = sqrt(0.5*Copter::mass*UNIT_CONST / Copter::rho / PI / radius / radius / vtipa / vtipa);
-		mul = vel[0] / vtipa;
-		for (i = 1; i < itermax; ++i) {
+		twistt = twist(ns-1) - twist(0);
+		
+		lambtpp[0] = 0.01;
+		lambdi_ag = lambtpp[0];
+		lambdh_ag = lambdi_ag;
+		lambdh.setvalue(lambdh_ag);
+		for (int i = 1; i < itermax; ++i) {
+
+			BladeDynamics(type);
+
+			veltpp[0] = veltpp[1] = veltpp[2] = 0;
+			for (int i = 2; i >= 0; --i) {
+				for (int j = 2; j >= 0; --j) {
+					veltpp[i] += tppcoord.Ttransf[i][j] * vel[j];
+				}
+			}
 			
-			airforce[2] = sigma*a0*0.5*(sita[3] / 3 * (1 + 1.5*mul * mul) - 0.5*lambtpp[i - 1]);
-			lambdi_ag += airforce[2] / (2 * sqrt(mul*mul + lambtpp[i - 1]*lambtpp[i - 1]));
+			mul = vel[0] / vtipa;
+
+			// 以后把sita3改掉，补上sita1c, sita1s			
+			ct = sigma*a0*0.5*(sita[3] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp[i - 1]);
+			lambdi_ag += ct / 2.0 / sqrt(mul*mul + lambtpp[i - 1] * lambtpp[i - 1]);
 			lambdi_ag /= 2.0;
-			lambdt_ag = lambdi_ag + veltpp[2] / vtipa;
+
+			lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
 			lambtpp[i] = lambdt_ag;
+
+			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+			lambdh.setvalue(lambdh_ag);
 			
-			airforce[2] *= -rho*PI*radius*radius*vtipa*vtipa;//
-			lambdh_ag = lambdi_ag + vel[2] / vtipa;
-			if (Abs(lambtpp[i] / lambtpp[i - 1] - 1) < err_w) { break; }
+			airforce[2] = -ct*rho*PI*radius*radius*vtipa*vtipa;//
+
+			iter = i;
+			if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) { break; }
 		}
 #ifdef OUTPUT_MODE
 		lambtpp.outputs("_tail_lambtpp.output", 4);
 
 #endif // OUTPUT_MODE
 	}
+	niter_w = iter;
 
-#ifndef OUTPUT_MODE
-	if (!strcmp(type, "main")) {
-		cout << endl;
-		printf("%s rotor induced velocity iter count: %d \n", type, i-1);
-		printf("%s rotor flaps (degs): %f, %f\n", type, beta[1]/PI*180, beta[2]/PI*180);
-		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
-		cout << endl;
-	}
-	else {
-		cout << endl;
-		printf("%s rotor induced velocity iter count: %d \n", type, i-1);
-		printf("induced error: %f \n", Abs(lambtpp[i-1] / lambtpp[i - 2] - 1));
-		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
-		cout << endl;
-	}
-#endif // OUTPUT_MODE
 }
 
 
@@ -1174,6 +1288,21 @@ inline void Rotor::SetAirfm(void)
 		airforce[0] = airforce[1] = airmoment[0] = airmoment[1] = 0;
 		AvrgInducedVel();
 	}
+
+#ifndef OUTPUT_MODE
+
+	cout << endl;
+	printf("%s rotor induced velocity iter count: %d \n", type, niter_w);
+	printf("%s rotor flaps (degs): %f, %f, %f\n", type, beta[0] / PI * 180, beta[1] / PI * 180, beta[2] / PI * 180);
+	printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
+	cout << endl;
+	printf("%s rotor airdynamics: \n", type);
+	printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
+	printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
+	cout << endl;
+
+#endif // OUTPUT_MODE
+
 }
 
 

@@ -20,6 +20,8 @@ public:
 
 	void TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_ptr<Component>> &C);
 
+	void TrimSolver_Ad(Copter &H, Component &CP, const std::vector<std::unique_ptr<Component>> &C);
+
 	void TransientSolver(const Copter &H, const std::vector<Component> &C);
 };
 
