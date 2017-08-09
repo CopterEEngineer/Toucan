@@ -50,7 +50,6 @@
 #endif // WIND_TRIM
 
 #define DISABLE_SLD 1
-#define ABSOLUTED 0
 
 #define SITA_COLL_MAX PI/6
 #define SITA_CYCL_MAX PI/12
@@ -83,6 +82,8 @@
 #endif // DISABLE_REVISE_SIZE
 
 #define MAX_SIZE 21600
+#define ROLL_SLD_RE
+//#define PARALL
 
 const int CASE_NUM = 13;
 const myTYPE INI_PITCH[CASE_NUM] = {0.78, 0.99, 1.43, 2.12, 3.04, 4.33, 5.66, 7.11, 8.73, 10.32, 12.0, 14.0, 16.0 };
@@ -464,7 +465,7 @@ private:
 	myTYPE iflap, m1, rtip, rc0, outboard;
 	myTYPE mul, vtipa;
 	myTYPE beta[3];
-	myTYPE sita[4];
+	myTYPE sita[3];
 
 	Matrix2<myTYPE> cltc, cdtc, cmtc; //
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
@@ -520,11 +521,17 @@ private:
 
 
 		// air velocity
+#ifdef ROLL_SLD_RE
+		_ut = (_ra - eflap) * cos(b) + eflap + (sin(ia) * vel[0] + cos(ia) * vel[1]) / vtipa;
+		_up = (_ra - eflap) * db / omega + (cos(ia) * vel[0] - sin(ia) * vel[1]) * sin(b) / vtipa + _lambdh * cos(b);
+#else
 		_ut = (_ra - eflap) * cos(b) + eflap + sin(ia) * vel[0] / vtipa;
+		_up = (_ra - eflap) * db / omega + cos(ia) * sin(b) * vel[0] / vtipa + _lambdh * cos(b);
+#endif // !ROLL_SLD_RE
+
 		//_ut *= mcos(sweep(0, id_ns));
 		_ut *= mcos(sweep);
 
-		_up = (_ra - eflap) * db / omega + cos(ia) * sin(b) * vel[0] / vtipa + _lambdh * cos(b);
 
 
 	}
@@ -732,17 +739,11 @@ private:
 		d22(2, 1) = -2 * omega;
 		d22(2, 2) = omega*gama*(0.125 - 1.0 / 3.0*eflap + 0.25*eflap*eflap);
 				
-		//可以把操纵都放在前3个位置，因为sita现在是rotor的私有成员了
-		if (!strcmp(type, "main")) {
-			sita_temp[0] = sita[0];
-			sita_temp[1] = sita[1];
-			sita_temp[2] = sita[2];
-			twistt = twist(ns - 1) - twist(0);
-		}
-		else {
-			sita_temp[0] = sita[3];
-			twistt = twist(ns - 1) - twist(0);
-		}
+
+		sita_temp[0] = sita[0];
+		sita_temp[1] = sita[1];
+		sita_temp[2] = sita[2];
+		twistt = twist(ns - 1) - twist(0);
 
 		k1 = tan(del*PI / 180);
 		mb = m1*radius;
@@ -838,6 +839,10 @@ private:
 		q(0) = q0(0);
 		q(1) = q0(1);
 		q(2) = q0(2);
+
+		sol(0, 0) = q(0);
+		sol(1, 0) = q(1);
+		sol(2, 0) = q(2);
 
 		for (int i = 0; i < Nitermax - 1; ++i) {
 			qq = f22 - (k22.matrixmultiplyP2(q)) * af;
@@ -1048,16 +1053,12 @@ private:
 		d22(1, 0) = -2 * omega;
 		d22(1, 1) = omega*gama / 8.0;
 
-		if (!strcmp(type, "main")) {
-			sita_temp[0] = sita[0];
-			sita_temp[1] = sita[1];
-			sita_temp[2] = sita[2];
-			twistt = twist(ns-1) - twist(0);
-		}
-		else{
-			sita_temp[0] = sita[3];
-			twistt = 0.0;
-		}
+
+		sita_temp[0] = sita[0];
+		sita_temp[1] = sita[1];
+		sita_temp[2] = sita[2];
+		twistt = twist(ns-1) - twist(0);
+	
 
 		k1 = tan(del*PI / 180);
 		p2 = 1 + khub / iflap / omega / omega + eflap*m1*radius / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
@@ -1105,6 +1106,9 @@ private:
 		dq = dq0;
 		q(0) = q0(0);
 		q(1) = q0(1);
+
+		sol(0, 0) = q(0);
+		sol(1, 0) = q(1);
 
 		for (int i = 0; i < Nitermax - 1; ++i) {
 			qq = f22 - (k22.matrixmultiplyP2(q)) * af;

@@ -656,6 +656,10 @@ Rotor::Rotor(const char *s) :Component() {
 			}
 		}
 
+		beta[0] = precone;
+		beta[1] = 0 * PI / 180;
+		beta[2] = 0 * PI / 180;
+
 		myTYPE origin[3], euler[3];
 		origin[0] = -0.0625;
 		origin[1] = 0;
@@ -695,8 +699,9 @@ Rotor::Rotor(const char *s) :Component() {
 		power = 0;
 		torque = 0;
 
-		beta[1] = beta[2] = 0;
-		beta[0] = precone;
+		sita[0] = 12.1 * PI / 180;
+		sita[1] = 1.18 * PI / 180;
+		sita[2] = 3.12 * PI / 180;
 
 		bflap.allocate(nf, ns); // flap
 		dbflap.allocate(nf, ns);
@@ -727,25 +732,6 @@ Rotor::Rotor(const char *s) :Component() {
 
 		ristation.allocate(nf, ni);
 		
-		sita[0] = sita[1] = sita[2] = sita[3] = 0.0;
-
-#ifdef TEST_DATA
-		//mul = 0.0;
-		//vel[0] = mul * vtipa;
-		//vel[1] = vel[2] = 0;
-		//lambdh.setvalue(-0.0725);
-		//lambdh.input("lambdh.txt");
-		//lambdh.output("lambdh.output", 4);
-		sita[0] = 12.1 * PI / 180;
-		sita[1] = 1.18 * PI / 180;
-		sita[2] = 3.12 * PI / 180;
-		sita[3] = 0.0;
-		beta[1] = 0*PI / 180;
-		beta[2] = 0*PI / 180;
-		for (int j = ns - 1; j >= 0; --j) {
-			twist(j) = (-8.0 * PI / 180) * j / (ns - 1);
-		}
-#endif // TEST_DATA
 	}
 	else if (!strcmp(s, "tail")) {
 		teeter = false;
@@ -782,6 +768,9 @@ Rotor::Rotor(const char *s) :Component() {
 		azstation.allocate(nf, ns);
 		rastation.allocate(nf, ns);
 		chord.setvalue(0.167);
+
+		beta[1] = beta[2] = 0;
+		beta[0] = precone;
 
 		myTYPE origin[3], euler[3];
 		origin[0] = -13.48;
@@ -823,8 +812,8 @@ Rotor::Rotor(const char *s) :Component() {
 		power = 0;
 		torque = 0;
 
-		beta[1] = beta[2] = 0;
-		beta[0] = precone;
+		sita[0] = 10.1 * PI / 180;
+		sita[1] = sita[2] = 0.0;
 
 		bflap.allocate(nf, ns); // flap
 		dbflap.allocate(nf, ns);
@@ -851,11 +840,6 @@ Rotor::Rotor(const char *s) :Component() {
 
 		tipgeometry.allocate(nk, nf, 3);
 		bladedeform.allocate(nf, ns, 3);
-
-		sita[0] = sita[1] = sita[2] = sita[3] = 0.0;
-#ifdef TEST_DATA
-		sita[3] = 10.1 * PI / 180;
-#endif // TEST_DATA
 
 	}
 	else {
@@ -947,7 +931,6 @@ Rotor::Rotor(const Rotor &R) {
 	sita[0] = R.sita[0];
 	sita[1] = R.sita[1];
 	sita[2] = R.sita[2];
-	sita[3] = R.sita[3];
 }
 
 
@@ -1003,7 +986,7 @@ Rotor::~Rotor() {
 	bladecoord.~Coordinate();
 	tppcoord.~Coordinate();
 
-	sita[0] = sita[1] = sita[2] = sita[3] = 0;
+	sita[0] = sita[1] = sita[2] = 0;
 }
 
 
@@ -1102,52 +1085,28 @@ void Rotor::_bladeCSD(void)
 
 void Rotor::SetCtrl(myTYPE * xctrl, const int n)
 {
-	if (!strcmp(type, "main")) {
 #ifdef _DEBUG
-		if (n != 3) { print_wrong_msg("Undefined Control variations for main rotor."); }
+	if (n > 3) { printf("Undefined Control variations for %s rotor.", type); }
 #endif // _DEBUG
-
-		for (int i = 0; i < 3; ++i) {
-			sita[i] = xctrl[i];
-		}
-		sita[3] = 0;
-	}
-	else{
-#ifdef _DEBUG
-		if (n != 1) { print_wrong_msg("Undefined Control variations for tail rotor."); }
-#endif // _DEBUG
-		for (int i = 0; i < n; ++i) {
-			sita[i+3] = xctrl[i+3];
-		}
-		sita[0] = sita[1] = sita[2] = 0;
-	}
-#ifdef TEST_MODE
-	printf("%s set control variations successfully.", type);
-
-#endif // TEST_MODE
+	
+	sita[0] = sita[1] = sita[2] = 0;
+	for (int i = 0; i < n; ++i) {
+		sita[i] = *(xctrl+i);
+	}	
 
 }
 
 
 void Rotor::GetCtrl(myTYPE * xctrl, const int n)
 {
-	if (!strcmp(type, "main")) {
 #ifdef _DEBUG
-		if (n != 3) { print_wrong_msg("Undefined Control variations for main rotor."); }
+	if (n > 3) { printf("Undefined Control variations for %s rotor.", type); }
 #endif // _DEBUG
 
-		for (int i = 0; i < 3; ++i) {
-			xctrl[i] = sita[i];
-		}
+	for (int i = 0; i < n; ++i) {
+		xctrl[i] = sita[i];
 	}
-	else {
-#ifdef _DEBUG
-		if (n != 1) { print_wrong_msg("Undefined Control variations for tail rotor."); }
-#endif // _DEBUG
-		for (int i = 0; i < n; ++i) {
-			xctrl[i + 3] = sita[i + 3];
-		}
-	}
+
 }
 
 
@@ -1171,8 +1130,8 @@ void Rotor::BladeDynamics(const char *t)
 {
 	myTYPE euler_temp[3];
 	if (!strcmp(t, "main")) { 
-		//_flapmotionrt(); 
-		_flapmotionfx();
+		_flapmotionrt(); 
+		//_flapmotionfx();
 	}
 	else { _flapmotionfx(); }
 
@@ -1253,9 +1212,8 @@ void Rotor::AvrgInducedVel(void)
 			}
 			
 			mul = vel[0] / vtipa;
-
-			// 以后把sita3改掉，补上sita1c, sita1s			
-			ct = sigma*a0*0.5*(sita[3] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp[i - 1]);
+		
+			ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp[i - 1]);
 			lambdi_ag += ct / 2.0 / sqrt(mul*mul + lambtpp[i - 1] * lambtpp[i - 1]);
 			lambdi_ag /= 2.0;
 

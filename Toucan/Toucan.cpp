@@ -46,7 +46,7 @@ int main()
 		helicopter.SetInit(ic);
 		trimsolver.TrimSolver(helicopter, component, comps);
 	}
-	
+
 
 	printf("\n");
 	printf("Completed.\n");
