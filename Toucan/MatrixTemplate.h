@@ -1987,6 +1987,9 @@ public:
 	inline Matrix1<Type> operator()(const Matrix1<int> &A, int j);
 
 
+	inline Matrix2<Type> operator()(const Matrix2<int> &A);
+
+
 	inline Matrix2<Type> & operator=(const Matrix2<Type> &A) {
 		//check_shape(A);	
 		if (~((this->Nv == A.Nv) && (this->NI == A.NI))) {
@@ -3478,6 +3481,27 @@ inline Matrix1<double> Matrix2<double>::operator()(const Matrix1<int> &A, int j)
 	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this) (A.v_p[k], j); }
 	return temp;
 }
+
+//template<class Type>
+//inline Matrix2<Type> Matrix2<Type>::operator()(const Matrix2<int>& A)
+//{
+//	Matrix2<Type> temp(A.NI, A.NJ);
+//#ifdef BOUNDS_CHECK
+//	try {
+//		if (A(0) < 0) throw 99;
+//		if (A(0) > A(A.Nv-1))¡¡throw 99;
+//	}
+//	catch (int i) {
+//		printf_wrong_msg("Index beyond.");
+//	}
+//#endif // BOUNDS_CHECK
+//	for (int j = A.NJ - 1; j >= 0; --j) {
+//		for (int i = A.NI - 1; i >= 0; --i) {
+//			temp(i, j) = this->v_p[A(i, j)];
+//		}
+//	}
+//	return temp;
+//}
 
 
 inline Matrix1<int> Matrix2<int>::operator()(const Matrix1<int> &A, int j) {

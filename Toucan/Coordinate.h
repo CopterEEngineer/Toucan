@@ -71,9 +71,14 @@ public:
 
 	
 	template <class Type, class Coordinate> void SetCoordinate(const Type *og, const Type *el, const Coordinate *C) {
-		Type rx[3][3] = { 0 };
-		Type ry[3][3] = { 0 };
-		Type rz[3][3] = { 0 };
+		//Type rx[3][3] = { 0 };
+		//Type ry[3][3] = { 0 };
+		//Type rz[3][3] = { 0 };
+		const int dim = 3;
+		Matrix2<Type> rx(dim, dim);
+		Matrix2<Type> ry(dim, dim);
+		Matrix2<Type> rz(dim, dim);
+
 
 		base = C;
 
@@ -82,33 +87,41 @@ public:
 			euler[i] = el[i];
 		}
 		// roll
-		rx[0][0] = 1;
-		rx[1][1] = cos(euler[0]);
-		rx[2][2] = rx[1][1];
-		rx[1][2] = sin(euler[0]);
-		rx[2][1] = -sin(euler[0]);
+		rx(0, 0) = 1;
+		rx(1, 1) = cos(euler[0]);
+		rx(2, 2) = rx(1, 1);
+		rx(1, 2) = sin(euler[0]);
+		rx(2, 1) = -sin(euler[0]);
 		// pitch
-		ry[0][0] = cos(euler[1]);
-		ry[1][1] = 1;
-		ry[2][2] = ry[0][0];
-		ry[0][2] = -sin(euler[1]);
-		ry[2][0] = sin(euler[1]);
+		ry(0, 0) = cos(euler[1]);
+		ry(1, 1) = 1;
+		ry(2, 2) = ry(0, 0);
+		ry(0, 2) = sin(euler[1]);
+		ry(2, 0) = -sin(euler[1]);
 		// yaw
-		rz[0][0] = cos(euler[2]);
-		rz[1][1] = rz[0][0];
-		rz[2][2] = 1;
-		rz[0][1] = sin(euler[2]);
-		rz[1][0] = -sin(euler[2]);
+		rz(0, 0) = cos(euler[2]);
+		rz(1, 1) = rz(0, 0);
+		rz(2, 2) = 1;
+		rz(0, 1) = sin(euler[2]);
+		rz(1, 0) = -sin(euler[2]);
 
 		// Ttransf
-		Type temp[3][3] = { 0 };
+		//Type temp[3][3] = { 0 };
+		Matrix2<Type> temp1(dim, dim), temp2(dim, dim);
 #ifdef USE_DOUBLE
-		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *rx, 3, *ry, 3, 0, *temp, 3);
-		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *temp, 3, *rz, 3, 0, *Ttransf, 3);
+		//cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *rx, 3, *ry, 3, 0, *temp, 3);
+		//cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *temp, 3, *rz, 3, 0, *Ttransf, 3);
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, rx.v_p, 3, ry.v_p, 3, 0, temp1.v_p, 3);
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, temp1.v_p, 3, rz.v_p, 3, 0, temp2.v_p, 3);
 #else
-		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *rx, 3, *ry, 3, 0, *temp, 3);
-		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, *temp, 3, *rz, 3, 0, *Ttransf, 3);
+		cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, rx.v_p, 3, ry.v_p, 3, 0, temp1.v_p, 3);
+		cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 3, 3, 3, 1, temp1.v_p, 3, rz.v_p, 3, 0, temp2.v_p, 3);
 #endif // USE_DOUBLE
+		for (int j = 0; j < dim; ++j) {
+			for (int i = 0; i < dim; ++i) {
+				Ttransf[i][j] = temp2(i, j);
+			}
+		}
 
 		// Etransf
 		Etransf[0][0] = 1;
