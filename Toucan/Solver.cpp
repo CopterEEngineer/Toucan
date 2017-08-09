@@ -33,18 +33,17 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	myTYPE euler_temp[3] = { 0 };
 	myTYPE uctrl_temp[FREEDOM] = { 0 };
 	myTYPE epsilon = 1e-2;
-	const int Nitermax = 100;
+	const int Nitermax = 20;
 	myTYPE err_a, err_c;
-	myTYPE sum_a_del[Nitermax] = { 0.0 };
-	myTYPE sum_c_del[Nitermax] = { 0.0 };
+	Matrix1<myTYPE> sum_a1_del(Nitermax), sum_a2_del(Nitermax), max_c_del(Nitermax);
 	int iter = 0;
 	const Coordinate *_coordbase = H.refcoord.base;
 
 	//cout << _coordbase << endl;
 	//cout << H.refcoord.base << endl;
-
-	err_a = err_c = 1e-4;
-	sum_a_del[0] = sum_c_del[0] = 1;
+	err_a = 1.e-3;
+	err_c = 1.e-3;
+	sum_a1_del(0) = sum_a2_del(0) = max_c_del(0) = 1;
 
 	//H.SetStates(_vc, _wc, _dvc, _dwc);
 	H.SetStates();
@@ -122,50 +121,60 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			// main rotor
 			uctrl[iq] += epsilon;
 			C[MROTOR]->SetCtrl(uctrl, 3);
-			C[MROTOR]->SetAirfm();
+			for (int ic = 0; ic <= C.size() - 1; ++ic) {
+				C[ic]->SetAirfm();
+			}
 			CP.Assemble(C, _coordbase);
 			CP.GetAirfm_sg(ftemp, mtemp);			
 			H.SetDerivs(_dv_p, _dw_p, ftemp, mtemp);
 
 			uctrl[iq] -= 2 * epsilon;
 			C[MROTOR]->SetCtrl(uctrl, 3);
-			C[MROTOR]->SetAirfm();
+			for (int ic = 0; ic <= C.size() - 1; ++ic) {
+				C[ic]->SetAirfm();
+			}
 			CP.Assemble(C, _coordbase);
 			CP.GetAirfm_sg(ftemp, mtemp);
 			H.SetDerivs(_dv_n, _dw_n, ftemp, mtemp);
 
 			// jacob
 			for (int ijb = 0; ijb < 3; ++ijb) {
-				//jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
-				//jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+				jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
+				jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb, iq) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb + 3, iq) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 			}
 			uctrl[iq] += epsilon;
+			C[MROTOR]->SetCtrl(uctrl, 3);
 		}
 		// tail rotor
 		uctrl[3] += epsilon;
 		C[TROTOR]->SetCtrl(uctrl, 1);
-		C[TROTOR]->SetAirfm();
+		for (int ic = 0; ic <= C.size() - 1; ++ic) {
+			C[ic]->SetAirfm();
+		}
 		CP.Assemble(C, _coordbase);
 		CP.GetAirfm_sg(ftemp, mtemp);
 		H.SetDerivs(_dv_p, _dw_p, ftemp, mtemp);
 
 		uctrl[3] -= 2 * epsilon;
 		C[TROTOR]->SetCtrl(uctrl, 1);
-		C[TROTOR]->SetAirfm();
+		for (int ic = 0; ic <= C.size() - 1; ++ic) {
+			C[ic]->SetAirfm();
+		}
 		CP.Assemble(C, _coordbase);
 		CP.GetAirfm_sg(ftemp, mtemp);
 		H.SetDerivs(_dv_n, _dw_n, ftemp, mtemp);
 		
 		// jacob
 		for (int ijb = 0; ijb < 3; ++ijb) {
-			//jacob[ijb][3] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
-			//jacob[ijb + 3][3] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+			jacob[ijb][3] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
+			jacob[ijb + 3][3] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 			jacob_M(ijb, 3) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 			jacob_M(ijb + 3, 3) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 		}
 		uctrl[3] += epsilon;
+		C[TROTOR]->SetCtrl(uctrl, 1);
 
 		// euler
 		for (int iq = 4; iq < FREEDOM; ++iq) {
@@ -182,7 +191,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 				C[ic]->SetAirfm();
 			}
 
-			CP.Assemble(C, _coordbase); //指向的欧拉角会变吗
+			CP.Assemble(C, _coordbase); 
 			CP.GetAirfm_sg(ftemp, mtemp);
 			H.SetDerivs(_dv_p, _dw_p, ftemp, mtemp);
 
@@ -203,8 +212,8 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			H.SetDerivs(_dv_n, _dw_n, ftemp, mtemp);
 			// jacob
 			for (int ijb = 0; ijb < 3; ++ijb) {
-				//jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
-				//jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+				jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
+				jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb, iq) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb + 3, iq) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 			}
@@ -215,7 +224,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 #else
 			euler_temp[FREEDOM - iq] = uctrl[iq];
 #endif // DISABLE_SLD
-			H.refcoord.SetCoordinate(euler_temp, "euler");
+			H.refcoord.SetCoordinate(euler_temp, "euler"); //可以不用
 		}
 
 #ifndef OUTPUT_MODE
@@ -247,32 +256,40 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 		// limit
 		int ic_flg = 0;
 		if (Abs(uctrl[0]) > SITA_COLL_MAX) { 
-			uctrl[0] = SITA_COLL_MAX*Sign(uctrl[0]); 
+			//uctrl[0] = SITA_COLL_MAX*Sign(uctrl[0]); 
+			uctrl[0] = 0.5*SITA_COLL_MAX*Sign(uctrl[0]) + 0.5*uctrl[0];
+
 			++ic_flg;
 		}
 		if (Abs(uctrl[3]) > SITA_COLL_MAX) { 
-			uctrl[3] = SITA_COLL_MAX*Sign(uctrl[3]); 
+			//uctrl[3] = SITA_COLL_MAX*Sign(uctrl[3]); 
+			uctrl[3] = 0.5*SITA_COLL_MAX*Sign(uctrl[3]) + 0.5*uctrl[3];
+
 			++ic_flg;
 		}
 		if (Abs(uctrl[1]) > SITA_CYCL_MAX) { 
-			uctrl[1] = SITA_CYCL_MAX*Sign(uctrl[1]); 
+			//uctrl[1] = SITA_CYCL_MAX*Sign(uctrl[1]); 
+			uctrl[1] = 0.5*SITA_CYCL_MAX*Sign(uctrl[1]) + 0.5*uctrl[1];
+
 			++ic_flg;
 		}
 		if (Abs(uctrl[2]) > SITA_CYCL_MAX) { 
-			uctrl[2] = SITA_CYCL_MAX*Sign(uctrl[2]); 
+			//uctrl[2] = SITA_CYCL_MAX*Sign(uctrl[2]); 
+			uctrl[2] = 0.5*SITA_CYCL_MAX*Sign(uctrl[2]) + 0.5*uctrl[2];
+
 			++ic_flg;
 		}
 		if (Abs(uctrl[4]) > EULER_MAX) { 
-			uctrl[4] = EULER_MAX*Sign(uctrl[4]); 
+			//uctrl[4] = EULER_MAX*Sign(uctrl[4]); 
+			uctrl[4] = 0.5*EULER_MAX*Sign(uctrl[4]) + 0.5*uctrl[4];
+
 			++ic_flg;
 		}
 		if (Abs(uctrl[5]) > EULER_MAX) { 
-			uctrl[5] = EULER_MAX*Sign(uctrl[5]); 
+			//uctrl[5] = EULER_MAX*Sign(uctrl[5]); 
+			uctrl[5] = 0.5*EULER_MAX*Sign(uctrl[5]) + 0.5*uctrl[5];
+
 			++ic_flg;
-		}
-		if (ic_flg == FREEDOM) {
-			printf("Controls reach boundary.");
-			break;
 		}
 
 #ifndef OUTPUT_MODE
@@ -306,6 +323,10 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 		cout << endl << endl;
 #endif // !OUTPUT_MODE
 
+		if (ic_flg == FREEDOM) {
+			printf("Controls reach boundary.");
+			break;
+		}
 		
 #ifdef DISABLE_SLD
 		euler_temp[0] = uctrl[4];
@@ -328,19 +349,22 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 		H.SetDerivs(ftemp, mtemp);
 		H.GetStates(_vc, _wc, deltt, (deltt+3));
 
-		for (int ifd = 0; ifd < FREEDOM; ++ifd) {
-			sum_a_del[iter] += deltt[ifd] * deltt[ifd];
-			sum_c_del[iter] += (uctrl[ifd] / uctrl_temp[ifd] - 1) * (uctrl[ifd] / uctrl_temp[ifd] - 1);
+		max_c_del.v_p[iter] = Abs(uctrl[0] / uctrl_temp[0] - 1);
+		uctrl_temp[0] = uctrl[0];
+		for (int ifd = 1; ifd < FREEDOM; ++ifd) {
+			max_c_del.v_p[iter] = Max(max_c_del.v_p[iter], Abs(uctrl[ifd] / uctrl_temp[ifd] - 1));
 			uctrl_temp[ifd] = uctrl[ifd];
 		}
+		sum_a1_del.v_p[iter] = deltt[0] * deltt[0] + deltt[1] * deltt[1] + deltt[2] * deltt[2];
+		sum_a2_del.v_p[iter] = deltt[3] * deltt[3] + deltt[4] * deltt[4] + deltt[5] * deltt[5];
 		
-		if (sum_a_del[iter] < (err_a*err_a) && sum_c_del[iter] < (err_c*err_c)) {
+		if (Max(sum_a1_del.v_p[iter],sum_a2_del.v_p[iter]) < (err_a*err_a) && max_c_del.v_p[iter] < err_c) {
 			break; 
 		}
 #ifndef OUTPUT_MODE
 		cout << endl << endl;
-		printf("Iter: %d, Accelaration error: %f\n", iter, sum_a_del[iter]);
-		printf("Iter: %d, Control converge: %f\n", iter, sum_c_del[iter]);
+		printf("Iter: %d, Accelaration error: %f\n", iter, sum_a1_del.v_p[iter]+sum_a2_del.v_p[iter]);
+		printf("Iter: %d, Control converge: %f\n", iter, max_c_del.v_p[iter]);
 		cout << endl << endl;
 #endif // !OUTPUT_MODE
 
@@ -352,8 +376,15 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n", mtemp[0], mtemp[1], mtemp[2]);
 	cout << endl << endl;
+	sum_a1_del.output("sum_a1_del.output", 8);
+	sum_a2_del.output("sum_a2_del.output", 8);
+	max_c_del.output("max_c_del.output", 8);
 #endif // OUTPUT_MODE
-
+	Matrix1<myTYPE> uctrl_M(FREEDOM);
+	for (int i = 0; i < FREEDOM; ++i) { uctrl_M.v_p[i] = uctrl[i]/PI*180.0; }
+	printf("Finally controls: \n");
+	uctrl_M.output(4);
+	uctrl_M.outputs("uctrl.output", 4);
 #endif // FLIGHT_TRIM
 
 
