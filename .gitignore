@@ -15,6 +15,7 @@
 *.vsps
 *.csv
 *.xlsx
+MatrixTemplate.h
 
 # add an exception (using !)
 !ReadMe.txt
