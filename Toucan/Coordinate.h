@@ -15,7 +15,7 @@ public:
 	//Matrix1<myTYPE> origin, euler;
 	myTYPE Ttransf[3][3], Etransf[3][3];
 	//Matrix2<myTYPE> Transf, Etransf;
-	const Coordinate* base;
+	const Coordinate* base; // may be Coordinate * const base ??
 
 	Coordinate() {
 		//print_cons_on_screen("Coordinate");

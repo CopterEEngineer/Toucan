@@ -14,8 +14,6 @@
 
 // macro definition
 
-#define TEST_DATA
-//#define OUTPUT_MODE
 #define SLUG_CONST 32.174
 #define UNIT_CONST (32.1522/32.174)
 
@@ -73,13 +71,20 @@
 #define NBLADE 2
 #endif // UL496
 
-#ifdef NDEBUG // release configuration
-#define DISABLE_REVISE_SIZE 1
-#endif // NDEBUG
 
+#define OUTPUT_MODE
 #ifdef _DEBUG // debug configuration
 #define DISABLE_REVISE_SIZE 0
-#endif // DISABLE_REVISE_SIZE
+#define TEST_DATA
+#define OUTPUT_MODE_1
+
+#elif NDEBUG // release configuration
+#define DISABLE_REVISE_SIZE 1
+#define OUTPUT_MODE_2
+
+#endif // _DEBUG
+
+//#define TEST_MODE
 
 #define MAX_SIZE 21600
 #define ROLL_SLD_RE
@@ -346,12 +351,12 @@ private:
 			C[i]->SetAirfm_cg(base);
 			C[i]->GetAirfm_cg(ftemp, mtemp);
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE_1
 			printf("Component %d aerodynamics at CG: \n", i);
 			printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 			printf("M: %f, %f, %f \n", mtemp[0], mtemp[1], mtemp[2]);
 			cout << endl << endl;
-#endif // OUTPUT_MODE
+#endif // OUTPUT_MODE_1
 
 			for (int j = 0; j < 3; ++j) {
 				f[j] += ftemp[j];
@@ -421,7 +426,7 @@ public:
 	~Fuselage();
 
 	// member functions
-	inline void SetAirfm(void);
+	void SetAirfm(void);
 
 
 };
@@ -446,7 +451,7 @@ public:
 	~Wing();
 
 	// member functions
-	inline void SetAirfm(void);
+	void SetAirfm(void);
 };
 
 
@@ -515,10 +520,10 @@ private:
 		_ra = rastation(0, id_ns);
 
 		_lambdh = lambdh.interplinear_fast(azstation(id_nf, 0), _ra, _az, _ra);
-#ifdef OUTPUT_MODE
-		_lambdh.outputs("_lambdh.output", 4);
-#endif // OUTPUT_MODE
 
+#ifdef TEST_MODE
+		_lambdh.outputs("_lambdh.output", 4);
+#endif // TEST_MODE
 
 		// air velocity
 #ifdef ROLL_SLD_RE
@@ -552,10 +557,10 @@ private:
 		_ut *= mcos(sweep);
 		_ut = _ut*vtipa;
 
-#ifdef OUTPUT_MODE
+#ifdef TEST_MODE
 		_up.outputs("_up.output", 4);
 		_ut.outputs("_ut.output", 4);
-#endif // OUTPUT_MODE
+#endif // TEST_MODE
 
 		_ua = msqrt(_ut*_ut + _up*_up);
 		_ua = _ua / vsound;
@@ -590,7 +595,7 @@ private:
 		// air coefficients
 		_aerodynacoef(_cl, _cd, _incidn, _ua);
 
-#ifdef OUTPUT_MODE
+#ifdef TEST_MODE
 
 		//cout << "up" << endl;
 		//_up.output(4);
@@ -624,7 +629,7 @@ private:
 		//cout << "_ua" << endl;
 		//_ua.output(4);
 		_ua.outputs("_ma.output", 4);
-#endif // OUTPUT_MODE
+#endif // TEST_MODE
 
 		//cout << "*********************************************************" << endl;
 
@@ -646,10 +651,10 @@ private:
 		_cl *= _factor;
 		_cd *= _factor;
 
-#ifdef OUTPUT_MODE
+#ifdef TEST_MODE
 		_cl.outputs("_dL.output", 4);
 		_cd.outputs("_dD.output", 4);
-#endif // OUTPUT_MODE
+#endif // TEST_MODE
 
 		_dfx = _cl * msin(_inflow) + _cd * mcos(_inflow);
 		_dfz = _cl * mcos(_inflow) - _cd * msin(_inflow);
@@ -678,11 +683,11 @@ private:
 			db = (-beta[1] * sin(ia) + beta[2] * cos(ia)) * omega;
 
 			_setairfm(_dfx, _dfz, _dfr, it, b, db);
-#ifdef OUTPUT_MODE
+#ifdef TEST_MODE
 			_dfx.outputs("_dfx.output", 4);
 			_dfz.outputs("_dfz.output", 4);
 			_dfr.outputs("_dfr.output", 4);
-#endif // OUTPUT_MODE
+#endif // TEST_MODE
 
 			_dt = _dfz*cos(b);
 			_yf = _dfx*cos(ia) - _dfr*sin(ia);
@@ -691,11 +696,6 @@ private:
 			f[0] -= _hf.sum()*NBLADE / nf;
 			f[1] -= _yf.sum()*NBLADE / nf;
 			f[2] -= _dt.sum()*NBLADE / nf;
-
-#ifdef OUTPUT_MODE
-			cout << i << endl;
-			cout << "F[2]: " << f[2] << endl << endl;
-#endif // OUTPUT_MODE
 
 			ra2 = (ra - eflap)*sin(b);
 			ra1 = (ra - eflap)*cos(b) + eflap;
@@ -778,11 +778,6 @@ private:
 		f_temp(2, 2) = 0;
 		f_temp(2, 3)= 0.5*gama*(0.25 - 1.0 / 3.0*eflap + 0.75*mul*mul*(0.5 - eflap + 0.5*eflap*eflap));
 
-		/*cout << endl << endl;
-		f_temp.output(4);
-		cout << endl << endl;
-		c_temp.output(4);
-		cout << endl << endl;*/
 		
 		f22 = (f_temp.matrixmultiplyP2(c_temp)) * omega*omega;
 
@@ -1186,7 +1181,7 @@ public:
 
 	void AvrgInducedVel(void);
 
-	inline void SetAirfm(void);
+	void SetAirfm(void);
 
 	void functest(void);
 

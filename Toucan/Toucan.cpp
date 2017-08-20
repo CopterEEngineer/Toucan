@@ -42,11 +42,12 @@ int main()
 	comps.back()->SetCoordBase();
 #endif // FLIGHT_TRIM
 
+	tStart = clock();
 	for (int ic = 0; ic < CASE_NUM; ++ic) {
 		helicopter.SetInit(ic);
 		trimsolver.TrimSolver(helicopter, component, comps);
 	}
-
+	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
 
 	printf("\n");
 	printf("Completed.\n");

@@ -144,6 +144,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Algorithm.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="Coordinate.h" />
     <ClInclude Include="DebugHelper.h" />
@@ -156,6 +157,9 @@
   <ItemGroup>
     <ClCompile Include="Algorithm.cpp" />
     <ClCompile Include="Component.cpp" />
+    <ClCompile Include="Copter.cpp" />
+    <ClCompile Include="Fuselage.cpp" />
+    <ClCompile Include="Rotor.cpp" />
     <ClCompile Include="Solver.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -165,6 +169,7 @@
     </ClCompile>
     <ClCompile Include="Toucan.cpp" />
     <ClCompile Include="UnitTest.cpp" />
+    <ClCompile Include="Wing.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -40,7 +40,7 @@ typedef double myTYPE; //float //
 #include <string>
 #include "mkl.h"
 #include "mkl_vml.h"
-#include "Algorithm.h"
+#include <omp.h>
 
 
 using std::cout;
@@ -50,6 +50,22 @@ using std::exception;
 using std::string;
 using std::ifstream;
 using std::ofstream;
+
+
+template<class _Ty>
+_Ty _Atan2(const _Ty &m, const _Ty &n)
+{
+	_Ty aoa = 0;
+	if (((m > 0) && (n > 0)) || ((m < 0) && (n > 0))) { aoa = atan(m / n); }
+	else if ((m > 0) && (n < 0)) { aoa = atan(m / n) + PI; }
+	else if ((m < 0) && (n < 0)) { aoa = atan(m / n) - PI; }
+	else if ((m == 0) && (n > 0)) { aoa = 0.0; }
+	else if ((m == 0) && (n < 0)) { aoa = PI; }
+	else if ((m > 0) && (n == 0)) { aoa = PI / 2; }
+	else if ((m < 0) && (n == 0)) { aoa = -PI / 2; }
+	else { aoa = 0.0; }
+	return aoa;
+}
 
 
 //define matrix template
@@ -269,7 +285,7 @@ public:
 		}
 		else {
 			cout << "Matrix has been allocated." << endl;
-			system("pause");
+			//system("pause");
 			cout << "Go" << endl;
 		}
 #if(INI)
@@ -2476,6 +2492,60 @@ public:
 	inline Matrix2<Type> operator()(int axis0, int axis1, const Matrix2<int> &A);
 
 
+	inline Matrix2<Type> operator()(int axis, int id) {
+		Matrix2<Type> temp;
+		if (axis == 0) {
+			temp.allocate(NJ, NK);
+#ifdef BOUNDS_CHECK
+			if (id > NI || id < 0) {
+				printf("Bound error");
+				system("pause");
+			}
+#endif // BOUND_CHECK
+
+			for (int i = NJ - 1; i >= 0; --i) {
+				for (int j = NK - 1; j >= 0; --j) {
+					temp(i, j) = (*this)(id, i, j);
+				}
+			}
+		}
+		else if (axis == 1) {
+			temp.allocate(NI, NK);
+#ifdef BOUNDS_CHECK
+			if (id > NJ || id < 0) {
+				printf("Bound error");
+				system("pause");
+			}
+#endif // BOUND_CHECK
+			for (int i = NI - 1; i >= 0; --i) {
+				for (int j = NK - 1; j >= 0; --j) {
+					temp(i, j) = (*this)(i, id, j);
+				}
+			}
+		}
+		else if (axis == 2) {
+			temp.allocate(NI, NJ);
+#ifdef BOUNDS_CHECK
+			if (id > NK || id < 0) {
+				printf("Bound error");
+				system("pause");
+			}
+#endif // BOUND_CHECK
+			for (int i = NI - 1; i >= 0; --i) {
+				for (int j = NJ - 1; j >= 0; --j) {
+					temp(i, j) = (*this)(i, j, id);
+				}
+			}
+		}
+		else {
+			//Matrix2<Type> temp(1, 1);
+			cout << "Wrong axis gotten in Matrix3 data drawn." << endl;
+			system("pause");
+		}
+		return temp;
+	}
+
+
 	inline Matrix3<Type> operator()(const Matrix3<int> &A);
 
 
@@ -3053,7 +3123,884 @@ public:
 
 
 
+template<class Type> class SpMtrx {
+	Type aa = 0;//用于()重载的时候返回零元素地址，防止野指针
+public:
+	Type *v;
+	int *ia, *ja; // 行偏移, 列编号，均从1开始计数
 
+	//稀疏矩阵的类型：
+	//0（默认）对称稀疏矩阵，只存储右上半
+	//1 非对称矩阵存储全部
+	//在做矩阵乘以向量和求解线性方程组的时候是要区别对待
+	//其余时候，特别是（）取值操作时一样对待，
+	//也就是说，对于SpMtxType = 0的对称矩阵，当取(I,J)时，若I>J则返回0，并不会取（J,I）的值
+	int SpMtxType = 0;
+
+
+	int Nv, N; // 元素总数，行数
+
+
+	SpMtrx() {
+		Nv = 0;
+		N = 0;
+		ia = new int[0];
+		ja = new int[0];
+		v = new Type[0];
+	};
+
+	SpMtrx(int n, int nv) {
+		Nv = nv;
+		N = n;
+		ia = new int[N + 1];
+		ja = new int[Nv];
+		v = new Type[Nv];
+	}
+
+	SpMtrx(const SpMtrx<Type> &A) {
+		Nv = A.Nv;
+		N = A.N;
+		ia = new int[N + 1];
+		ja = new int[Nv];
+		v = new Type[Nv];
+		for (int i = 0; i < Nv; i++) {
+			v[i] = A.v[i];
+			ja[i] = A.ja[i];
+		}
+		for (int i = 0; i < N + 1; i++) {
+			ia[i] = A.ia[i];
+		}
+	}
+
+	~SpMtrx() {
+		Nv = 0;
+		N = 0;
+		delete[] ia, ja, v;
+	};
+
+	void allocate(int n, int nv) {
+		delete[] ia, ja, v;
+		Nv = nv;
+		N = n;
+		ja = new int[Nv];
+		v = new Type[Nv];
+		ia = new int[N + 1];
+
+	}
+
+	void allocate(int n, int nv, Type *vin, int *iain, int *jain) {
+		delete[] ia, ja, v;
+		Nv = nv;
+		N = n;
+		ia = new int[N + 1];
+		ja = new int[Nv];
+		v = new Type[Nv];
+		for (int i = 0; i < Nv; i++) {
+			v[i] = vin[i];
+			ja[i] = jain[i];
+		}
+		for (int i = 0; i < N + 1; i++) {
+			ia[i] = iain[i];
+		}
+
+	}
+
+	void deallocate() {
+		Nv = 0;
+		N = 0;
+		delete[] ia, ja, v;
+		v = new Type[0];
+		ia = new int[0];
+		ja = new int[0];
+	}
+
+	void refine() {
+		//剔除稀疏矩阵中的零元
+		int Nv2 = Nv;
+		for (int i = 0; i < Nv; i++) {
+			if (v[i] == 0) {
+				ja[i] = 0;
+				Nv2--;
+			}
+		}
+		double *v2;
+		int k = 0;
+		v2 = new double[Nv2];
+		for (int i = 0; i < Nv; i++) {
+			if (ja[i] != 0) {
+				v2[k] = v[i];
+				k++;
+			}
+		}
+
+		delete[] v;
+		v = v2;//指针操作
+
+		int *ia2;
+		ia2 = new int[N + 1];
+		ia2[0] = 1;
+		for (int i = 0; i < N; i++) {
+			ia2[i + 1] = ia[i + 1];
+			for (int j = ja[0]; j < ia[i + 1]; j++) {
+				if (ja[j - 1] == 0) {
+					ia2[i + 1]--;
+				}
+			}
+		}
+		delete[] ia;
+		ia = ia2;
+
+
+		int *ja2;
+		k = 0;
+		ja2 = new int[Nv2];
+		for (int i = 0; i < Nv; i++) {
+			if (ja[i] != 0) {
+				ja2[k] = ja[i];
+				k++;
+			}
+		}
+
+		delete[] ja;
+		ja = ja2;
+
+		Nv = Nv2;
+	}
+
+	inline Type & operator()(int I) {
+#ifdef BOUNDS_CHECK
+		if (I<1) {
+			cout << "Error: I = " << I << " < 1 " << " in SpMatrix operator()" << endl;
+			system("pause");
+			I = 1;
+		}
+		if (I>Nv) {
+			cout << "Error: I = " << I << " > Nv = " << Nv << " in SpMatrix operator()" << endl;
+			system("pause");
+			I = Nv;
+		}
+#endif
+		return v[I - 1];
+	}
+
+	inline Type & operator()(int I, int J) {
+#ifdef BOUNDS_CHECK
+
+		if (I < 1) {
+			cout << "Error: I = " << I << " < 1 " << " in SpMtx" << endl;
+			system("pause");
+			I = 1;
+		}
+		if (I > N) {
+			cout << "Error: I = " << I << " > N = " << N << " in SpMtx" << endl;
+			system("pause");
+			I = N;
+		}
+		if (J < 1) {
+			cout << "Error: J = " << J << " < 1 = " << " in SpMtx" << endl;
+			system("pause");
+			J = 1;
+		}
+		if (J > N) {
+			cout << "Error: J = " << J << " > N = " << N << " in SpMtx" << endl;
+			system("pause");
+			J = N;
+		}
+#endif
+
+		for (int ii = ia[I - 1]; ii < ia[I]; ii++) {
+			if (J == ja[ii - 1]) {
+				return v[ii - 1];
+			}
+		}
+
+#ifdef BOUNDS_CHECK
+		if (aa != 0) {
+			//上次对零元强行赋值，并没有赋上
+			cout << "Warning: Sparse Element wasn't set: ";
+			cout << "  I = " << I << "  J = " << J;
+			getchar();
+		}
+#endif
+		aa = 0;//一定要将aa清零
+		return aa;
+	}
+
+	inline int & Ia(int I) {
+#ifdef BOUNDS_CHECK
+		if (I<1) {
+			cout << "Error: I = " << I << " < 1 " << " in SpMatrix Ia(int I)" << endl;
+			system("pause");
+			I = 1;
+		}
+		if (I>N + 1) {
+			cout << "Error: I = " << I << " > N+1 = " << N + 1 << " in SpMatrix Ia(int I)" << endl;
+			system("pause");
+			I = N + 1;
+		}
+
+#endif
+		return ia[I - 1];
+	}
+
+	inline int & Ja(int I) {
+#ifdef BOUNDS_CHECK
+		if (I<1) {
+			cout << "Error: I = " << I << " < 1 " << " in SpMatrix Ja(int I)" << endl;
+			system("pause");
+			I = 1;
+		}
+		if (I>Nv) {
+			cout << "Error: I = " << I << " > Nv = " << Nv << " in SpMatrix Ja(int I)" << endl;
+			system("pause");
+			I = Nv;
+		}
+#endif
+		return ja[I - 1];
+	}
+
+	inline void Output(string filename) {
+		ofstream Outfile(filename);
+		Outfile.precision(10);
+		for (int i = 0; i < Nv; i++) {
+			Outfile << v[i] << endl;
+		}
+		for (int i = 0; i < N + 1; i++) {
+			Outfile << ia[i] << endl;
+		}
+		for (int i = 0; i < Nv; i++) {
+			Outfile << ja[i] << endl;
+		}
+		Outfile.close();
+	}
+
+	inline SpMtrx<Type> & operator+=(const Type x) {
+		for (int i = 0; i < Nv; i++) {
+			this->v[i] += x;
+		}
+
+		return *this;
+	};
+
+	inline SpMtrx<Type> & operator-=(const Type x) {
+		for (int i = 0; i < Nv; i++) {
+			this->v[i] -= x;
+		}
+
+		return *this;
+	};
+
+	inline SpMtrx<Type> & operator*=(const Type x) {
+		for (int i = 0; i < Nv; i++) {
+			this->v[i] *= x;
+		}
+
+		return *this;
+	};
+	inline SpMtrx<Type> & operator/=(const Type x) {
+		for (int i = 0; i < Nv; i++) {
+			this->v[i] /= x;
+		}
+
+		return *this;
+	};
+
+	inline SpMtrx<Type> & operator=(const SpMtrx<Type> & A) {
+		if (this->Nv != A.Nv) {
+			if (this->Nv != 0) {
+				cout << "Warning: \"operator=\" in Matrix1 may be wrong, because Nv is not equal" << endl;
+				system("pause");
+			}
+			this->deallocate();
+			this->allocate(A.N, A.Nv);
+		}
+		this->SpMtxType = A.SpMtxType;
+		for (int i = 0; i <= A.N; i++) {
+			this->ia[i] = A.ia[i];
+		}
+
+		for (int i = 0; i < A.Nv; i++) {
+			this->v[i] = A.v[i];
+			this->ja[i] = A.ja[i];
+		}
+
+		return (*this);
+	};
+};
+
+inline SpMtrx<double> operator+(const SpMtrx<double> &A, const  SpMtrx<double> &B) {
+
+	SpMtrx<double> Temp, c;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N && A.N*B.N != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N != B.N && A.N*B.N != 0" << endl;
+		system("pause");
+	};
+	if (A.N == 0 && A.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N == 0 && A.Nv != 0" << endl;
+		system("pause");
+	}
+	if (B.N == 0 && B.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: B.N == 0 && B.Nv != 0" << endl;
+		system("pause");
+	}
+#endif
+	if (A.Nv == 0) {
+		c = B;
+		return c;
+	}
+	if (B.Nv == 0) {
+		c = A;
+		return c;
+	}
+	N = A.N;
+	Nv = A.Nv + B.Nv + 1;
+	Temp.allocate(N, Nv);
+	double c0 = 1.0;
+	char trans = 'N';
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	if (ierr != 0) {
+		cout << "Wrong in SpMtrx<double> operator+: ierr = " << ierr << endl;
+		system("pause");
+	}
+	Nv = Temp.Ia(N + 1) - 1;
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+	return c;
+};
+inline void Mplus(SpMtrx<double> &c, const SpMtrx<double> &A, const SpMtrx<double> &B) {
+	SpMtrx<double> Temp;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N && A.N*B.N != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N != B.N && A.N*B.N != 0" << endl;
+		system("pause");
+	};
+	if (A.N == 0 && A.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N == 0 && A.Nv != 0" << endl;
+		system("pause");
+	}
+	if (B.N == 0 && B.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: B.N == 0 && B.Nv != 0" << endl;
+		system("pause");
+	}
+#endif
+	if (A.Nv == 0) {
+		c = B;
+	}
+	if (B.Nv == 0) {
+		c = A;
+	}
+	N = A.N;
+	Nv = A.Nv + B.Nv + 1;
+	Temp.allocate(N, Nv);
+	double c0 = 1.0;
+	char trans = 'N';
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	if (ierr != 0) {
+		cout << "Wrong in SpMtrx<double> operator+: ierr = " << ierr << endl;
+		system("pause");
+	}
+	Nv = Temp.Ia(N + 1) - 1;
+	c.deallocate();
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+};
+inline void Mplus(SpMtrx<double> &c, const SpMtrx<double> &A, const SpMtrx<double> &B, double c0) {
+	//c=A+c0*B;
+	SpMtrx<double> Temp;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N && A.N*B.N != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N != B.N && A.N*B.N != 0" << endl;
+		system("pause");
+	};
+	if (A.N == 0 && A.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N == 0 && A.Nv != 0" << endl;
+		system("pause");
+	}
+	if (B.N == 0 && B.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: B.N == 0 && B.Nv != 0" << endl;
+		system("pause");
+	}
+#endif
+	if (A.Nv == 0) {
+		c = B;
+	}
+	if (B.Nv == 0) {
+		c = A;
+	}
+	N = A.N;
+	Nv = A.Nv + B.Nv + 1;
+	Temp.allocate(N, Nv);
+	char trans = 'N';
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	if (ierr != 0) {
+		cout << "Wrong in SpMtrx<double> operator+: ierr = " << ierr << endl;
+		system("pause");
+	}
+	Nv = Temp.Ia(N + 1) - 1;
+	c.deallocate();
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+};
+inline void Mplus(SpMtrx<double> &c, const SpMtrx<double> &A, const SpMtrx<double> &B, double c0, double d0) {
+	//c=c0*A+d0*B;
+	if (c0 != 0) {
+		double d1 = d0 / c0;
+		//c = (A + d1*B)*c0
+		Mplus(c, A, B, d1);
+		c *= c0;
+	}
+	else if (d0 != 0) {
+		double c1 = c0 / d0;
+		//c = (c1*A + B)*d0
+		Mplus(c, B, A, c1);
+		c *= d0;
+	}
+	else {
+		c *= 0;
+	}
+}
+
+inline SpMtrx<double> MplusT(const SpMtrx<double> &A, const  SpMtrx<double> &B) {
+	//计算 c=A+B^(T)
+	SpMtrx<double> Temp, c;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N && A.N*B.N != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N != B.N && A.N*B.N != 0" << endl;
+		system("pause");
+	};
+	if (A.N == 0 && A.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N == 0 && A.Nv != 0" << endl;
+		system("pause");
+	}
+	if (B.N == 0 && B.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: B.N == 0 && B.Nv != 0" << endl;
+		system("pause");
+	}
+#endif
+	if (A.Nv == 0) {
+		c = B;
+		return c;
+	}
+	if (B.Nv == 0) {
+		c = A;
+		return c;
+	}
+	N = A.N;
+	Nv = A.Nv + B.Nv + 1;
+	Temp.allocate(N, Nv);
+	double c0 = 1.0;
+	char trans = 'T';//
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	if (ierr != 0) {
+		cout << "Wrong in SpMtrxAddT: ierr = " << ierr << endl;
+		system("pause");
+	}
+	Nv = Temp.Ia(N + 1) - 1;
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+	return c;
+};
+inline void MplusT(SpMtrx<double> &c, const SpMtrx<double> &A, const  SpMtrx<double> &B) {
+	//计算 c=A+B^(T)
+	SpMtrx<double> Temp;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N && A.N*B.N != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N != B.N && A.N*B.N != 0" << endl;
+		system("pause");
+	};
+	if (A.N == 0 && A.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: A.N == 0 && A.Nv != 0" << endl;
+		system("pause");
+	}
+	if (B.N == 0 && B.Nv != 0) {
+		cout << "Wrong in SpMtrx operator+: B.N == 0 && B.Nv != 0" << endl;
+		system("pause");
+	}
+#endif
+	if (A.Nv == 0) {
+		c = B;
+	}
+	if (B.Nv == 0) {
+		c = A;
+	}
+	N = A.N;
+	Nv = A.Nv + B.Nv + 1;
+	Temp.allocate(N, Nv);
+	double c0 = 1.0;
+	char trans = 'T';//
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	if (ierr != 0) {
+		cout << "Wrong in SpMtrxAddT: ierr = " << ierr << endl;
+		system("pause");
+	}
+	Nv = Temp.Ia(N + 1) - 1;
+	c.deallocate();
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+};
+
+inline SpMtrx<double> operator-(const SpMtrx<double> &A, const  SpMtrx<double> &B) {
+
+	SpMtrx<double> Temp, c;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N) {
+		cout << "Error: A.N = " << A.N << " != B.N = " << B.N << " in SpMtrx<double> operator- (const SpMtrx<double> &A, const  SpMtrx<double> &B)" << endl;
+		system("pause");
+		return A;
+	};
+#endif
+	N = A.N;
+	Nv = A.Nv + B.Nv;
+	Temp.allocate(N, Nv);
+	double c0 = -1.0;
+	char trans = 'N';
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	Nv = Temp.Ia(N + 1) - 1;
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+	return c;
+};
+inline void Msubs(SpMtrx<double> &c, const SpMtrx<double> &A, const  SpMtrx<double> &B) {
+
+	SpMtrx<double> Temp;
+	int N, Nv;
+#ifdef BOUNDS_CHECK
+	if (A.N != B.N) {
+		cout << "Error: A.N = " << A.N << " != B.N = " << B.N << " in SpMtrx<double> operator- (const SpMtrx<double> &A, const  SpMtrx<double> &B)" << endl;
+		system("pause");
+	};
+#endif
+	N = A.N;
+	Nv = A.Nv + B.Nv;
+	Temp.allocate(N, Nv);
+	double c0 = -1.0;
+	char trans = 'N';
+	int ierr;
+	int request = 0, sort = 0;
+	mkl_dcsradd(&trans, &request, &sort, &N, &N, A.v, A.ja, A.ia, &c0, B.v, B.ja, B.ia, Temp.v, Temp.ja, Temp.ia, &Nv, &ierr);
+	Nv = Temp.Ia(N + 1) - 1;
+	c.deallocate();
+	c.allocate(N, Nv);
+
+	for (int i = 0; i <= c.N; i++) {
+		c.ia[i] = Temp.ia[i];
+	}
+
+	for (int i = 0; i < c.Nv; i++) {
+		c.v[i] = Temp.v[i];
+		c.ja[i] = Temp.ja[i];
+	}
+	if (A.SpMtxType == 1 || B.SpMtxType == 1) {
+		c.SpMtxType = 1;
+	}
+	else {
+		c.SpMtxType = 0;
+	}
+};
+
+inline SpMtrx<double> operator*(const double x, const SpMtrx<double> & B) {
+
+	SpMtrx<double> Temp;
+
+	Temp.allocate(B.N, B.Nv);
+
+	for (int i = 0; i <= B.N; i++) {
+		Temp.ia[i] = B.ia[i];
+		//cout << Temp.ia[i] << endl;
+	}
+
+	for (int i = 0; i < B.Nv; i++) {
+		Temp.v[i] = x*B.v[i];
+		Temp.ja[i] = B.ja[i];
+	}
+	Temp.SpMtxType = B.SpMtxType;
+
+	return Temp;
+
+};
+
+
+inline Matrix1<double> operator*(const SpMtrx<double> & A, const Matrix1<double> & X) {
+#ifdef BOUNDS_CHECK
+	if (A.N != X.Nv) {
+		cout << "Error: A.N = " << A.N << " != X.Nv = " << X.Nv << " in Matrix1<double> operator*(const SpMtrx<double> & A, const Matrix1<double> & X)" << endl;
+		system("pause");
+		return X;
+	};
+#endif
+	Matrix1<double> b(X.I0, X.I1);
+
+	if (A.SpMtxType == 0) {
+		//对称稀疏矩阵
+		const char uplo = 'U';
+		int NN = A.N;
+		mkl_dcsrsymv(&uplo, &NN, A.v, A.ia, A.ja, X.v_p, b.v_p);
+	}
+	else if (A.SpMtxType == 1) {
+		//非对称稀疏矩阵
+		const char transa = 'N';
+		int NN = A.N;
+		mkl_dcsrgemv(&transa, &NN, A.v, A.ia, A.ja, X.v_p, b.v_p);
+	}
+	return b;
+};
+inline void Mmul(Matrix1<double> &b, const SpMtrx<double> & A, const Matrix1<double> & X) {
+#ifdef BOUNDS_CHECK
+	if (A.N != X.Nv) {
+		cout << "Error: A.N = " << A.N << " != X.Nv = " << X.Nv << " in Matrix1<double> operator*(const SpMtrx<double> & A, const Matrix1<double> & X)" << endl;
+		system("pause");
+		return;
+	};
+#endif
+	if (b.Nv == 0) {
+		b.allocate(X.Nv);
+	}
+	else if (b.Nv != X.Nv) {
+		cout << "Error: b.Nv != X.Nv in SpMtrxMtpM1!" << endl;
+		system("pause");
+		return;
+	}
+
+	if (A.SpMtxType == 0) {
+		//对称稀疏矩阵
+		const char uplo = 'U';
+		int NN = A.N;
+		mkl_dcsrsymv(&uplo, &NN, A.v, A.ia, A.ja, X.v_p, b.v_p);
+	}
+	else if (A.SpMtxType == 1) {
+		//非对称稀疏矩阵
+		const char transa = 'N';
+		int NN = A.N;
+		mkl_dcsrgemv(&transa, &NN, A.v, A.ia, A.ja, X.v_p, b.v_p);
+	}
+}
+
+inline void Msolve(SpMtrx<double> &K, Matrix1<double> &F, Matrix1<double> &X) {
+
+	__int64 pt[64];
+	int maxfct = 1, mnum = 1, mtype, phase, error, msglvl;
+	int iparm[64];
+	int perm;
+	int nrhs = 1;
+
+	//Initiliaze the internal solver memory pointer.This is only necessary for the FIRST call of the PARDISO solver.
+	for (int i = 0; i < 64; i++) {
+		iparm[i] = 0;
+		pt[i] = 0;
+	}
+
+	//ompnum = omp_get_thread_num();
+	iparm[0] = 1;//no solver default
+	iparm[1] = 2;//fill - in reordering from METIS
+	iparm[2] = 0;//numbers of processors, value of OMP_NUM_THREADS
+	iparm[3] = 0;//no iterative - direct algorithm
+	iparm[4] = 0;//no user fill - in reducing permutation
+	iparm[5] = 0;//= 0 solution on the first n compoments of x
+	iparm[6] = 16;//default logical fortran unit number for output
+	iparm[7] = 9;//numbers of iterative refinement steps
+	iparm[8] = 0;//not in use
+	iparm[9] = 13;//perturbe the pivot elements with 1E-13
+	iparm[10] = 1;//use nonsymmetric permutation and scaling MPS
+	iparm[11] = 0;//not in use
+	iparm[12] = 0;//not in use
+	iparm[13] = 0;//Output: number of perturbed pivots
+	iparm[14] = 0;//not in use
+	iparm[15] = 0;//not in use
+	iparm[16] = 0;//not in use
+	iparm[17] = -1;//Output : number of nonzeros in the factor LU
+	iparm[18] = -1;//Output : Mflops for LU factorization
+	iparm[19] = 0;//Output : Numbers of CG Iterations
+	error = 0;//initialize error flag
+	msglvl = 0;//don't print statistical information
+	if (K.SpMtxType == 0) {
+		mtype = -2;//real and symmetric indefinite
+	}
+	else if (K.SpMtxType == 1) {
+		mtype = 11;//real and nonsymmetric
+	}
+	phase = 13;// Analysis, numerical factorization, solve, iterative refinement
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &K.N, K.v, K.ia, K.ja, &perm, &nrhs, iparm, &msglvl, F.v_p, X.v_p, &error);
+	if (error != 0) {
+		K.Output("K.dat");
+		F.output("F.dat");
+		cout << "ERROR1 IN SolverMKL was detected: " << error;
+		getchar();
+	}
+
+	phase = -1;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &K.N, K.v, K.ia, K.ja, &perm, &nrhs, iparm, &msglvl, F.v_p, X.v_p, &error);
+
+	if (error != 0) {
+		cout << "ERROR2 IN SolverMKL was detected: " << error;
+		getchar();
+	}
+}
+inline void Msolve(SpMtrx<double> &K, Matrix1<double> &F) {
+	//solve X = K\X;
+	__int64 pt[64];
+	int maxfct = 1, mnum = 1, mtype, phase, error, msglvl;
+	int iparm[64];
+	int perm;
+	int nrhs = 1;
+	Matrix1<double> X;
+	X = F;
+	//Initiliaze the internal solver memory pointer.This is only necessary for the FIRST call of the PARDISO solver.
+	for (int i = 0; i < 64; i++) {
+		iparm[i] = 0;
+		pt[i] = 0;
+	}
+
+	//ompnum = omp_get_thread_num();
+	iparm[0] = 1;//no solver default
+	iparm[1] = 2;//fill - in reordering from METIS
+	iparm[2] = 0;//numbers of processors, value of OMP_NUM_THREADS
+	iparm[3] = 0;//no iterative - direct algorithm
+	iparm[4] = 0;//no user fill - in reducing permutation
+	iparm[5] = 1;//= 0 solution on the first n compoments of x///**************************************
+	iparm[6] = 16;//default logical fortran unit number for output
+	iparm[7] = 9;//numbers of iterative refinement steps
+	iparm[8] = 0;//not in use
+	iparm[9] = 13;//perturbe the pivot elements with 1E-13
+	iparm[10] = 1;//use nonsymmetric permutation and scaling MPS
+	iparm[11] = 0;//not in use
+	iparm[12] = 0;//not in use
+	iparm[13] = 0;//Output: number of perturbed pivots
+	iparm[14] = 0;//not in use
+	iparm[15] = 0;//not in use
+	iparm[16] = 0;//not in use
+	iparm[17] = -1;//Output : number of nonzeros in the factor LU
+	iparm[18] = -1;//Output : Mflops for LU factorization
+	iparm[19] = 0;//Output : Numbers of CG Iterations
+	error = 0;//initialize error flag
+	msglvl = 0;//don't print statistical information
+	if (K.SpMtxType == 0) {
+		mtype = -2;//real and symmetric indefinite
+	}
+	else if (K.SpMtxType == 1) {
+		mtype = 11;//real and nonsymmetric
+	}
+	phase = 13;// Analysis, numerical factorization, solve, iterative refinement
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &K.N, K.v, K.ia, K.ja, &perm, &nrhs, iparm, &msglvl, F.v_p, X.v_p, &error);
+	if (error != 0) {
+		K.Output("K.dat");
+		F.output("F.dat");
+		cout << "ERROR1 IN SolverMKL was detected: " << error;
+		getchar();
+	}
+
+	phase = -1;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &K.N, K.v, K.ia, K.ja, &perm, &nrhs, iparm, &msglvl, F.v_p, X.v_p, &error);
+
+	if (error != 0) {
+		cout << "ERROR2 IN SolverMKL was detected: " << error;
+		getchar();
+	}
+}
+
+inline void Msolve(SpMtrx<double> &K, Matrix1<double> &F, Matrix1<double> &X, int solveid);
 
 
 
@@ -3740,7 +4687,7 @@ inline Matrix1<float> atan2(const Matrix1<float> &A, const Matrix1<float> &B) {
 	for (int i = anv - 1; i >= 0; --i) {
 		m = A.v_p[i];
 		n = B.v_p[i];
-		temp.v_p[i] = Atan2(m, n);
+		temp.v_p[i] = _Atan2(m, n);
 #ifdef _DEBUG
 		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
 			cerr << "Wrong atan." << endl;
@@ -3769,7 +4716,7 @@ inline Matrix1<double> atan2(const Matrix1<double> &A, const Matrix1<double> &B)
 	for (int i = anv - 1; i >= 0; --i) {
 		m = A.v_p[i];
 		n = B.v_p[i];
-		temp.v_p[i] = Atan2(m, n);
+		temp.v_p[i] = _Atan2(m, n);
 #ifdef _DEBUG
 		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
 			cerr << "Wrong atan." << endl;
@@ -3974,7 +4921,7 @@ inline Matrix2<float> atan2(const Matrix2<float> &A, const Matrix2<float> &B) {
 	for (int i = anv - 1; i >= 0; --i) {
 		m = A.v_p[i];
 		n = B.v_p[i];
-		temp.v_p[i] = Atan2(m, n);
+		temp.v_p[i] = _Atan2(m, n);
 #ifdef _DEBUG
 		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
 			cerr << "Wrong atan." << endl;
@@ -4003,7 +4950,7 @@ inline Matrix2<double> atan2(const Matrix2<double> &A, const Matrix2<double> &B)
 	for (int i = anv - 1; i >= 0; --i) {
 		m = A.v_p[i];
 		n = B.v_p[i];
-		temp.v_p[i] = Atan2(m, n);
+		temp.v_p[i] = _Atan2(m, n);
 #ifdef _DEBUG
 		if ((temp.v_p[i] > PI) || (temp.v_p[i] < -PI)) {
 			cerr << "Wrong atan." << endl;

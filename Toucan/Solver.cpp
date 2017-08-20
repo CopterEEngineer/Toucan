@@ -27,7 +27,9 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	myTYPE _dv_p[3], _dw_p[3], _dv_n[3], _dw_n[3];
 	myTYPE ftemp[3], mtemp[3];
 	myTYPE deltt[FREEDOM] = { 0 };
+#ifdef _DEBUG
 	myTYPE jacob[FREEDOM][FREEDOM] = { 0 };
+#endif // _DEBUG
 	Matrix2<myTYPE> jacob_M(FREEDOM, FREEDOM);
 	myTYPE uctrl[FREEDOM] = { 0 };
 	myTYPE euler_temp[3] = { 0 };
@@ -45,32 +47,38 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 
 	// get initial values
 	C[MROTOR]->GetCtrl(uctrl, 3);
+
 #ifdef FLIGHT_TRIM
+
 	C[TROTOR]->GetCtrl((uctrl + 3), 1);
+
 #ifdef DISABLE_SLD
 
-#ifdef PARALL
-	uctrl[0] = 12.1 * PI / 180;
-	uctrl[1] = 1.18 * PI / 180;
-	uctrl[2] = 3.12 * PI / 180;
-	uctrl[3] = 10.1 * PI / 180;
-#endif // PARALL
-	
 	uctrl[4] = H.refcoord.euler[0];
 	uctrl[5] = H.refcoord.euler[1];
 	euler_temp[0] = uctrl[4];
 	euler_temp[1] = uctrl[5];
 	euler_temp[2] = H.refcoord.euler[2];
 #else
+
 	uctrl[4] = H.refcoord.euler[2];
 	uctrl[5] = H.refcoord.euler[1];
 	euler_temp[0] = H.refcoord.euler[0];
 	euler_temp[1] = uctrl[5];
 	euler_temp[2] = uctrl[4];
 #endif // DISABLE_SLD
+
+#ifdef PARALL
+
+	uctrl[0] = 12.1 * PI / 180;
+	uctrl[1] = 1.18 * PI / 180;
+	uctrl[2] = 3.12 * PI / 180;
+	uctrl[3] = 10.1 * PI / 180;
+#endif // PARALL
+
 #endif // FLIGHT_TRIM
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE
 	cout << endl;
 	printf("Initial Controls:\n");
 	for (int iq = 0; iq < FREEDOM; ++iq) {
@@ -80,7 +88,6 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	cout << endl << endl;
 #endif // OUTPUT_MODE
 
-	//H.SetStates(_vc, _wc, _dvc, _dwc);
 	H.SetStates();
 	H.GetStates(_vc, _wc, _dvc, _dwc);
 #ifdef FLIGHT_TRIM
@@ -95,6 +102,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 		
 #ifdef OUTPUT_MODE
 		C[i]->GetAirfm(ftemp, mtemp);
+		printf("Init component aerodynamics.\n");
 		printf("Component %d: \n", i);
 		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 		printf("M: %f, %f, %f \n", mtemp[0], mtemp[1], mtemp[2]);
@@ -106,7 +114,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	CP.Assemble(C, _coordbase);
 	CP.GetAirfm_sg(ftemp, mtemp);
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE
 	cout << endl;
 	printf("Init guess:\n");
 	printf("Total aerodynamics at CG: \n");
@@ -118,13 +126,6 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 	H.Assemble(ftemp, mtemp);
 	H.SetDerivs();
 	H.GetStates(_vc, _wc, deltt, (deltt+3));
-
-#ifdef TEST_MODE
-	printf("%f, %f, %f\n", deltt[0], deltt[1], deltt[2]);
-	printf("%f, %f, %f\n", deltt[3], deltt[4], deltt[5]);
-
-#endif // TEST_MODE
-
 
 
 	for (int ifd = 0; ifd < FREEDOM; ++ifd) { uctrl_temp[ifd] = 1; }
@@ -148,8 +149,11 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 
 		// jacob
 		for (int ijb = 0; ijb < 3; ++ijb) {
+#ifdef _DEBUG
 			jacob[ijb][3] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 			jacob[ijb + 3][3] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+#endif // _DEBUG
+
 			jacob_M(ijb, 3) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 			jacob_M(ijb + 3, 3) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 		}
@@ -178,8 +182,11 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 
 			// jacob
 			for (int ijb = 0; ijb < 3; ++ijb) {
+#ifdef _DEBUG
 				jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+#endif // _DEBUG
+
 				jacob_M(ijb, iq) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb + 3, iq) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 			}
@@ -224,8 +231,11 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			H.SetDerivs(_dv_n, _dw_n, ftemp, mtemp);
 			// jacob
 			for (int ijb = 0; ijb < 3; ++ijb) {
+#ifdef _DEBUG
 				jacob[ijb][iq] = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob[ijb + 3][iq] = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
+#endif // _DEBUG
+
 				jacob_M(ijb, iq) = (_dv_p[ijb] - _dv_n[ijb]) / 2 / epsilon;
 				jacob_M(ijb + 3, iq) = (_dw_p[ijb] - _dw_n[ijb]) / 2 / epsilon;
 			}
@@ -239,7 +249,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			H.refcoord.SetCoordinate(euler_temp, "euler"); 
 		}
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE_1
 		cout << endl;
 		printf("Accelaration:\n");
 		for (int iq = 0; iq < FREEDOM; ++iq) {
@@ -256,10 +266,9 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			}
 			cout << endl;
 		}
-#endif // !OUTPUT_MODE
+#endif // !OUTPUT_MODE_1
 
 		// update deltt, flight states, aerodynamics etc. 
-
 		Msolver(jacob_M.v_p, deltt, 6);
 		for (int iq = 0; iq < FREEDOM; ++iq) {
 			uctrl[iq] -= deltt[iq];
@@ -297,7 +306,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			++ic_flg;
 		}
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE_1
 		cout << endl;
 		printf("Delta controls (degs).\n");
 		for (int iq = 0; iq < FREEDOM; ++iq) {
@@ -326,7 +335,7 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 			cout << uctrl[iq] << "\t";
 		}
 		cout << endl << endl;
-#endif // !OUTPUT_MODE
+#endif // !OUTPUT_MODE_1
 
 		if (ic_flg == FREEDOM) {
 			printf("Controls reach boundary.");
@@ -363,34 +372,45 @@ void Solver::TrimSolver(Copter &H, Component &CP, const std::vector<std::unique_
 		sum_a1_del.v_p[iter] = deltt[0] * deltt[0] + deltt[1] * deltt[1] + deltt[2] * deltt[2];
 		sum_a2_del.v_p[iter] = deltt[3] * deltt[3] + deltt[4] * deltt[4] + deltt[5] * deltt[5];
 
-#ifndef OUTPUT_MODE
-		cout << endl << endl;
-		printf("Iter: %d, Accelaration error: %f\n", iter, sum_a1_del.v_p[iter] + sum_a2_del.v_p[iter]);
-		printf("Iter: %d, Control converge: %f\n", iter, max_c_del.v_p[iter]);
-		cout << endl << endl;
-#endif // !OUTPUT_MODE		
-
 		if (Max(sum_a1_del.v_p[iter],sum_a2_del.v_p[iter]) < (err_a*err_a) && max_c_del.v_p[iter] < err_c) {
 			break; 
 		}
 
 	}
 
-#ifndef OUTPUT_MODE
+#ifdef OUTPUT_MODE
 	cout << endl;
 	printf("Iter: %d, Total aerodynamics at CG: \n", iter);
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n", mtemp[0], mtemp[1], mtemp[2]);
-	cout << endl << endl;
+#ifdef OUTPUT_MODE_1
+	printf("Accelaration error: %f, %f\n", sum_a1_del.v_p[iter], sum_a2_del.v_p[iter]);
+	printf("Control converge: %f \n", max_c_del.v_p[iter]);
+#endif // OUTPUT_MODE_1
+	printf("Finally controls: \n");
+	for (int iq = 0; iq < FREEDOM; ++iq) {
+		cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+		cout << uctrl[iq] * 180.0 / PI << "\t";
+	}
+#endif // OUTPUT_MODE
+
 	sum_a1_del.outputs("sum_a1_del.output", 8);
 	sum_a2_del.outputs("sum_a2_del.output", 8);
 	max_c_del.outputs("max_c_del.output", 8);
-#endif // OUTPUT_MODE
-	Matrix1<myTYPE> uctrl_M(FREEDOM);
-	for (int i = 0; i < FREEDOM; ++i) { uctrl_M.v_p[i] = uctrl[i]/PI*180.0; }
-	printf("Finally controls: \n");
-	uctrl_M.output(4);
-	uctrl_M.outputs("uctrl.output", 4);
+	ofstream OutFile("uctrl.output", std::ios::app);
+	//ofstream OutFile("uctrl.output");
+	if (OutFile) {
+		OutFile.precision(6);
+		for (int i = 0; i < FREEDOM; ++i) {
+			OutFile << std::right << std::setw(6 + 2) << std::setprecision(6) << std::fixed << std::showpoint;
+			OutFile << uctrl[i]*180.0/PI << '\t';
+		}
+		OutFile << endl;
+		OutFile.close();
+	}
+	else {
+		cout << "uctrl.output" << " open failed." << endl;
+		system("pause");
+	}
+
 #endif // FLIGHT_TRIM
 
 
