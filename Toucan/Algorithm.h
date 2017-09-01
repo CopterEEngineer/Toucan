@@ -618,5 +618,30 @@ void Msolver(float *A, float *b, const int n, const int nrhs = 1);
 void SolveSpEig(SpMtrx<double> &K, SpMtrx<double> &M, Matrix1<double> &lam, Matrix2<double> &Vn, int Nwmax, double emin, double emax, int &Nw);
 
 
+class GenArf {
+public:
+	double pho;
+	double af, am, bt, r;
+	double ck, c0, c1, c2, c3, c4, c5;
+
+	GenArf() { pho = 0.0; }
+	~GenArf() { ; }
+
+	void InitCoef(double dt) {
+		af = pho / (pho + 1.0);
+		am = (2.0*pho - 1.0) / (pho + 1.0);
+		bt = 4.0 / (1 - am + af) / (1 - am + af);
+		r = 0.5 - am + af;
+
+		ck = 1.0 - af;
+		c0 = (1 - am)*bt / dt / dt;
+		c1 = ck*r*bt / dt;
+		c2 = dt*c0;
+		c3 = c2*dt / 2.0 - 1.0;
+		c4 = ck*r*bt - 1.0;
+		c5 = ck*(r / 2.0*bt - 1.0)*dt;
+	}
+};
+
 
 #endif // !Algorithm_h

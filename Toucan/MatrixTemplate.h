@@ -606,6 +606,33 @@ public:
 		return temp;
 	}
 
+	inline void input(string filename) {
+		int m;
+		ifstream InFile(filename);
+		InFile >> m;
+#ifdef BOUNDS_CHECK
+		try {
+			if (m != Nv) throw 99;
+		}
+		catch (int i) {
+			printf("Shape error: input %d is not consistent with %d. \n", m, Nv);
+			system("pause");
+		}
+		catch (...) {
+			cerr << "Exception caught." << endl;
+			system("pause");
+		}
+#endif
+		if (InFile) {
+			for (int i = 0; i < m; ++i) {
+				InFile >> this->v_p[i];
+			}
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}
+	}
 
 	inline void output(int presc = 2) {
 		cout.precision(presc);
@@ -665,10 +692,6 @@ public:
 
 		OutFile.close();
 	}
-
-
-	inline void input(string filename);
-
 
 	inline void output(ofstream &outfile) {
 		for (int i = I0; i <= I1; ++i) { outfile << v_p[i] << "\t"; }

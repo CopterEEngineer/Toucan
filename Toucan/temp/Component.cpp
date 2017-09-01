@@ -16,8 +16,6 @@ Component::Component() :Copter() {
 		airforce_sigma[i] = 0;
 		airmoment_sigma[i] = 0;
 	}
-	//cout << refcoord.base << endl;
-
 }
 
 
@@ -37,17 +35,7 @@ Component::Component(const Component &C) :Copter(C) {
 
 
 Component::~Component() {
-	//print_dscons_on_screen("Component");
-	for (int i = 2; i >= 0; --i) {
-		vel[i] = 0;
-		omg[i] = 0;
-		dvel[i] = 0;
-		domg[i] = 0;
-		airforce[i] = 0;
-		airmoment[i] = 0;
-		airforce_cg[i] = 0;
-		airmoment_cg[i] = 0;
-	}
+	;
 }
 
 

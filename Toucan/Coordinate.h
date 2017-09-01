@@ -169,6 +169,7 @@ public:
 	void SetBase(const Coordinate *C) {
 		base = C;
 	}
+
 };
 
 

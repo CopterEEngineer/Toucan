@@ -4,8 +4,12 @@
 #include "stdafx.h"
 #include "MatrixTemplate.h"
 #include "Coordinate.h"
-#include "Component.h"
+//#include "Component.h"
+#include "Components.h"
 #include "Solver.h"
+
+#include "SimCase.h"
+//#include "Solver.h"
 #include "UnitTest.h"
 
 #include <vector>
@@ -16,41 +20,28 @@
 
 int main()
 {
-	Solver trimsolver;
-	Copter helicopter;
-	Component component;
-	Coordinate *BASE_COORD = &helicopter.refcoord;
-	std::vector<std::unique_ptr<Component>> comps;
+	Jobs jobs;
+	Model_UL496 ul496;
+	Copter copter;
+	CopterSolver solver;
+	int s, e;
 	clock_t tStart;
 
-	// order fixed
-	comps.emplace_back(new Rotor("main"));
-	comps.emplace_back(new Fuselage);
-	comps.emplace_back(new Wing("hor"));
-	comps.emplace_back(new Wing("ver", 1));
-	comps.emplace_back(new Wing("ver", 2));
-	comps.emplace_back(new Rotor("tail"));
-
-	component.refcoord.SetBase(BASE_COORD);
-	for (auto it = comps.cbegin(); it != comps.cend(); ++it) {
-		(*it)->refcoord.SetBase(BASE_COORD);
-	}
-	cout << comps.size() << endl;
-
-#ifdef FLIGHT_TRIM
-	comps[0]->SetCoordBase();
-	comps.back()->SetCoordBase();
-#endif // FLIGHT_TRIM
-
+	ul496.GetProb();
+	ul496.GetModel();
+	copter.InitRotorCraft(ul496);
+	
+	jobs.InitProject();
+	s = 0, e = 2; // jobs.nCase;
 	tStart = clock();
-	for (int ic = 0; ic < CASE_NUM; ++ic) {
-		helicopter.SetInit(ic);
-		trimsolver.TrimSolver(helicopter, component, comps);
+	for (int i = s; i < 1; ++i)
+	{
+		jobs.SetSimCond(copter, i);
+		solver.CopterSimulation(copter);
+		jobs.PostProcess(copter, i, s, e);
 	}
 	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
 
-	printf("\n");
-	printf("Completed.\n");
 	system("pause");
 	return 0;
 }

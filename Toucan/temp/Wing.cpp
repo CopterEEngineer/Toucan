@@ -98,7 +98,7 @@ Wing::~Wing() {
 }
 
 
-inline void Wing::SetAirfm(void) {
+void Wing::SetAirfm(void) {
 	myTYPE stot, ar, a03d;
 	myTYPE aoa, cl, cd, vel2;
 	myTYPE f[3] = { 0 };
@@ -140,3 +140,71 @@ inline void Wing::SetAirfm(void) {
 
 
 }
+
+
+void Wing::Wing_UT496(void)
+{
+	myTYPE origin[3], euler[3];
+
+	strcpy(type, "hor");
+	origin[0] = -7.87;
+	origin[1] = 0;
+	origin[2] = 0;
+	euler[0] = 0;
+	euler[1] = 4 * PI / 180;
+	euler[2] = 0;
+	refcoord.SetCoordinate(origin, euler, refcoord.base); // base copy constructor give correct base if no need to revise
+
+	a0 = 5.73;
+	cd0 = 0.04;
+	cd1 = 0;
+	cd2 = 0;
+	span = 3.75;
+	chord = 1;
+	taper = 1;
+}
+
+
+void Wing::Fin_UT496(int num)
+{
+	myTYPE origin[3], euler[3];
+	strcpy(type, "ver");
+
+	span = 1.33;
+	chord = 1.13;
+	taper = 0.51;
+	a0 = 5.3;
+	cd0 = 0.0105;
+	cd1 = 0;
+	cd2 = 0.01325;
+	if (num == 1) {
+		origin[0] = -(7.87 + 0.164);
+		origin[1] = 3.75 / 2;
+		origin[2] = 0;
+		euler[0] = PI / 2;
+		euler[1] = 0;
+		euler[2] = 5 * PI / 180;
+		refcoord.SetCoordinate(origin, euler, refcoord.base);
+	}
+	else if (num == 2) {
+		origin[0] = -(7.87 - 0.164);
+		origin[1] = -3.75 / 2;
+		origin[2] = 0;
+		euler[0] = PI / 2;
+		euler[1] = 0;
+		euler[2] = 5 * PI / 180;
+		refcoord.SetCoordinate(origin, euler, refcoord.base);
+	}
+	else {
+		print_wrong_msg("Wrong wing definition.");
+	}
+}
+
+
+//void Wing::GetModel(void)
+//{
+//	if (!strcmp(s, "hor"))
+//	Wing_UT496();
+//	Fin_UT496(1);
+//	Fin_UT496(2);
+//}

@@ -213,9 +213,11 @@ public:
 
 	void SetDerivs(void);
 
-	//void SetDerivs(myTYPE dv[3], myTYPE dw[3]);
-
 	void SetInit(const int ic);
+
+	virtual void GetModel(void) { ; }
+
+	void Copter_UT496(void);
 
 	void GetStates(myTYPE v[3], myTYPE w[3], myTYPE dv[3], myTYPE dw[3]) {
 		for (int i = 2; i >= 0; --i) {
@@ -296,6 +298,8 @@ public:
 
 	void Assemble(const std::vector<std::unique_ptr<Component>> & C, const Coordinate *base);
 
+	
+	//virtual void GetModel(void) { ; }
 
 
 	void functest(std::vector<Component> &C);
@@ -428,7 +432,9 @@ public:
 	// member functions
 	void SetAirfm(void);
 
+	void Fuse_UT496(void);
 
+	virtual void GetModel(void) { ; }
 };
 
 
@@ -452,6 +458,12 @@ public:
 
 	// member functions
 	void SetAirfm(void);
+
+	void Wing_UT496(void);
+
+	void Fin_UT496(int num);
+
+	virtual void GetModel(void) { ; }
 };
 
 
