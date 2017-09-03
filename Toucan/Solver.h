@@ -19,6 +19,7 @@ private:
 	void _TransientSolver(Copter &C);
 	void _CompsSetAirFM(Copter &C);
 	void _Assemble(Copter &C);
+	void _EnableWake(Copter &C);
 
 	template <class _Ty>
 	void _CompsSetStates(Copter &C, const _Ty *vc, const _Ty *wc, const _Ty *dvc, const _Ty *dwc);
@@ -280,12 +281,17 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 				cout << DEG(xctrl[iq]) << "\t";
 			}
 			cout << endl;
+
+			printf("Translation Accelation: %f \n", sum_a1_del(iter));
+			printf("Angular Accelation: %f \n", sum_a2_del(iter));
+			printf("Max Controls Delt: %f \n", max_c_del(iter));
+
 #endif // OUTPUT_MODE
-#ifdef _DEBUG
+
 			sum_a1_del.outputs("sum_a1_del.output", 8);
 			sum_a2_del.outputs("sum_a2_del.output", 8);
 			max_c_del.outputs("max_c_del.output", 8);
-#endif // _DEBUG
+
 			return false;
 		}
 	}

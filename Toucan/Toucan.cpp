@@ -32,9 +32,9 @@ int main()
 	copter.InitRotorCraft(ul496);
 	
 	jobs.InitProject();
-	s = 0, e = 2; // jobs.nCase;
+	s = 0, e = jobs.nCase;
 	tStart = clock();
-	for (int i = s; i < 1; ++i)
+	for (int i = s; i < e; ++i)
 	{
 		jobs.SetSimCond(copter, i);
 		solver.CopterSimulation(copter);

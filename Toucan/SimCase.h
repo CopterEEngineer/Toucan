@@ -8,7 +8,7 @@ class Model_UL496 :public ModelCase
 {
 public:
 	Model_UL496() : ModelCase() { ; }
-	Model_UL496(const Model_UL496 &M) :ModelCase(M) { ; }
+	//Model_UL496(const Model_UL496 &M) :ModelCase(M) { ; }
 	~Model_UL496() { ; }
 
 	void GetModel(void);
@@ -29,6 +29,7 @@ public:
 
 private:
 	Matrix1<double> Mus, Pits;
+	Matrix1<int> Kwtips;
 public:
 	int nCase;
 };

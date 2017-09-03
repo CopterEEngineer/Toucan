@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SimCase.h"
+#include <string>
 
 void Model_UL496::GetProb(void)
 {
@@ -95,9 +96,9 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	R.type = Mrotor;
 	R.teeter = true, R.nb = 2;
 	R.amb = amb;
-	R.bld.soltype = Rotation, R.adyna = PWake;
+	R.bld.soltype = Rotation, R.adyna = PWake; //Averaged; // 
 	R.nf = 72, R.ns = 40, R.ni = 10; 
-	R.kwtip = 5, R.kwrot = 5; R.nk = R.nf*R.kwtip;
+	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
 	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
 
@@ -113,7 +114,8 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	R.cdtc.allocate(52, 12), R.cdtc.input("vr7_cd_c81.txt");
 	R.iflap = 24.93, R.m1 = 3.25;
 	R.sigma = 0.0309, R.gama = 5.01*amb.rho / 0.002378;	
-	R.chord.setvalue(0.558), R.sweep.setvalue(0);
+	R.chord.setvalue(0.558); // chord have unit
+	R.sweep.setvalue(0);
 	myTYPE temp_twist, temp_azimuth, temp_station;
 	for (int j = R.ns - 1; j >= 0; --j) {
 		temp_station = R.rroot + j*(1.0 - R.rroot) / (R.ns - 1); // uniform seperated accepted so far.
@@ -196,13 +198,18 @@ void Model_UL496::InitTailRotor(Rotor &R, double w)
 		printf("Undefined tail wake func. \n");
 }
 
-void Rotor::InitWakePram(void)
+void Rotor::WakeModelPrams(const int _k)
 {
-	kwtip = 5, kwrot = 5, nk = nf*kwtip;
+	kwtip = _k, kwrot = 5, nk = nf*kwtip;
 	//nf = naz, ns = nrs,
-	outboard = 0.3, rtip = 1.0;
+	outboard = 0.3, rtip = 0.98;
 	rc0 = 0.004852173913043;
-	haveGeo = false, haveStr = false;
+	haveGeo = false, haveStr = false, outputWake = true;
+	// update allocate
+	tipstr.deallocate();
+	tipstr.allocate(nk, nf);
+	tipgeometry.deallocate();
+	tipgeometry.allocate(nk, nf, 3);
 }
 
 void Rotor::InitVariables(void)
@@ -210,6 +217,8 @@ void Rotor::InitVariables(void)
 	switch (type)
 	{
 	case Mrotor:
+		power = power_c = power_i = power_f = power_o = 0;
+		torque = torque_c = torque_i = torque_f = torque_o = 0;
 		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.03;
 		niter_a = niter_w = -1;
 		power = torque = 0;
@@ -220,6 +229,8 @@ void Rotor::InitVariables(void)
 		bld.sol.allocate(bld.nitermax);
 		break;
 	case Trotor:
+		power = power_c = power_i = power_f = power_o = 0;
+		torque = torque_c = torque_i = torque_f = torque_o = 0; 
 		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.01;
 		niter_a = niter_w = -1;
 		power = torque = 0;
@@ -227,6 +238,7 @@ void Rotor::InitVariables(void)
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
 		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
+		bld.sol.allocate(bld.nitermax);
 		break;
 	default:
 		break;
@@ -260,7 +272,7 @@ void CopterSolver::InitCopterSolver(void)
 {
 	err_a = err_c = 1.0e-3;
 	epsilon = 0.01;
-	nitermax = 20;
+	nitermax = 35;
 	sita_coll_max = RAD(30);
 	sita_cycl_max = RAD(15);
 	euler_max = RAD(20);
@@ -269,9 +281,10 @@ void CopterSolver::InitCopterSolver(void)
 void Jobs::InitProject(void)
 {
 	nCase = 13;
-	Mus.allocate(nCase), Pits.allocate(nCase);
+	Mus.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
 	Mus.input("Mus.in");
 	Pits.input("Pits.in");
+	Kwtips.input("Kwtips.in");
 
 	if (remove("max_c_del.output") != 0)
 		printf("Remove max_c_del.output failed. \n");
@@ -292,15 +305,57 @@ void Jobs::SetSimCond(Copter &C, const int ic)
 	// define wake
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
 		if (C.RotorV[i].adyna > 0)
-			C.RotorV[i].InitWakePram();
+			C.RotorV[i].WakeModelPrams(Kwtips(ic));
 }
 
 void Jobs::PostProcess(Copter &C, const int ic, const int s, const int e)
 {
 	static Matrix2<double> uctrl(nCase, C.nfree);
+	static Matrix2<double> _power(nCase, 6), _torque(nCase, 6);
 	if (ic < e)
+	{
 		for (int i = C.nfree - 1; i >= 0; --i)
 			uctrl(ic, i) = DEG(C.controls[i]);
+		for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		{
+			_power(ic, 0) += C.RotorV[i].power;
+			_power(ic, 1) += C.RotorV[i].power_i;
+			_power(ic, 2) += C.RotorV[i].power_o;
+			_power(ic, 3) += C.RotorV[i].power_f;
+			_power(ic, 4) += C.RotorV[i].power_c;
+			_power(ic, 5) += C.RotorV[i].power_iid;
+			_torque(ic, 0) += C.RotorV[i].torque;
+			_torque(ic, 1) += C.RotorV[i].torque_i;
+			_torque(ic, 2) += C.RotorV[i].torque_o;
+			_torque(ic, 3) += C.RotorV[i].torque_f;
+			_torque(ic, 4) += C.RotorV[i].torque_c;
+			_torque(ic, 5) += C.RotorV[i].torque_iid;
+		}
+	}
+		
+
 	if (ic + 1 == e)
+	{
 		uctrl.output("uctrl.output", 6);
+		_power.output("power.output", 10);
+		_torque.output("torque.output", 10);
+	}
+	for (int i = C.RotorV.size() - 1; i>=0;--i) 
+		C.RotorV[i].OutPutWake(ic);
+}
+
+void Rotor::OutPutWake(const int ic)
+{
+	string _ic = std::to_string(ic);
+	string _im = std::to_string(type);
+
+	if (outputWake)
+	{
+		tipgeometry.output("tipgeo_" + _im + "_" + _ic + ".output", 10);
+		lambdi.output("lambdi_" + _im + "_" + _ic + ".output", 10);
+		lambdx.output("lambdx_" + _im + "_" + _ic + ".output", 10);
+		lambdy.output("lambdy_" + _im + "_" + _ic + ".output", 10);
+		lambdh.output("lambdh_" + _im + "_" + _ic + ".output", 6);
+		bladedeform.output("bladedeform_" + _im + "_" + _ic + ".output", 10);
+	}
 }

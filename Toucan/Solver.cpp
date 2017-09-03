@@ -160,6 +160,7 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 		C.GetStates(_vc, _wc, _dvc, _dwc);
 
 		_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
+		_EnableWake(C);
 		_CompsSetAirFM(C);
 		_Assemble(C);
 		_SetDerivs(dv, dw, SigmaF, SigmaM, C);
@@ -257,4 +258,11 @@ void CopterSolver::_Assemble(Copter &C)
 		SigmaF[j] += ftemp[j];
 		SigmaM[j] += mtemp[j];
 	}
+}
+
+void CopterSolver::_EnableWake(Copter &C)
+{
+	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		if (C.RotorV[i].adyna > 0)
+			C.RotorV[i].WakeInducedVel();
 }

@@ -11,6 +11,7 @@
 // macro definition
 #define SLUG_CONST 32.174
 #define UNIT_CONST (32.1522/32.174)
+#define HORSEPOWER (0.0018182)
 #define RAD(x) (PI*x)/180.0
 #define DEG(x) (x*180.0)/PI
 
@@ -108,9 +109,9 @@ public:
 
 public:
 	myTYPE Marf, Carf, Karf, Ka, err_b;
-	Matrix2<myTYPE> Marf22, Carf22, Karf22, Ka22;
+	//Matrix2<myTYPE> Marf22, Carf22, Karf22, Ka22;
 	myTYPE Qt, q0, dq0, ddq0, q1, q, dq, ddq;
-	Matrix1<myTYPE> Qt22, q02, dq02, ddq02, q12, dq2, ddq2;
+	//Matrix1<myTYPE> Qt22, q02, dq02, ddq02, q12, dq2, ddq2;
 	Matrix1<myTYPE> sol;
 
 	int nitermax, niter, dff, nperiod;
@@ -119,39 +120,24 @@ public:
 	BladeSolType soltype;
 };
 
-//class RotorWake
-//{
-//public:
-//	RotorWake() { ; }
-//	~RotorWake() { ; }
-//	void InitWakePram(const int naz, const int nrs);
-//	void Allocate(void);
-//	//void BladePosition(myTYPE b[3]);
-//	void WakeInducedVel(myTYPE *b);
-//
-//private:
-//	void _BladePosition(myTYPE *b);
-//	void _Bd_WakeGeo(void);
-//	void _Bd_WakeGeo_v0(void);
-//	void _Bd_WakeGeo_v1(void);
-//	void _Bd_WakeGeo_v2(void);
-//
-//private:
-//	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
-//	Matrix3<myTYPE> bladedeform, tipgeometry;
-//	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
-//	myTYPE beta[3];
-//	bool haveGeo;
-//public:
-//	int kwtip, kwrot, nk, nf, ns, ni, nbn, naf, nnr;
-//	myTYPE rtip, rc0, outboard;
-//};
-
-
 class Rotor
 {
 public:
 	Rotor() { ; }
+	//Rotor(const Rotor &R)
+	//{
+	//	chord = R.chord, twist = R.twist, sweep = R.sweep;
+	//	cltc = R.cltc, cdtc = R.cdtc, cmtc = R.cmtc; //
+	//	rastation = R.rastation, ristation = R.ristation, azstation = R.azstation; //, chord , twist, sweep;
+	//	bflap = R.bflap, dbflap = R.dbflap, sfth = R.sfth;
+	//	ut = R.ut, un = R.un, up = R.up, ua = R.ua, ma_n = R.ma_n;
+	//	_cl = R._cl, _ua = R._ua;
+	//	incidn = R.incidn, cl = R.cl, cd = R.cd;
+	//	lambdi = R.lambdi, lambdh = R.lambdh, lambdt = R.lambdt, lambdy = R.lambdy, lambdx = R.lambdx;
+
+	//	tipstr = R.tipstr, rotstr = R.rotstr, shdstr = R.shdstr, trlstr = R.trlstr, cirlb = R.cirlb;
+	//	bladedeform = R.bladedeform, tipgeometry = R.tipgeometry;
+	//}
 	~Rotor() { ; }
 	void SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc);
 	void SetAirfm_cg(const Coordinate *base);
@@ -163,7 +149,9 @@ public:
 	void GetAirfm_cg(myTYPE f[3], myTYPE m[3]);
 	void AvrgInducedVel(void);
 	void BladeDynamics(void);
-	void InitWakePram(void);
+	void WakeModelPrams(const int k);
+	void WakeInducedVel(void);
+	void OutPutWake(const int ic);
 private:
 	void _allocate(void);
 	void _initvariables(void);
@@ -214,12 +202,11 @@ private:
 	myTYPE mul;
 	myTYPE beta[3];
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
-	myTYPE power, torque;
 	Matrix2<myTYPE> bflap, dbflap, sfth;
 	Matrix2<myTYPE> ut, un, up, ua, ma_n;
-	Matrix1<myTYPE> _cl, _ua;
+	Matrix1<myTYPE> _cl, _cd, _ua, _incidn, _inflow, _factor;
 	Matrix2<myTYPE> incidn, cl, cd;
-	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
+	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdy, lambdx;
 
 	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
 	Matrix3<myTYPE> bladedeform, tipgeometry;
@@ -252,13 +239,16 @@ public:
 	int kwtip, kwrot, nk, nbn, naf, nnr;
 	//int nf, ns, ni;
 	myTYPE rtip, rc0, outboard;
-
+	bool outputWake;
+	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
+	myTYPE power_iid, torque_iid;
 };
 
 class ModelCase
 {
 public:
 	ModelCase() { ; }
+	ModelCase(const ModelCase &M) { ; }
 	~ModelCase() { ; }
 	virtual void GetModel();
 	virtual void GetProb();

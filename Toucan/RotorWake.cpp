@@ -8,9 +8,9 @@ void Rotor::_wakeInducedVel(void)
 	{
 	case PWake:
 		haveStr = _tipVortexStr();
-		_bladePosition();
+		//_bladePosition();
 		haveGeo = _wakeGeoBd();
-		_wakeIndVelCalc();
+		//_wakeIndVelCalc();
 		break;
 	case FWake:
 		break;
@@ -52,11 +52,12 @@ void Rotor::_bladePosition()
 			bfp = beta[0] + beta[1] * cos(azm) + beta[2] * sin(azm);
 			rst = rastation(i, j);
 			bladedeform(i, j, 0) = ((rst - eflap)*cos(bfp) + eflap) * cos(azm);
-			bladedeform(i, j, 1) = ((rst - eflap)*sin(bfp) + eflap) * sin(azm);
+			bladedeform(i, j, 1) = ((rst - eflap)*cos(bfp) + eflap) * sin(azm);
 			bladedeform(i, j, 2) = sin(bfp)*(rst - eflap);
 		}
 	}
-
+	//if (bladedeform(1, ns - 1, 1) < 0)
+	//	bladedeform.output("bladedeform.output", 6);
 }
 
 bool Rotor::_wakeGeoBd()
@@ -77,30 +78,34 @@ bool Rotor::_wakeGeoBd()
 		}
 	}
 
-	ka = Atan2(-veltpp[0], -veltpp[2] + lambdi_ag);
+	ka = Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag);
 	E = ka / 2.0;
-	kx = E; ky = -2.0 * veltpp[0]; ky3 = -kx; k0 = 1.0 - 8.0 * ky3 / 15.0 / PI;
+	kx = E; ky = -2.0 * veltpp[0] / vtipa; ky3 = -kx; k0 = 1.0 - 8.0 * ky3 / 15.0 / PI;
 
 	// compute tip vortices geometry in TPP coord
 	df = 2.0 * PI / nf; xe = 0;
 	for (int j = nf - 1; j >= 0; --j) {
 		for (int i = nk - 1; i >= 0; --i) {
 			x0 = r0 * cos(df * (j - i));
-			xv = x0 - veltpp[0] * df * i;
+			xv = x0 + veltpp[0] / vtipa * df * i;
 			yv = r0 * sin(df * (j - i));
 			if (xv * xv + yv * yv < 1.01) {
 				zv = -lambdi_ag * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * i*df - lambdi_ag / 2.0 * kx * (x0 + xv) * i*df;
 			}
 			else {
 				xe = sqrt(1.0 - yv*yv);
-				zv = lambdi_ag / veltpp[0] * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx * (x0 + xe) * i*df;
-				zv += 2.0 * lambdi_ag / veltpp[0] * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
+				//zv = -lambdi_ag / veltpp[0] * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx * (x0 + xe) * i*df;
+				zv = -lambdi_ag / veltpp[0] * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx / veltpp[0] * vtipa * (xe*xe - x0*x0);
+				zv -= 2.0 * lambdi_ag * vtipa / veltpp[0] * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
 			}
 			tipgeometry(i, j, 0) = xv;
 			tipgeometry(i, j, 1) = yv;
 			tipgeometry(i, j, 2) = zv + z0;
 		}
 	}
+	//if (outputWake)
+	//	tipgeometry.output("tipgeo.output", 6);
+
 	return true;
 }
 
@@ -199,11 +204,11 @@ void Rotor::_wakeIndVelCalc()
 				//geofunc *= height2 / sqrt(height2 * height2 + rc04);
 				geofunc *= (1 - 0.5 * rc04 / height2 / height2);
 				geofunc *= 0.5*(*(--temp_str0_b0_ptr) + (*temp_str0_b0_ptr));
-				_temp = 0.25 / PI * geofunc / radius / vtipa;
+				_temp = 0.25 / PI * geofunc;
 
-				temp_lambdx += rcros[0] * _temp;
-				temp_lambdy += rcros[1] * _temp;
-				temp_lambdi += rcros[2] * _temp;
+				temp_lambdx -= rcros[0] * _temp;
+				temp_lambdy -= rcros[1] * _temp;
+				temp_lambdi -= rcros[2] * _temp;
 
 				// save current element related variables
 				// str0_b0_ptr = str1_b0_ptr;
@@ -240,11 +245,11 @@ void Rotor::_wakeIndVelCalc()
 				//geofunc *= height2 / sqrt(height2 * height2 + rc04);
 				geofunc *= (1 - 0.5 * rc04 / height2 / height2);
 				geofunc *= 0.5*(*(--temp_str0_b1_ptr) + (*temp_str0_b1_ptr)); // get value first,  left shift and get value
-				_temp = 0.25 / PI * geofunc / radius / vtipa;
+				_temp = 0.25 / PI * geofunc;
 
-				temp_lambdx += rcros[0] * _temp;
-				temp_lambdy += rcros[1] * _temp;
-				temp_lambdi += rcros[2] * _temp;
+				temp_lambdx -= rcros[0] * _temp;
+				temp_lambdy -= rcros[1] * _temp;
+				temp_lambdi -= rcros[2] * _temp;
 
 				// save current element related variables
 				//str0_b0_ptr = str1_b0_ptr;
@@ -255,12 +260,20 @@ void Rotor::_wakeIndVelCalc()
 				r0len = r1len;
 			}
 
-			lambdi(iz, ir) = temp_lambdi;
-			lambdx(iz, ir) = temp_lambdx;
-			lambdy(iz, ir) = temp_lambdy;
+			lambdi(iz, ir) = temp_lambdi / radius / vtipa;
+			lambdx(iz, ir) = temp_lambdx / radius / vtipa;
+			lambdy(iz, ir) = temp_lambdy / radius / vtipa;
 		}	
 	}
 	lambdh = lambdi - vel[2] / vtipa;
+	//OutPutWake(999);
+	//if (outputWake)
+	//{
+	//	lambdi.output("lambdi.output", 6);
+	//	lambdx.output("lambdx.output", 6);
+	//	lambdy.output("lambdy.output", 6);
+	//	lambdh.output("lambdh.output", 6);
+	//}
 	//for (int i = 0; i < nb; ++i)
 	//{
 	//	delete[]tipgeoathub_x[i];

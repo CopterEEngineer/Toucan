@@ -943,6 +943,7 @@ public:
 		J1 = 0;
 		Nv = 0;
 		if (v_p != NULL) delete[] v_p;
+		v_p = NULL;
 		//cout << "[] is deleted." << endl;
 	}
 
@@ -1035,7 +1036,7 @@ public:
 		NI = 0;
 		NJ = 0;
 		Nv = 0;
-		delete[] v_p;
+		if (v_p != NULL) delete[] v_p;
 		v_p = new Type[0];
 	}
 
@@ -1682,7 +1683,7 @@ public:
 
 
 	inline void output(string filename, int presc = 2) {
-		ofstream OutFile(filename);
+		ofstream OutFile(filename, std::ios::out | std::ios::trunc);
 		int ni = NI;
 		int nj = NJ;
 		if (OutFile) {
@@ -2343,15 +2344,20 @@ public:
 
 	inline void output(string filename, int presc = 2) {
 		int ni, nj, nk;
-		ofstream OutFile(filename);
+		//ofstream OutFile(filename);
 		ni = NI;
 		nj = NJ;
 		nk = NK;
-		if (OutFile) {
-			OutFile.precision(presc);
-			for (int k = 0; k < nk; ++k) {
-				printf("k = %d \n", k);
-				OutFile << "k = " << k << endl;
+		string _file;
+		for (int k = 0; k < nk; ++k)
+		{
+			//printf("k = %d \n", k);
+			//OutFile << "k = " << k << endl;
+			_file = "id" + std::to_string(k) + "-" + filename;
+			ofstream OutFile(_file, std::ios::out | std::ios::trunc);
+			if (OutFile)
+			{
+				OutFile.precision(presc);
 				for (int i = 0; i < ni; ++i) {
 					for (int j = 0; j < nj; ++j) {
 						OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
@@ -2360,12 +2366,12 @@ public:
 					OutFile << endl;
 				}
 				OutFile << endl << endl;
+				OutFile.close();
 			}
-			OutFile.close();
-		}
-		else {
-			cout << filename << " open failed." << endl;
-			system("pause");
+			else {
+				cout << filename << " open failed." << endl;
+				system("pause");
+			}
 		}
 	}
 

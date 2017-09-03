@@ -20,6 +20,12 @@ void Rotor::_allocate(void)
 	incidn.allocate(nf, ns);// AOA
 	cl.allocate(nf, ns);    // air coefficients
 	cd.allocate(nf, ns);
+	_cl.allocate(ns);
+	_cd.allocate(ns);
+	_ua.allocate(ns);
+	_incidn.allocate(ns);
+	_inflow.allocate(ns);
+	_factor.allocate(ns);
 	
 	lambdi.allocate(nf, ns);// induced velocity
 	lambdx.allocate(nf, ns);
@@ -101,6 +107,11 @@ void Rotor::AvrgInducedVel(void)
 	}
 }
 
+void Rotor::WakeInducedVel(void)
+{
+	_wakeInducedVel();
+}
+
 void Rotor::_avrgInducedVel_MR(void)
 {
 	switch (bld.soltype)
@@ -160,6 +171,7 @@ void Rotor::_avrgInducedVel_TRFx(void)
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
 	lambdh.setvalue(lambdh_ag);
+	lambdi.setvalue(lambdi_ag);
 	for (int i = 1; i < itermax; ++i) {
 
 		//BladeDynamics(type);
@@ -212,6 +224,7 @@ void Rotor::_teeterdynamics_rt(void)
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
 	lambdh.setvalue(lambdh_ag);
+	lambdi.setvalue(lambdi_ag);
 
 	for (int i = 1; i < itermax; ++i) 
 	{
@@ -232,17 +245,31 @@ void Rotor::_teeterdynamics_rt(void)
 		lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
 		lambtpp[i] = lambdt_ag;
 		// vel: hub velocity with copter
-		lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
-		lambdh.setvalue(lambdh_ag);
+		if (haveGeo && haveStr)
+		{
+			_bladePosition();
+			_wakeIndVelCalc();
+		}
+		else
+		{
+			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+			lambdh.setvalue(lambdh_ag);
+			lambdi.setvalue(lambdi_ag);
+		}
 
-		if (adyna > 0)
-			_wakeInducedVel();
+		//if (adyna > 0)
+		//	_wakeInducedVel();
 
 		iter = i;
 		if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) { break; }
 	}
 	//lambtpp.outputs("_lambtpp.output", 4);
 	niter_w = iter;
+	// reset wake flags
+	if (haveGeo)
+		haveGeo = false;
+	if (haveStr)
+		haveStr = false;
 }
 
 void Rotor::_teeterdynamics_fx(void)
@@ -258,7 +285,7 @@ void Rotor::_teeterdynamics_fx(void)
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
 	lambdh.setvalue(lambdh_ag);
-
+	lambdi.setvalue(lambdi_ag);
 	for (int i = 0; i < itermax; ++i)
 	{
 		_teeterflap_fx();
@@ -475,7 +502,7 @@ void Rotor::_hingedynamics_fx(void)
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
 	lambdh.setvalue(lambdh_ag);
-
+	lambdi.setvalue(lambdi_ag);
 	for (int i = 0; i < itermax; ++i)
 	{
 		_hingeflap_fx();
@@ -662,13 +689,19 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	double ia = 0;
 	double b = 0;
 	double db = 0;
-	Matrix1<double> _dt(ns), _yf(ns), _hf(ns);
+	Matrix1<double> _dt(ns), _yf(ns), _hf(ns), _az(ns), _lambdi(ns), az(nf);
 	Matrix1<double> _dfx(ns), _dfz(ns), _dfr(ns), ra(ns), ra2(ns), ra1(ns);
+	Matrix1<double> _dD(ns);
 	Matrix1<int> id_ns = step(0, ns - 1);
+	Matrix1<int> id_nf = step(0, nf - 1);
 	ra = rastation(0, id_ns);
+	az = azstation(id_nf, 0);
 
 	f[0] = f[1] = f[2] = 0.0;
 	m[0] = m[1] = m[2] = 0.0;
+
+	power = power_c = power_i = power_f = power_o = power_iid = 0;
+	torque = torque_c = torque_i = torque_f = torque_o = torque_iid = 0;
 
 	for (int i = 0; i < nf; ++i) {
 		ia = i * 2 * PI / nf;
@@ -677,11 +710,6 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		db = (-beta[1] * sin(ia) + beta[2] * cos(ia)) * omega;
 
 		_setairfm(_dfx, _dfz, _dfr, it, b, db, i);
-#ifdef TEST_MODE
-		_dfx.outputs("_dfx.output", 4);
-		_dfz.outputs("_dfz.output", 4);
-		_dfr.outputs("_dfr.output", 4);
-#endif // TEST_MODE
 
 		_dt = _dfz*cos(b);
 		_yf = _dfx*cos(ia) - _dfr*sin(ia);
@@ -701,13 +729,33 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 			m[1] -= (_dt * ra1 * cos(ia) + _hf * ra2).sum()*radius*nb / nf;
 		}
 		m[2] += (_dfx * ra1).sum()*radius*nb / nf;
+
+		// power computation
+		_az.setvalue(ia);
+		_lambdi = lambdi.interplinear_fast(az, ra, _az, ra);
+		_dD = _cd*_factor / mcos(_inflow);
+		power_i += (_dt*_lambdi).sum() +db / omega * ((ra - eflap)*_dfz).sum();
+		power_o += (_dD*sin(ia)*mul + _dD*ra1).sum();
+		power_iid += db / omega*((ra - eflap)*_dfz).sum();
 	}
+	//lambdi.output("temp_lambdi.output", 10);
+	power_i *= HORSEPOWER * vtipa*nb / nf;
+	power_iid = HORSEPOWER * (-f[2] * lambdi_ag + power_iid * nb / nf) * vtipa;
+	power_o *= HORSEPOWER * vtipa*nb / nf;
+	power_f = HORSEPOWER * f[0] * vel[0];
+	power_c = HORSEPOWER * f[2] * vel[2];
+	power = HORSEPOWER*m[2] * omega;
+	torque_i = power_i / omega;
+	torque_iid = power_iid / omega;
+	torque_o = power_o / omega;
+	torque_f = power_f / omega;
+	torque_c = power_c / omega;
 }
 
 void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<double> &_dfr, const double &it, const double &b, const double &db, const int iz)
 {
-	Matrix1<double> _ut(ns), _up(ns), _ua(ns), _cl(ns), _cd(ns);
-	Matrix1<double> _factor(ns), _inflow(ns), _incidn(ns);// , _sfth(ns), _az(ns);
+	Matrix1<double> _ut(ns), _up(ns);// , _ua(ns), _cl(ns), _cd(ns);
+	//Matrix1<double> _inflow(ns); //_factor(ns), _incidn(ns);// , _sfth(ns), _az(ns);
 	double _sfth = 0;
 	double ia = 3 * PI;
 	Matrix1<int> id_ns(ns);
@@ -719,11 +767,6 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 	//_ut *= mcos(sweep(0, id_ns));
 	_ut *= mcos(sweep);
 	_ut = _ut*vtipa;
-
-#ifdef TEST_MODE
-	_up.outputs("_up.output", 4);
-	_ut.outputs("_ut.output", 4);
-#endif // TEST_MODE
 
 	_ua = msqrt(_ut*_ut + _up*_up);
 	_ua = _ua / amb.vsound;
@@ -758,45 +801,7 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 	// air coefficients
 	_aerodynacoef(_cl, _cd, _incidn, _ua);
 	for (int i = ns - 1; i >= 0; --i)
-		cirlb(iz%nf, i) = 0.5 * _ua(i) * _cl(i) * chord(i);
-
-#ifdef TEST_MODE
-
-	//cout << "up" << endl;
-	//_up.output(4);
-	//cout << "ut" << endl;
-	//_ut.output(4);
-
-	//cout << "cl" << endl;
-	//_cl.output(4);
-	_cl.outputs("_cl.output", 4);
-	//cout << "cd" << endl;
-	//_cd.output(4);
-	_cd.outputs("_cd.output", 4);
-
-	//cout << "_inflow" << endl;
-	//_inflow.output(4);
-	_inflow.outputs("_inflow.output", 4);
-
-	//_sfth.output("_sfth.output", 4);
-	//twist.output("_twist.output", 4);
-
-	//cout << "_sfth" << endl;
-	//_sfth.output(4);
-
-	//cout << "twist" << endl;
-	//twist(0, id_ns).output(4);
-
-	//cout << "_incidn" << endl;
-	//_incidn.output(4);
-	_incidn.outputs("_incidn.output", 4);
-
-	//cout << "_ua" << endl;
-	//_ua.output(4);
-	_ua.outputs("_ma.output", 4);
-#endif // TEST_MODE
-
-	//cout << "*********************************************************" << endl;
+		cirlb(iz%nf, i) = 0.5 * _ua(i) * _cl(i) * chord(i) * amb.vsound;
 
 	// air forces and moments
 	//_dr.setvalue(rastation(0, 1) - rastation(0, 0));
@@ -808,16 +813,11 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 	_factor *= chord * _dr *amb.vsound*amb.vsound*0.5*amb.rho* radius;
 
 	//_factor.output(4);
-	_cl *= _factor;
-	_cd *= _factor;
+	//_cl *= _factor;
+	//_cd *= _factor;
 
-#ifdef TEST_MODE
-	_cl.outputs("_dL.output", 4);
-	_cd.outputs("_dD.output", 4);
-#endif // TEST_MODE
-
-	_dfx = _cl * msin(_inflow) + _cd * mcos(_inflow);
-	_dfz = _cl * mcos(_inflow) - _cd * msin(_inflow);
+	_dfx = (_cl * msin(_inflow) + _cd * mcos(_inflow)) * _factor;
+	_dfz = (_cl * mcos(_inflow) - _cd * msin(_inflow)) * _factor;
 	_dfr = _dfz * (sin(b)) * (-1);
 
 }
