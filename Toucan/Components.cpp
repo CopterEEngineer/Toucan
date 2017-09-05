@@ -144,6 +144,12 @@ void Rotor::GetAirfm_cg(myTYPE f[3], myTYPE m[3])
 	}
 }
 
+void Rotor::GetBeta(myTYPE b[3])
+{
+	for (int i = 0; i < 3; ++i)
+		b[i] = beta[i];
+}
+
 void Rotor::SetAirfm_cg(const Coordinate *base)
 {
 	if (!_setairfm_cg(airforce_cg, airmoment_cg, airforce, airmoment, refcoord, base))

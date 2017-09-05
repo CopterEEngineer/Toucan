@@ -370,7 +370,7 @@ void Rotor::_teeterflap_rt(void)
 	}
 
 	if (niter == nitermax - 1)
-		printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
+		//printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
 
 	euler_temp[0] = -beta[2];
 	euler_temp[1] = beta[1];
@@ -750,6 +750,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	torque_o = power_o / omega;
 	torque_f = power_f / omega;
 	torque_c = power_c / omega;
+	torque = power / omega;
 }
 
 void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<double> &_dfr, const double &it, const double &b, const double &db, const int iz)
@@ -783,7 +784,7 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 		}
 	}
 
-	_sfth = sita[0] + sita[1] * cos(ia) + sita[2] * sin(ia);
+	_sfth = sita[0] + sita[1] * cos(ia) + sita[2] * sin(ia) + pitchroot;
 
 	// aoa
 	_inflow = atan2(_up, _ut);

@@ -48,6 +48,7 @@ private:
 public:
 	SimType simtype;
 	double err_a, err_c, epsilon;
+	Matrix1<double> sum_a1_del, sum_a2_del, max_c_del;
 	int nitermax;
 	double SigmaF[3], SigmaM[3];
 	double dv[3], dw[3];
@@ -243,11 +244,11 @@ void CopterSolver::_UpdateRotorCtrls(_Ty xctrl[6], Copter &C)
 template <class _Ty>
 bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 {
-	static Matrix1<double> sum_a1_del(nitermax), sum_a2_del(nitermax), max_c_del(nitermax);
+	//static Matrix1<double> sum_a1_del(nitermax), sum_a2_del(nitermax), max_c_del(nitermax);
 	static double xctrl_temp[6] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
 	if (iter == 0)
 	{
-		sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
+		//sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
 		xctrl_temp[0] = xctrl_temp[1] = xctrl_temp[2] = xctrl_temp[3] = xctrl_temp[4] = xctrl_temp[5] = 1.0;
 	}
 
@@ -267,26 +268,23 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			return false;
 		else
 		{
-#ifdef OUTPUT_MODE
+
 			cout << endl;
-			printf("Warning: may not be convergent. \n");
+			printf("**********************************************\n");
+			printf("*        Warning: may not be convergent.     *\n");
+			printf("**********************************************\n");
+
 			printf("Iter: %d, Total aerodynamics at CG: \n", iter);
-#ifdef OUTPUT_MODE_1
-			printf("Accelaration error: %f, %f\n", sum_a1_del.v_p[iter], sum_a2_del.v_p[iter]);
-			printf("Control converge: %f \n", max_c_del.v_p[iter]);
-#endif // OUTPUT_MODE_1
+
 			printf("Finally controls: \n");
 			for (int iq = 0; iq < 6; ++iq) {
 				cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
 				cout << DEG(xctrl[iq]) << "\t";
 			}
 			cout << endl;
-
 			printf("Translation Accelation: %f \n", sum_a1_del(iter));
 			printf("Angular Accelation: %f \n", sum_a2_del(iter));
 			printf("Max Controls Delt: %f \n", max_c_del(iter));
-
-#endif // OUTPUT_MODE
 
 			sum_a1_del.outputs("sum_a1_del.output", 8);
 			sum_a2_del.outputs("sum_a2_del.output", 8);
@@ -297,7 +295,6 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 	}
 	else
 	{
-#ifdef OUTPUT_MODE
 		cout << endl;
 		printf("Convergent. \n");
 		printf("Iter: %d, Total aerodynamics at CG: \n", iter);
@@ -310,7 +307,6 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
 			cout << DEG(xctrl[iq]) << "\t";
 		}
-#endif // OUTPUT_MODE
 
 #ifdef _DEBUG
 		sum_a1_del.outputs("sum_a1_del.output", 8);

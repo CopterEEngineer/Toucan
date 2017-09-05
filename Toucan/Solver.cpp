@@ -176,6 +176,9 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 
 	for (int i = 0; i < C.nfree; ++i)
 		C.controls[i] = uctrl[i];
+	C.sum_a1_del = sum_a1_del(iter == nitermax ? iter - 1 : iter);
+	C.sum_a2_del = sum_a2_del(iter == nitermax ? iter - 1 : iter);
+	C.max_c_del = max_c_del(iter == nitermax ? iter - 1 : iter);
 }
 
 void CopterSolver::_WindTrimSolver(Copter &C)

@@ -15,7 +15,7 @@
 #define RAD(x) (PI*x)/180.0
 #define DEG(x) (x*180.0)/PI
 
-#define OUTPUT_MODE
+//#define OUTPUT_MODE
 //#define OUTPUT_MODE_1
 
 // enum
@@ -147,6 +147,7 @@ public:
 	void SetAirfm(void);
 	void GetAirfm(myTYPE f[3], myTYPE m[3]);
 	void GetAirfm_cg(myTYPE f[3], myTYPE m[3]);
+	void GetBeta(myTYPE b[3]);
 	void AvrgInducedVel(void);
 	void BladeDynamics(void);
 	void WakeModelPrams(const int k);
@@ -314,6 +315,7 @@ public:
 	int nfree;
 	int Ncase;
 	myTYPE controls[6];
+	myTYPE sum_a1_del, sum_a2_del, max_c_del;
 
 private:
 	void _Allocate(void);

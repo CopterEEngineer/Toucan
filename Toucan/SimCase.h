@@ -15,6 +15,10 @@ public:
 	void GetProb(void);
 	void InitMainRotor(Rotor &R);
 	void InitTailRotor(Rotor &R, double w);
+	void ParamSweep(void);
+
+public:
+	Matrix2<double> RPMs;
 };
 
 class Jobs
@@ -26,11 +30,17 @@ public:
 	void InitProject(void);
 	void SetSimCond(Copter &C, const int ic);
 	void PostProcess(Copter &C, const int ic, const int s, const int e);
+	void PostProcess(Copter &C, const int ic, const int ip, const int s, const int e);
+
+	void ParamSweep(const Copter &C);
+	void UpdateParam(Copter &C, const int ic, const int ip);
 
 private:
-	Matrix1<double> Mus, Pits;
+	Matrix1<double> Mus, Pits, Vfs;
 	Matrix1<int> Kwtips;
+	Matrix2<double> RPMs;
+	Matrix1<double> param0;
 public:
-	int nCase;
+	int nCase, nParams;
 };
 

@@ -65,7 +65,8 @@ void Model_UL496::GetModel(void)
 	
 
 	// tail rotor
-	InitTailRotor(trotor, mrotor.omega);
+	//InitTailRotor(trotor, mrotor.omega);
+	InitTailRotor(trotor, 525*PI/30);
 	trotor.SetCoordBase(BASE_COORD);
 
 	// entire parameters
@@ -99,11 +100,12 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	R.bld.soltype = Rotation, R.adyna = PWake; //Averaged; // 
 	R.nf = 72, R.ns = 40, R.ni = 10; 
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
+	R.outputWake = false;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
 	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
 
 	R.a0 = 5.7;
-	R.eflap = 0, R.khub = 0, R.del = 0, R.pitchroot = 0;
+	R.eflap = 0, R.khub = 0, R.del = 0, R.pitchroot = RAD(-2);
 	R.radius = 11.5, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
 	R.precone = 3.0*PI / 180;
 	R.omega = 525 * PI / 30;
@@ -159,6 +161,7 @@ void Model_UL496::InitTailRotor(Rotor &R, double w)
 	R.bld.soltype = HubFixed, R.adyna = Averaged;
 	R.nf = 1, R.ns = 1, R.ni = 1; 
 	R.kwtip = 0, R.kwrot = 0, R.nk = 1;
+	R.outputWake = false;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
 	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
 
@@ -204,7 +207,7 @@ void Rotor::WakeModelPrams(const int _k)
 	//nf = naz, ns = nrs,
 	outboard = 0.3, rtip = 0.98;
 	rc0 = 0.004852173913043;
-	haveGeo = false, haveStr = false, outputWake = true;
+	haveGeo = false, haveStr = false, outputWake = false;
 	// update allocate
 	tipstr.deallocate();
 	tipstr.allocate(nk, nf);
@@ -276,13 +279,15 @@ void CopterSolver::InitCopterSolver(void)
 	sita_coll_max = RAD(30);
 	sita_cycl_max = RAD(15);
 	euler_max = RAD(20);
+	sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
 }
 
 void Jobs::InitProject(void)
 {
 	nCase = 13;
-	Mus.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
+	Mus.allocate(nCase), Vfs.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
 	Mus.input("Mus.in");
+	Vfs.input("Vfs.in");
 	Pits.input("Pits.in");
 	Kwtips.input("Kwtips.in");
 
@@ -297,25 +302,31 @@ void Jobs::InitProject(void)
 void Jobs::SetSimCond(Copter &C, const int ic)
 {
 	double euler[3] = { 0,0,0 };
-	C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
+	//C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
+	C.vel_g[0] = Vfs(ic);
 	euler[1] = RAD(Pits(ic));
 	C.refcoord.SetCoordinate(euler, "euler");
 	//C.fuselage.refcoord.SetCoordinate(euler, "euler");
 
 	// define wake
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	{
+		C.RotorV[i].InitVariables();
 		if (C.RotorV[i].adyna > 0)
 			C.RotorV[i].WakeModelPrams(Kwtips(ic));
+	}
+
 }
 
 void Jobs::PostProcess(Copter &C, const int ic, const int s, const int e)
 {
-	static Matrix2<double> uctrl(nCase, C.nfree);
+	static Matrix2<double> uctrl(nCase, C.nfree), beta(nCase, 3);
 	static Matrix2<double> _power(nCase, 6), _torque(nCase, 6);
+	double _beta[3];
 	if (ic < e)
 	{
 		for (int i = C.nfree - 1; i >= 0; --i)
-			uctrl(ic, i) = DEG(C.controls[i]);
+			uctrl(ic, i) = DEG(C.controls[i]);		
 		for (int i = C.RotorV.size() - 1; i >= 0; --i)
 		{
 			_power(ic, 0) += C.RotorV[i].power;
@@ -331,17 +342,87 @@ void Jobs::PostProcess(Copter &C, const int ic, const int s, const int e)
 			_torque(ic, 4) += C.RotorV[i].torque_c;
 			_torque(ic, 5) += C.RotorV[i].torque_iid;
 		}
+		C.RotorV[0].GetBeta(_beta);
+		for (int i = 0; i < 3; ++i)
+			beta(ic, i) = DEG(_beta[i]);
+		printf("\n Main rotor power: %f \n", C.RotorV[0].power);
 	}
 		
 
 	if (ic + 1 == e)
 	{
 		uctrl.output("uctrl.output", 6);
+		beta.output("beta.output", 4);
 		_power.output("power.output", 10);
 		_torque.output("torque.output", 10);
 	}
 	for (int i = C.RotorV.size() - 1; i>=0;--i) 
 		C.RotorV[i].OutPutWake(ic);
+
+	// vel test
+	printf("\n Vel g test: %f \n", C.vel_g[0]);
+}
+
+void Jobs::PostProcess(Copter &C, const int ic, const int ip, const int s, const int e)
+{
+	static Matrix3<double> uctrl(nCase, C.nfree, nParams), beta(nCase, 3, nParams), err(nCase, 3, nParams);
+	static Matrix3<double> _power(nCase, 6, nParams), _torque(nCase, 6, nParams); 
+	double _beta[3];
+	if (ic < e && ip < nParams)
+	{
+		for (int i = C.nfree - 1; i >= 0; --i)
+			uctrl(ic, i, ip) = DEG(C.controls[i]);
+		for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		{
+			_power(ic, 0, ip) += C.RotorV[i].power;
+			_power(ic, 1, ip) += C.RotorV[i].power_i;
+			_power(ic, 2, ip) += C.RotorV[i].power_o;
+			_power(ic, 3, ip) += C.RotorV[i].power_f;
+			_power(ic, 4, ip) += C.RotorV[i].power_c;
+			_power(ic, 5, ip) += C.RotorV[i].power_iid;
+			_torque(ic, 0, ip) += C.RotorV[i].torque;
+			_torque(ic, 1, ip) += C.RotorV[i].torque_i;
+			_torque(ic, 2, ip) += C.RotorV[i].torque_o;
+			_torque(ic, 3, ip) += C.RotorV[i].torque_f;
+			_torque(ic, 4, ip) += C.RotorV[i].torque_c;
+			_torque(ic, 5, ip) += C.RotorV[i].torque_iid;
+		}
+		C.RotorV[0].GetBeta(_beta);
+		for (int i = 0; i < 3; ++i)
+			beta(ic, i, ip) = DEG(_beta[i]);
+		err(ic, 0, ip) = C.sum_a1_del;
+		err(ic, 1, ip) = C.sum_a2_del;
+		err(ic, 2, ip) = C.max_c_del;
+	}
+	if (ic + 1 == e && ip + 1 == nParams)
+	{
+		uctrl.output2("uctrl_rpm.output", 6);
+		beta.output2("beta_rpm.output", 4);
+		_power.output2("power_rpm.output", 10);
+		_torque.output2("torque_rpm.output", 10);
+		err.output2("err_rpm.output", 10);
+	}
+	// vel and params test 
+	printf("\n");
+	printf("Vel g test: %f \n", C.vel_g[0]);
+	printf("Omg test: %f \n", C.RotorV[0].omega/param0(0));
+}
+
+
+void Jobs::ParamSweep(const Copter &C)
+{
+	RPMs.allocate(2, nCase), param0.allocate(2);
+	nParams = 21;
+	RPMs.input("RPMs.in");
+	param0(0) = C.RotorV[0].omega, param0(1) = C.RotorV[0].vtipa;
+}
+
+void Jobs::UpdateParam(Copter &C, const int ic, const int ip)
+{
+	double _rpm = RPMs(0, ic) + (RPMs(1, ic) - RPMs(0, ic)) / (nParams - 1)*ip;
+	//_rpm = 1.0;
+	C.RotorV[0].omega = param0(0)*_rpm;
+	C.RotorV[0].vtipa = param0(1)*_rpm;
 }
 
 void Rotor::OutPutWake(const int ic)

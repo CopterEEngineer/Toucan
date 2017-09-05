@@ -283,11 +283,11 @@ public:
 			I1 = Nv - 1;
 			v_p = new Type[Nv];
 		}
-		else {
-			cout << "Matrix has been allocated." << endl;
-			//system("pause");
-			cout << "Go" << endl;
-		}
+		//else {
+		//	cout << "Matrix has been allocated." << endl;
+		//	//system("pause");
+		//	//cout << "Go" << endl;
+		//}
 #if(INI)
 		for (int i = I0; i <= I1; ++i) v_p[i] = NAN;
 #else
@@ -1015,11 +1015,11 @@ public:
 			Nv = NI * NJ;
 			v_p = new Type[Nv];
 		}
-		else {
-			//cout << "Matrix has been allocated." << endl;
-			//system("pause");
-			//cout << "Go" << endl;
-		}
+		//else {
+		//	//cout << "Matrix has been allocated." << endl;
+		//	//system("pause");
+		//	//cout << "Go" << endl;
+		//}
 #if(INI)
 		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
 #else
@@ -2174,7 +2174,7 @@ public:
 
 
 	Matrix3(const Matrix3<Type> &A) {
-		cout << "Copy constructor." << endl;
+		//cout << "Copy constructor." << endl;
 		NI = A.NI;
 		NJ = A.NJ;
 		NK = A.NK;
@@ -2259,11 +2259,11 @@ public:
 			Nv = NI * NJ * NK;
 			v_p = new Type[Nv];
 		}
-		else {
-			cout << "Matrix has been allocated." << endl;
-			//system("pause");
-			//cout << "Go" << endl;
-		}
+		//else {
+		//	cout << "Matrix has been allocated." << endl;
+		//	//system("pause");
+		//	//cout << "Go" << endl;
+		//}
 #if(INI)
 		for (int i = I0; i < Nv; ++i) { v_p[i] = NAN; }
 #else
@@ -2373,6 +2373,35 @@ public:
 				system("pause");
 			}
 		}
+	}
+
+	inline void output2(string filename, int presc = 2) {
+		int ni, nj, nk;
+		ofstream OutFile(filename);
+		ni = NI;
+		nj = NJ;
+		nk = NK;
+		//string _file;
+		if (OutFile)
+		{
+			OutFile.precision(presc);
+			for (int k = 0; k < nk; ++k)
+			{
+				for (int i = 0; i < ni; ++i) {
+					for (int j = 0; j < nj; ++j) {
+						OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
+						OutFile << (*this)(i, j, k) << "\t";
+					}
+					OutFile << endl;
+				}
+				OutFile << endl << endl;
+			}				
+			OutFile.close();
+		}
+		else {
+			cout << filename << " open failed." << endl;
+			system("pause");
+		}		
 	}
 
 
@@ -2764,7 +2793,7 @@ public:
 
 
 	Matrix4(const Matrix4<Type> &A) {
-		cout << "Copy constructor." << endl;
+		//cout << "Copy constructor." << endl;
 		NI = A.NI;
 		NJ = A.NJ;
 		NK = A.NK;
@@ -2859,11 +2888,11 @@ public:
 			Nv = NI * NJ * NK * NW;
 			v_p = new Type[Nv];
 		}
-		else {
-			cout << "Matrix has been allocated." << endl;
-			//system("pause");
-			//cout << "Go" << endl;
-		}
+		//else {
+		//	cout << "Matrix has been allocated." << endl;
+		//	//system("pause");
+		//	//cout << "Go" << endl;
+		//}
 #if(INI)
 		for (int i = Nv - 1; i >= 0; --i) { v_p[i] = NAN; }
 #else
