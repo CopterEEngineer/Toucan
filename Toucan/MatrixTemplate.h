@@ -5230,7 +5230,7 @@ inline void cross(double A[3], const double &x1, const double &y1, const double 
 
 
 inline void cross(float A[3], const float &x1, const float &y1, const float &z1, const float &x2, const float &y2, const float &z2) {
-	A[0] = y1*z2 - y2*z1;
+	A[0] = y1*z2 - z1*y2;
 	A[1] = z1*x2 - x1*z2;
 	A[2] = x1*y2 - y1*x2;
 }

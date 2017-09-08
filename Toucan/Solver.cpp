@@ -34,7 +34,12 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 	double _vc[3], _wc[3], _dvc[3], _dwc[3];
 	double deltt[6], _dv_p[3], _dv_n[3], _dw_p[3], _dw_n[3];
 	int iter = 0;
-	
+	bool doWake = false;
+
+	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		if (C.RotorV[i].adyna > 0)
+			doWake |= true;
+
 	jacobM.allocate(C.nfree, C.nfree);
 
 	C.GetCtrl(uctrl);
@@ -62,117 +67,123 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 	}
 
 	for (iter = 0; iter < nitermax; ++iter)
-	{
-		// tail rotor first
-		for (int i = C.RotorV.size() - 1; i >= 0; --i)
 		{
-			switch (C.RotorV[i].type)
+			// tail rotor first
+			for (int i = C.RotorV.size() - 1; i >= 0; --i)
 			{
-			case Trotor:
-				uctrl[3] += epsilon;
-				C.SetCtrl((uctrl + 3), C.RotorV[i]);
-				_UpdateDerivs(_dv_p, _dw_p, C.RotorV[i], C);
-
-				uctrl[3] -= 2 * epsilon;
-				C.SetCtrl((uctrl + 3), C.RotorV[i]);
-				_UpdateDerivs(_dv_n, _dw_n, C.RotorV[i], C);
-
-				_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, 3);
-				uctrl[3] += epsilon;
-				C.SetCtrl((uctrl + 3), C.RotorV[i]);
-				C.RotorV[i].SetAirfm();
-				break;
-			case Mrotor:
-				for (int iq = 0; iq < 3; ++iq)
+				switch (C.RotorV[i].type)
 				{
-					uctrl[iq] += epsilon;
-					C.SetCtrl(uctrl, C.RotorV[i]);
+				case Trotor:
+					uctrl[3] += epsilon;
+					C.SetCtrl((uctrl + 3), C.RotorV[i]);
 					_UpdateDerivs(_dv_p, _dw_p, C.RotorV[i], C);
 
-					uctrl[iq] -= 2 * epsilon;
-					C.SetCtrl(uctrl, C.RotorV[i]);
+					uctrl[3] -= 2 * epsilon;
+					C.SetCtrl((uctrl + 3), C.RotorV[i]);
 					_UpdateDerivs(_dv_n, _dw_n, C.RotorV[i], C);
 
-					_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, iq);
-					uctrl[iq] += epsilon;
-					C.SetCtrl(uctrl, C.RotorV[i]);
+					_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, 3);
+					uctrl[3] += epsilon;
+					C.SetCtrl((uctrl + 3), C.RotorV[i]);
+					C.RotorV[i].SetAirfm();
+					break;
+				case Mrotor:
+					for (int iq = 0; iq < 3; ++iq)
+					{
+						uctrl[iq] += epsilon;
+						C.SetCtrl(uctrl, C.RotorV[i]);
+						_UpdateDerivs(_dv_p, _dw_p, C.RotorV[i], C);
+
+						uctrl[iq] -= 2 * epsilon;
+						C.SetCtrl(uctrl, C.RotorV[i]);
+						_UpdateDerivs(_dv_n, _dw_n, C.RotorV[i], C);
+
+						_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, iq);
+						uctrl[iq] += epsilon;
+						C.SetCtrl(uctrl, C.RotorV[i]);
+					}
+					break;
+				default:
+					break;
 				}
-				break;
-			default:
-				break;
 			}
-		}
 
-		// euler
-		for (int i = 4; i < 6; ++i)
-		{
-			uctrl[i] += epsilon;
+			// euler
+			for (int i = 4; i < 6; ++i)
+			{
+				uctrl[i] += epsilon;
+				_UpdateEuler(uctrl, C);
+				C.SetStates(_vc, _wc, _dvc, _dwc);
+				_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
+				_CompsSetAirFM(C);
+				_Assemble(C);
+				_SetDerivs(_dv_p, _dw_p, SigmaF, SigmaM, C);
+
+				uctrl[i] -= 2 * epsilon;
+				_UpdateEuler(uctrl, C);
+				C.SetStates(_vc, _wc, _dvc, _dwc);
+				_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
+				_CompsSetAirFM(C);
+				_Assemble(C);
+				_SetDerivs(_dv_n, _dw_n, SigmaF, SigmaM, C);
+
+				_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, i);
+				uctrl[i] += epsilon;
+			}
 			_UpdateEuler(uctrl, C);
-			C.SetStates(_vc, _wc, _dvc, _dwc);
-			_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
-			_CompsSetAirFM(C);
-			_Assemble(C);
-			_SetDerivs(_dv_p, _dw_p, SigmaF, SigmaM, C);
-
-			uctrl[i] -= 2 * epsilon;
-			_UpdateEuler(uctrl, C);
-			C.SetStates(_vc, _wc, _dvc, _dwc);
-			_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
-			_CompsSetAirFM(C);
-			_Assemble(C);
-			_SetDerivs(_dv_n, _dw_n, SigmaF, SigmaM, C);
-
-			_SetJacob(_dv_p, _dv_n, _dw_p, _dw_n, i);
-			uctrl[i] += epsilon;			
-		}
-		_UpdateEuler(uctrl, C);
 
 #ifdef OUTPUT_MODE
-		cout << endl;
-		printf("Accelaration:\n");
-		for (int iq = 0; iq < 6; ++iq) {
-			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
-			cout << deltt[iq] << "\t";
-		}
-		cout << endl << endl;
-
-		printf("Jacob:\n");
-		for (int i = 0; i < 6; ++i) {
-			for (int j = 0; j < 6; ++j) {
-				cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
-				cout << jacobM(i, j) << "\t";
-			}
 			cout << endl;
-		}
+			printf("Accelaration:\n");
+			for (int iq = 0; iq < 6; ++iq) {
+				cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+				cout << deltt[iq] << "\t";
+			}
+			cout << endl << endl;
+
+			printf("Jacob:\n");
+			for (int i = 0; i < 6; ++i) {
+				for (int j = 0; j < 6; ++j) {
+					cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+					cout << jacobM(i, j) << "\t";
+				}
+				cout << endl;
+			}
 #endif // !OUTPUT_MODE_1
 
-		Msolver(jacobM.v_p, deltt, 6);
-		if (_UpdateCtrls(uctrl, deltt) == 6)
-		{
-			printf("Controls reach boundary.");
-			break;
+			Msolver(jacobM.v_p, deltt, 6);
+			if (_UpdateCtrls(uctrl, deltt) == 6)
+			{
+				printf("Controls reach boundary.");
+				break;
+			}
+
+			_UpdateEuler(uctrl, C);
+			_UpdateRotorCtrls(uctrl, C);
+
+			C.SetStates();
+			C.GetStates(_vc, _wc, _dvc, _dwc);
+
+			_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
+			//if (iter > 0 && Max(sum_a1_del(iter - 1), sum_a2_del(iter - 1)) < err_a*err_a * 4)
+			//	doWake = true;
+			//if (doWake)
+			//	_EnableWake(C);
+
+			_EnableWake(C);
+			_CompsSetAirFM(C);
+			_Assemble(C);
+			_SetDerivs(dv, dw, SigmaF, SigmaM, C);
+			for (int i = 0; i < 3; ++i)
+			{
+				deltt[i] = dv[i];
+				deltt[i + 3] = dw[i];
+			}
+
+			if (isExit(uctrl, deltt, iter))
+				break;
 		}
 
-		_UpdateEuler(uctrl, C);
-		_UpdateRotorCtrls(uctrl, C);
-
-		C.SetStates();
-		C.GetStates(_vc, _wc, _dvc, _dwc);
-
-		_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
-		_EnableWake(C);
-		_CompsSetAirFM(C);
-		_Assemble(C);
-		_SetDerivs(dv, dw, SigmaF, SigmaM, C);
-		for (int i = 0; i < 3; ++i)
-		{
-			deltt[i] = dv[i];
-			deltt[i + 3] = dw[i];
-		}
-
-		if (isExit(uctrl, deltt, iter))
-			break;
-	}
 
 	for (int i = 0; i < C.nfree; ++i)
 		C.controls[i] = uctrl[i];

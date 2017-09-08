@@ -28,7 +28,7 @@ void levelflight(void)
 	copter.InitRotorCraft(ul496);
 	jobs.InitProject();
 
-	s = 12, e = 13;// jobs.nCase;
+	s = 0, e = jobs.nCase;
 	tStart = clock();
 	for (int i = s; i < e; ++i)
 	{
@@ -78,7 +78,16 @@ void rpmsweep(void)
 int main()
 {
 	//levelflight();
-	rpmsweep();
+	//rpmsweep();
+	clock_t tStart;
+
+	tStart = clock();
+
+	//LevelFlight();
+	LevelFlightMP();
+
+
+	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
 
 	system("pause");
 	return 0;

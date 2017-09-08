@@ -370,7 +370,7 @@ void Rotor::_teeterflap_rt(void)
 	}
 
 	if (niter == nitermax - 1)
-		//printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
+		;//printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
 
 	euler_temp[0] = -beta[2];
 	euler_temp[1] = beta[1];

@@ -213,7 +213,6 @@ private:
 	Matrix3<myTYPE> bladedeform, tipgeometry;
 	//Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
 	//myTYPE beta[3];
-	bool haveGeo, haveStr;
 	
 public:
 	CompType type;
@@ -241,6 +240,7 @@ public:
 	//int nf, ns, ni;
 	myTYPE rtip, rc0, outboard;
 	bool outputWake;
+	bool haveGeo, haveStr;
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
 	myTYPE power_iid, torque_iid;
 };
@@ -400,6 +400,7 @@ bool BladeSolver::_GenArfStarter(_Ty _Qt, _Ty _q, _Ty _dq)
 	ddq = Marf / (_Qt - Carf*_dq - Karf*_q) ;
 	dq = _dq;
 	q = _q;
+	sol.allocate(nitermax);
 	sol(0) = q;
 	return true;
 }

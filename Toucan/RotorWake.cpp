@@ -103,6 +103,7 @@ bool Rotor::_wakeGeoBd()
 			tipgeometry(i, j, 2) = zv + z0;
 		}
 	}
+
 	//if (outputWake)
 	//	tipgeometry.output("tipgeo.output", 6);
 
@@ -145,6 +146,7 @@ void Rotor::_wakeIndVelCalc()
 	for (int k = 0; k < 3; ++k)
 		for (int j = 0; j < nk*nf; ++j)
 			tipgeoathub(j%nk, j / nk, k) = tipgeoexpand(k, j);
+
 	for (int iz = nf - 1, iz2 = iz + nf / nb; iz >= 0; --iz, iz2 = iz + nf / nb)
 	{
 		if (nb != 2)
@@ -266,24 +268,6 @@ void Rotor::_wakeIndVelCalc()
 		}	
 	}
 	lambdh = lambdi - vel[2] / vtipa;
-	//OutPutWake(999);
-	//if (outputWake)
-	//{
-	//	lambdi.output("lambdi.output", 6);
-	//	lambdx.output("lambdx.output", 6);
-	//	lambdy.output("lambdy.output", 6);
-	//	lambdh.output("lambdh.output", 6);
-	//}
-	//for (int i = 0; i < nb; ++i)
-	//{
-	//	delete[]tipgeoathub_x[i];
-	//	delete[]tipgeoathub_y[i];
-	//	delete[]tipgeoathub_z[i];
-	//	delete[]temp_tipgeoathub_x[i];
-	//	delete[]temp_tipgeoathub_y[i];
-	//	delete[]temp_tipgeoathub_z[i];
-	//}
-	//delete[]tipgeoathub_x, delete[]tipgeoathub_y, delete[]tipgeoathub_z;
-	//delete[]temp_tipgeoathub_x, delete[]temp_tipgeoathub_y, delete[]temp_tipgeoathub_z;
+
 }
 

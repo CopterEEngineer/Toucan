@@ -55,6 +55,7 @@ public:
 	double jacob66[6][6], jacob33[3][3];
 	Matrix2<double> jacobM;
 	double sita_coll_max, sita_cycl_max, euler_max;
+	double xctrl_temp[6];
 };
 
 
@@ -160,7 +161,7 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt)
 		xctrl[i] -= deltt[i];
 	if (Abs(xctrl[0]) > sita_coll_max)
 	{
-		xctrl[0] = sita_coll_max*Sign(xctrl[0]);
+		xctrl[0] = 0.5 * sita_coll_max*Sign(xctrl[0]) + 0.5 * (xctrl[0] + deltt[0]);
 		++ic_flg;
 	}
 	switch (simtype)
@@ -172,27 +173,27 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt)
 		nfree = 6;
 		if (Abs(xctrl[3]) > sita_coll_max)
 		{
-			xctrl[3] = sita_coll_max*Sign(xctrl[3]);
+			xctrl[3] = 0.5 * sita_coll_max*Sign(xctrl[3]) + 0.5 * (xctrl[3] + deltt[3]);
 			++ic_flg;
 		}
 		if (Abs(xctrl[1]) > sita_cycl_max)
 		{
-			xctrl[1] = sita_cycl_max*Sign(xctrl[1]);
+			xctrl[1] = 0.5 * sita_cycl_max*Sign(xctrl[1]) + 0.5*(xctrl[1] + deltt[1]);
 			++ic_flg;
 		}
 		if (Abs(xctrl[2]) > sita_cycl_max)
 		{
-			xctrl[2] = sita_cycl_max*Sign(xctrl[2]);
+			xctrl[2] = 0.5 * sita_cycl_max*Sign(xctrl[2]) + 0.5*(xctrl[2] + deltt[2]);
 			++ic_flg;
 		}
 		if (Abs(xctrl[4]) > euler_max)
 		{
-			xctrl[4] = euler_max*Sign(xctrl[4]);
+			xctrl[4] = 0.5 * euler_max*Sign(xctrl[4]) + 0.5*(xctrl[4] + deltt[4]);
 			++ic_flg;
 		}
 		if (Abs(xctrl[5]) > euler_max)
 		{
-			xctrl[5] = euler_max*Sign(xctrl[5]);
+			xctrl[5] = 0.5 * euler_max*Sign(xctrl[5]) + 0.5*(xctrl[5] + deltt[5]);
 			++ic_flg;
 		}
 		break;
@@ -245,10 +246,14 @@ template <class _Ty>
 bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 {
 	//static Matrix1<double> sum_a1_del(nitermax), sum_a2_del(nitermax), max_c_del(nitermax);
-	static double xctrl_temp[6] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+	//static double xctrl_temp[6] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+	//if (iter == 0)
+	//{
+	//	//sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
+	//	xctrl_temp[0] = xctrl_temp[1] = xctrl_temp[2] = xctrl_temp[3] = xctrl_temp[4] = xctrl_temp[5] = 1.0;
+	//}
 	if (iter == 0)
 	{
-		//sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
 		xctrl_temp[0] = xctrl_temp[1] = xctrl_temp[2] = xctrl_temp[3] = xctrl_temp[4] = xctrl_temp[5] = 1.0;
 	}
 
