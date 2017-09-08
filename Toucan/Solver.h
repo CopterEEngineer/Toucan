@@ -300,6 +300,7 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 	}
 	else
 	{
+#ifdef OUTPUT_MODE
 		cout << endl;
 		printf("Convergent. \n");
 		printf("Iter: %d, Total aerodynamics at CG: \n", iter);
@@ -312,7 +313,7 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
 			cout << DEG(xctrl[iq]) << "\t";
 		}
-
+#endif // OUTPUT_MODE
 #ifdef _DEBUG
 		sum_a1_del.outputs("sum_a1_del.output", 8);
 		sum_a2_del.outputs("sum_a2_del.output", 8);

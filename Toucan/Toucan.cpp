@@ -86,8 +86,42 @@ int main()
 	//LevelFlight();
 	LevelFlightMP();
 
-
 	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
+
+//	double a[100], b[100], c[100];
+//	double *d, *ap, *bp;
+//	d = new double[100];
+//	ap = a;
+//	bp = b;
+//	for (int i = 0; i < 100; i++)
+//	{
+//		a[i] = 1.3*i;
+//		b[i] = 0.5 + i;
+//		++ap = a + i;
+//		++bp = b + i;
+//	}
+//
+//	bp = b; ap = a;
+//	//for (int i = 0; i < 100; i++)
+//	//	cout << *bp++ << "\t";
+//	int i = 0;
+//#pragma omp parallel shared(a,b,d) private(i)
+//	{
+//#pragma omp for
+//		for (i = 0; i < 100; i++)
+//		{
+//			c[i] = a[i] + b[i];
+//			*(d+i) = *(a + i) + *(b + i);
+//		}
+//	}
+//
+//	for (i = 0; i < 100; i++)
+//		cout << c[i] << "\t";
+//
+//	for (i = 0; i < 100; i++)
+//		cout << d[i] << "\t";
+	//delete[]d;
+
 
 	system("pause");
 	return 0;

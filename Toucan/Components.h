@@ -165,6 +165,7 @@ private:
 
 	void _wakeStarter(void);
 	void _wakeInducedVel(void);
+	void _wakeInducedVelMP(void);
 	void _bonVortexStr(void);
 	bool _tipVortexStr(void);
 	void _bladePosition(void);
@@ -472,7 +473,12 @@ void Copter::GetCtrl(_Ty *xctrl)
 template <class _Ty>
 void Copter::SetCtrl(_Ty *xctrl, Rotor &R)
 {
-	for (int i = 0; i < 3; ++i)
+	int e;
+	if (R.type == Mrotor)
+		e = 3;
+	else
+		e = 1;
+	for (int i = 0; i < e; ++i)
 		R.sita[i] = xctrl[i];
 }
 

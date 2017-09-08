@@ -98,7 +98,7 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	R.type = Mrotor;
 	R.teeter = true, R.nb = 2;
 	R.amb = amb;
-	R.bld.soltype = Rotation, R.adyna = PWake; //Averaged; // 
+	R.bld.soltype = Rotation, R.adyna = PWake; // Averaged; // 
 	R.nf = 72, R.ns = 40, R.ni = 10; 
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
 	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
@@ -287,6 +287,7 @@ void Jobs::InitProject(void)
 {
 	nCase = 13;
 	Mus.allocate(nCase), Vfs.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
+	Consini.allocate(nCase, 6);
 	uctrl.allocate(nCase, 6), beta.allocate(nCase, 3);
 	_power.allocate(nCase, 6), _torque.allocate(nCase, 6);
 	flg = 0, jtype = RPMSwp;
@@ -294,6 +295,7 @@ void Jobs::InitProject(void)
 	Vfs.input("Vfs.in");
 	Pits.input("Pits.in");
 	Kwtips.input("Kwtips.in");
+	Consini.input("Controls.in");
 
 	if (remove("max_c_del.output") != 0)
 		printf("Remove max_c_del.output failed. \n");
@@ -317,15 +319,25 @@ void Jobs::InitProject(Jobs &J, const int ic)
 void Jobs::SetSimCond(Copter &C, const int ic)
 {
 	double euler[3] = { 0,0,0 };
+	double _uctrl[6] = { 0,0,0,0,0,0 };
+
 	C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
 	//C.vel_g[0] = Vfs(ic);
-	euler[1] = RAD(Pits(ic));
-	C.refcoord.SetCoordinate(euler, "euler");
-	//C.fuselage.refcoord.SetCoordinate(euler, "euler");
+	//euler[1] = RAD(Pits(ic));
+	//C.refcoord.SetCoordinate(euler, "euler");
 
+	for (int i = 0; i < 6; i++)
+		_uctrl[i] = RAD(Consini(ic, i));
+
+	euler[0] = _uctrl[4], euler[1] = _uctrl[5];
+	C.refcoord.SetCoordinate(euler, "euler");
+	
+	C.SetCtrl(_uctrl, C.RotorV[0]);
+	C.SetCtrl(_uctrl + 3, C.RotorV[1]);
+	
 	// define wake
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
-	{
+	{		
 		if (jtype > SimTrim)
 			C.RotorV[i].InitVariables();
 		if (C.RotorV[i].adyna > 0)
@@ -495,10 +507,10 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		C.RotorV[0].GetBeta(_beta);
 		for (int i = 0; i < 3; ++i)
 			beta(ic, i) = DEG(_beta[i]);
-		printf("\n Main rotor power: %f \n", C.RotorV[0].power);
+		//printf("\n Main rotor power: %f \n", C.RotorV[0].power);
 	}
 
-	//printf("Flag: %d\n", flg);
+	printf("Flag: %d\n", flg);
 	if (flg == e - s)
 	{
 		uctrl.output("uctrl.output", 6);
@@ -510,7 +522,7 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		C.RotorV[i].OutPutWake(ic);*/
 
 	// vel test
-	printf("\n Vel g test: %f \n", C.vel_g[0]);
+	//printf("\n Vel g test: %f \n", C.vel_g[0]);
 }
 
 
@@ -560,21 +572,15 @@ void LevelFlight(void)
 	copter.InitRotorCraft(ul496);
 	jobs.InitProject();
 
-	s = 0, e = jobs.nCase, jobs.jtype = RPMSwp; // SimTrim; //
+	s = 0, e = 1, jobs.jtype = RPMSwp; // SimTrim; //
 
-//#pragma omp parallel num_threads(3)
+	for (int i = s; i < e; ++i)
 	{
-//#pragma omp for
-		for (int i = s; i < e; ++i)
-		{
-			cout << i << endl;
-			jobs.SetSimCond(copter, i);
-			solver.CopterSimulation(copter);
-			//jobs.PostProcess(copter, i, s, e);
-			solver.max_c_del.output(std::to_string(i) + "max_c_del_sp.output", 8);
-		}
+		cout << i << endl;
+		jobs.SetSimCond(copter, i);
+		solver.CopterSimulation(copter);
+		jobs.PostProcess(copter, i, s, e);
 	}
-
 }
 
 void LevelFlightMP(void)
@@ -592,7 +598,7 @@ void LevelFlightMP(void)
 	ul496.GetModel();
 	copter.InitRotorCraft(ul496);
 
-#pragma omp parallel num_threads(6) shared(s, e, jobs) firstprivate(i, solver, copter)
+#pragma omp parallel num_threads(7) shared(s, e, jobs) firstprivate(i, solver, copter)
 	{
 #pragma omp for
 		for (i = s; i < e; i++)

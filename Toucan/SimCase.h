@@ -49,6 +49,7 @@ public:
 
 private:
 	Matrix1<double> Mus, Pits, Vfs;
+	Matrix2<double> Consini;
 	Matrix1<int> Kwtips;
 	Matrix2<double> RPMs;
 	Matrix1<double> param0;

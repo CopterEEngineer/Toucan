@@ -248,7 +248,8 @@ void Rotor::_teeterdynamics_rt(void)
 		if (haveGeo && haveStr)
 		{
 			_bladePosition();
-			_wakeIndVelCalc();
+			//_wakeIndVelCalc();
+			_wakeInducedVelMP();
 		}
 		else
 		{
