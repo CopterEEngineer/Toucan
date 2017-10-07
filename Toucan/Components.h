@@ -36,6 +36,11 @@ enum AeroDynType {
 	Averaged = 0, PWake = 1, FWake = 2
 };
 
+enum JobsType
+{
+	SimTrim = 0, RPMSwp = 1, ChordSwp = 2, RadiusSwp = 3
+};
+
 class Ambience
 {
 public:
@@ -153,6 +158,7 @@ public:
 	void WakeModelPrams(const int k);
 	void WakeInducedVel(void);
 	void OutPutWake(const int ic);
+	void GetPower(myTYPE p[6], myTYPE t[6]);
 private:
 	void _allocate(void);
 	void _initvariables(void);
@@ -200,7 +206,6 @@ private:
 	myTYPE airforce[3], airmoment[3];
 	myTYPE airforce_cg[3], airmoment_cg[3];
 	myTYPE vel[3], omg[3], dvel[3], domg[3];
-	int niter_w, niter_a;
 	myTYPE mul;
 	myTYPE beta[3];
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
@@ -244,6 +249,7 @@ public:
 	bool haveGeo, haveStr;
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
 	myTYPE power_iid, torque_iid;
+	int niter_w, niter_a;
 };
 
 class ModelCase
@@ -280,6 +286,7 @@ public:
 	void SetStates(void);
 	void PostProcess(void);
 	void functest(void);
+	void GetErr(myTYPE e[3]);
 
 	template <class _Ty> 
 	void GetCtrl(_Ty *xctrl);
@@ -315,6 +322,7 @@ public:
 
 	int nfree;
 	int Ncase;
+	int Niter;
 	myTYPE controls[6];
 	myTYPE sum_a1_del, sum_a2_del, max_c_del;
 

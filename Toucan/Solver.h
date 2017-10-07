@@ -56,6 +56,9 @@ public:
 	Matrix2<double> jacobM;
 	double sita_coll_max, sita_cycl_max, euler_max;
 	double xctrl_temp[6];
+	int niter;
+	Matrix1<int> niter_r;
+	bool converge;
 };
 
 
@@ -273,7 +276,7 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			return false;
 		else
 		{
-
+#ifdef OUTPUT_MODE
 			cout << endl;
 			printf("**********************************************\n");
 			printf("*        Warning: may not be convergent.     *\n");
@@ -294,6 +297,7 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			sum_a1_del.outputs("sum_a1_del.output", 8);
 			sum_a2_del.outputs("sum_a2_del.output", 8);
 			max_c_del.outputs("max_c_del.output", 8);
+#endif // OUTPUT_MODE
 
 			return false;
 		}

@@ -247,6 +247,13 @@ void Copter::SetStates(void)
 	
 }
 
+void Copter::GetErr(myTYPE e[3])
+{
+	e[0] = sum_a1_del;
+	e[1] = sum_a2_del;
+	e[2] = max_c_del;
+}
+
 void Copter::PostProcess(void)
 {
 	ofstream OutFile("uctrl.output", std::ios::app);

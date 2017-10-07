@@ -265,12 +265,16 @@ void Rotor::_teeterdynamics_rt(void)
 		if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) { break; }
 	}
 	//lambtpp.outputs("_lambtpp.output", 4);
-	niter_w = iter;
+	niter_w = iter == itermax ? iter - 1 : iter;
 	// reset wake flags
 	if (haveGeo)
 		haveGeo = false;
 	if (haveStr)
 		haveStr = false;
+#ifdef OUTPUT_MODE_1
+	printf("Flap in _teeterdynamics_rt() counts: %d \n", niter_w);
+#endif // OUTPUT_MODE_1
+
 }
 
 void Rotor::_teeterdynamics_fx(void)
@@ -837,6 +841,8 @@ void Rotor::_setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia
 		else if (ia < -2 * PI) ia += 2 * PI;
 		else { break; }
 	}
+	if (ia > azstation(nf - 1, 0))
+		ia = 0;
 	_az.setvalue(ia);
 	_ra = rastation(0, id_ns);
 
@@ -857,6 +863,23 @@ void Rotor::_setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia
 
 	//_ut *= mcos(sweep(0, id_ns));
 	_ut *= mcos(sweep);
+}
+
+void Rotor::GetPower(myTYPE p[6], myTYPE t[6])
+{
+	p[0] = power;
+	p[1] = power_i;
+	p[2] = power_o;
+	p[3] = power_f;
+	p[4] = power_c;
+	p[5] = power_iid;
+
+	t[0] = torque;
+	t[1] = torque_i;
+	t[2] = torque_o;
+	t[3] = torque_f;
+	t[4] = torque_c;
+	t[5] = torque_iid;
 }
 
 

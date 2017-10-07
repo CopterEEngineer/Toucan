@@ -36,9 +36,9 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 	int iter = 0;
 	bool doWake = false;
 
-	for (int i = C.RotorV.size() - 1; i >= 0; --i)
-		if (C.RotorV[i].adyna > 0)
-			doWake |= true;
+	//for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	//	if (C.RotorV[i].adyna > 0)
+	//		doWake |= true;
 
 	jacobM.allocate(C.nfree, C.nfree);
 
@@ -187,9 +187,16 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 
 	for (int i = 0; i < C.nfree; ++i)
 		C.controls[i] = uctrl[i];
-	C.sum_a1_del = sum_a1_del(iter == nitermax ? iter - 1 : iter);
-	C.sum_a2_del = sum_a2_del(iter == nitermax ? iter - 1 : iter);
-	C.max_c_del = max_c_del(iter == nitermax ? iter - 1 : iter);
+	niter = iter == nitermax ? iter - 1 : iter;
+	C.sum_a1_del = sum_a1_del(niter);
+	C.sum_a2_del = sum_a2_del(niter);
+	C.max_c_del = max_c_del(niter);
+	C.Niter = niter;
+	if (Max(C.sum_a1_del, C.sum_a2_del) < 100 * err_a*err_a && C.max_c_del < 10 * err_c)
+		converge = true;
+	else
+		converge = false;
+
 }
 
 void CopterSolver::_WindTrimSolver(Copter &C)
@@ -205,7 +212,10 @@ void CopterSolver::_TransientSolver(Copter &C)
 void CopterSolver::_CompsSetAirFM(Copter &C)
 {
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	{
 		C.RotorV[i].SetAirfm();
+		niter_r(i) = C.RotorV[i].niter_w;
+	}
 	for (int i = C.WingV.size() - 1; i >= 0; --i)
 		C.WingV[i].SetAirfm();
 	C.fuselage.SetAirfm();

@@ -95,6 +95,7 @@ void Model_UL496::GetModel(void)
 
 void Model_UL496::InitMainRotor(Rotor &R)
 {
+	double temp = 1.0;
 	R.type = Mrotor;
 	R.teeter = true, R.nb = 2;
 	R.amb = amb;
@@ -107,16 +108,16 @@ void Model_UL496::InitMainRotor(Rotor &R)
 
 	R.a0 = 5.7;
 	R.eflap = 0, R.khub = 0, R.del = 0, R.pitchroot = RAD(-2);
-	R.radius = 11.5, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.radius = 11.5*temp, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI*temp*temp;
 	R.precone = 3.0*PI / 180;
 	R.omega = 525 * PI / 30;
-	R.vtipa = R.omega*R.radius;
+	R.vtipa = R.omega*R.radius*temp;
 	R.outboard = 0.3;
 	R.rc0 = 0.004852173913043;
 	R.cltc.allocate(40, 12), R.cltc.input("vr7_cl_c81.txt");
 	R.cdtc.allocate(52, 12), R.cdtc.input("vr7_cd_c81.txt");
-	R.iflap = 24.93, R.m1 = 3.25;
-	R.sigma = 0.0309, R.gama = 5.01*amb.rho / 0.002378;	
+	R.iflap = 24.93*temp*temp, R.m1 = 3.25*temp;
+	R.sigma = 0.0309/temp, R.gama = 5.01*amb.rho / 0.002378*temp*temp;
 	R.chord.setvalue(0.558); // chord have unit
 	R.sweep.setvalue(0);
 	myTYPE temp_twist, temp_azimuth, temp_station;
@@ -226,7 +227,7 @@ void Rotor::InitVariables(void)
 		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.03;
 		niter_a = niter_w = -1;
 		power = torque = 0;
-		sita[0] = RAD(16.1), sita[1] = RAD(1.18), sita[2] = RAD(3.12);
+		//sita[0] = RAD(16.1), sita[1] = RAD(1.18), sita[2] = RAD(3.12);
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
 		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
@@ -238,7 +239,8 @@ void Rotor::InitVariables(void)
 		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.01;
 		niter_a = niter_w = -1;
 		power = torque = 0;
-		sita[0] = RAD(10.1), sita[1] = RAD(0.0), sita[2] = RAD(0.0);
+		//sita[0] = RAD(10.1);
+		sita[1] = RAD(0.0), sita[2] = RAD(0.0);
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
 		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
@@ -274,12 +276,13 @@ void Wing::InitVariables(void)
 
 void CopterSolver::InitCopterSolver(void)
 {
-	err_a = err_c = 1.0e-3;
+	err_a = err_c = 5.0e-3;
 	epsilon = 0.01;
 	nitermax = 35;
 	sita_coll_max = RAD(50);
 	sita_cycl_max = RAD(30);
 	euler_max = RAD(40);
+	niter_r.allocate(2), niter = 0, converge = false;
 	sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
 }
 
@@ -290,7 +293,9 @@ void Jobs::InitProject(void)
 	Consini.allocate(nCase, 6);
 	uctrl.allocate(nCase, 6), beta.allocate(nCase, 3);
 	_power.allocate(nCase, 6), _torque.allocate(nCase, 6);
-	flg = 0, jtype = RPMSwp;
+	flg = 0, jtype = RadiusSwp; // RPMSwp; //ChordSwp; //
+	//jtype_M.allocate(2), jtype_M(0) = RadiusSwp, jtype_M(1) = RPMSwp;
+	
 	Mus.input("Mus.in");
 	Vfs.input("Vfs.in");
 	Pits.input("Pits.in");
@@ -321,8 +326,8 @@ void Jobs::SetSimCond(Copter &C, const int ic)
 	double euler[3] = { 0,0,0 };
 	double _uctrl[6] = { 0,0,0,0,0,0 };
 
-	C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
-	//C.vel_g[0] = Vfs(ic);
+	//C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
+	C.vel_g[0] = Vfs(ic);
 	//euler[1] = RAD(Pits(ic));
 	//C.refcoord.SetCoordinate(euler, "euler");
 
@@ -525,21 +530,131 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 	//printf("\n Vel g test: %f \n", C.vel_g[0]);
 }
 
+void Jobs::PostProcessMP(Copter &C, const int ic, const int ip, const int s, const int e, const int np)
+{
+	double _beta[3];
+	if (flg++ < np*(e-s))
+	{
+		for (int i = C.nfree - 1; i >= 0; --i)
+			uctrl3(ic, i, ip) = DEG(C.controls[i]);
+		for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		{
+			_power3(ic, 0, ip) += C.RotorV[i].power;
+			_power3(ic, 1, ip) += C.RotorV[i].power_i;
+			_power3(ic, 2, ip) += C.RotorV[i].power_o;
+			_power3(ic, 3, ip) += C.RotorV[i].power_f;
+			_power3(ic, 4, ip) += C.RotorV[i].power_c;
+			_power3(ic, 5, ip) += C.RotorV[i].power_iid;
+			_torque3(ic, 0, ip) += C.RotorV[i].torque;
+			_torque3(ic, 1, ip) += C.RotorV[i].torque_i;
+			_torque3(ic, 2, ip) += C.RotorV[i].torque_o;
+			_torque3(ic, 3, ip) += C.RotorV[i].torque_f;
+			_torque3(ic, 4, ip) += C.RotorV[i].torque_c;
+			_torque3(ic, 5, ip) += C.RotorV[i].torque_iid;
+		}
+		C.RotorV[0].GetBeta(_beta);
+		for (int i = 0; i < 3; ++i)
+			beta3(ic, i, ip) = DEG(_beta[i]);
+		err3(ic, 0, ip) = C.sum_a1_del;
+		err3(ic, 1, ip) = C.sum_a2_del;
+		err3(ic, 2, ip) = C.max_c_del;
+		flightspeed2(ic, ip) = C.vel_g[0];
+		wmega2(ic, ip) = C.RotorV[0].omega / param0(0);
+	}
+	if (flg == np*(e - s))
+	{
+		/*uctrl3.output2("uctrl_rpm.output", 6);
+		beta3.output2("beta_rpm.output", 4);
+		_power3.output2("power_rpm.output", 10);
+		_torque3.output2("torque_rpm.output", 10);
+		err3.output2("err_rpm.output", 10);*/
+		/*uctrl3.output2("uctrl_chd.output", 6);
+		beta3.output2("beta_chd.output", 4);
+		_power3.output2("power_chd.output", 10);
+		_torque3.output2("torque_chd.output", 10);
+		err3.output2("err_chd.output", 10);*/
+		uctrl3.output2("uctrl_rad.output", 6);
+		beta3.output2("beta_rad.output", 4);
+		_power3.output2("power_rad.output", 10);
+		_torque3.output2("torque_rad.output", 10);
+		err3.output2("err_rad.output", 10);
+		flightspeed2.output("flightspeed.output", 5);
+		wmega2.output("wmega.output", 4);
+	}
+	printf("\n\n");
+	printf("Count: %d, Case ID: (%d, %d) \n", flg, ic, ip);
+	printf("Vel g test: %f \n", C.vel_g[0]);
+	printf("Omg test: %f \n", C.RotorV[0].omega / param0(0));
+}
 
 void Jobs::ParamSweep(const Copter &C)
 {
-	RPMs.allocate(2, nCase), param0.allocate(2);
-	nParams = 21;
-	RPMs.input("RPMs.in");
-	param0(0) = C.RotorV[0].omega, param0(1) = C.RotorV[0].vtipa;
+	switch (jtype)
+	{
+	case SimTrim:
+		break;
+	case RPMSwp:
+		RPMs.allocate(2, nCase), param0.allocate(2);
+		nParams = 20;
+		RPMs.input("RPMs.in");
+		param0(0) = C.RotorV[0].omega, param0(1) = C.RotorV[0].vtipa;
+		break;
+	case ChordSwp:
+		Chds.allocate(2, nCase), param0.allocate(3);
+		nParams = 20;
+		Chds.input("Chds.in");
+		param0(0) = C.RotorV[0].chord.v_p[0], param0(1) = C.RotorV[0].sigma, param0(2) = C.RotorV[0].gama;
+		break;
+	case RadiusSwp:
+		Rads.allocate(2, nCase), param0.allocate(7);
+		nParams = 2;
+		Rads.input("Rads.in");
+		param0(0) = C.RotorV[0].radius, param0(1) = C.RotorV[0].vtipa, param0(2) = C.RotorV[0].disk_A;
+		param0(3) = C.RotorV[0].iflap, param0(4) = C.RotorV[0].m1;
+		param0(5) = C.RotorV[0].sigma, param0(6) = C.RotorV[0].gama;
+		break;
+	default:
+		break;
+	}
+
+	if (jtype > SimTrim)
+	{
+		uctrl3.allocate(nCase, 6, nParams), beta3.allocate(nCase, 3, nParams);
+		_power3.allocate(nCase, 6, nParams), _torque3.allocate(nCase, 6, nParams);
+		err3.allocate(nCase, 3, nParams);
+		flightspeed2.allocate(nCase, nParams), wmega2.allocate(nCase, nParams);
+	}
+
 }
 
 void Jobs::UpdateParam(Copter &C, const int ic, const int ip)
 {
-	double _rpm = RPMs(0, ic) + (RPMs(1, ic) - RPMs(0, ic)) / (nParams - 1)*ip;
-	//_rpm = 1.0;
-	C.RotorV[0].omega = param0(0)*_rpm;
-	C.RotorV[0].vtipa = param0(1)*_rpm;
+	double temp;
+	switch (jtype)
+	{
+	case SimTrim:
+		break;
+	case RPMSwp:
+		temp = RPMs(0, ic) + (RPMs(1, ic) - RPMs(0, ic)) / (nParams - 1)*ip;
+		C.RotorV[0].omega = param0(0)*temp;
+		C.RotorV[0].vtipa = param0(1)*temp;
+		break;
+	case ChordSwp:
+		temp = Chds(0, ic) + (Chds(1, ic) - Chds(0, ic)) / (nParams - 1)*ip;
+		C.RotorV[0].chord.setvalue(param0(0)*temp);
+		C.RotorV[0].gama = param0(2)*temp;
+		C.RotorV[0].sigma = param0(1)*temp;
+		break;
+	case RadiusSwp:
+		temp = Rads(0, ic) + (Rads(1, ic) - Rads(0, ic)) / (nParams - 1)*ip;
+		C.RotorV[0].radius = param0(0)*temp, C.RotorV[0].vtipa = param0(1)*temp, C.RotorV[0].disk_A = param0(2)*temp*temp;
+		C.RotorV[0].iflap = param0(3)*temp*temp, C.RotorV[0].m1 = param0(4)*temp;
+		C.RotorV[0].sigma = param0(5)/temp, C.RotorV[0].gama = param0(6)*temp*temp;
+		break;
+	default:
+		break;
+	}
+	
 }
 
 void Rotor::OutPutWake(const int ic)
@@ -627,4 +742,151 @@ void LevelFlightMP(void)
 //
 //	}
 
+}
+
+void RPMSweepMP(void)
+{
+	Jobs jobs;
+	Model_UL496 ul496;
+	Copter copter;
+	CopterSolver solver;
+	int s, e, i, j, k, np, allcase;
+
+	ul496.GetProb();
+	ul496.GetModel();
+	copter.InitRotorCraft(ul496);
+
+	jobs.InitProject();
+	jobs.ParamSweep(copter);
+	s = i = j = k = 0, e = jobs.nCase, np = jobs.nParams;
+	allcase = np*(e - s);
+
+#pragma omp parallel num_threads(8) shared(s, e, jobs) firstprivate(i, j, k, solver, copter)
+	{
+#pragma omp for
+		for (k = 0; k < allcase; k++)
+		{
+			i = k / np; // flight speed index
+			j = k % np; // parameter index
+			jobs.SetSimCond(copter, i);
+			jobs.UpdateParam(copter, i, j);
+			solver.CopterSimulation(copter);
+			jobs.PostProcessMP(copter, i, j, s, e, np);
+		}
+#pragma omp barrier
+	}
+}
+
+void MultiSweepMP(void)
+{
+	Jobs jobs;
+	Model_UL496 ul496;
+	Copter copter;
+	CopterSolver solver;
+
+	ul496.GetProb();
+	ul496.GetModel();
+	copter.InitRotorCraft(ul496);
+
+	jobs.InitProject();
+}
+
+void RPMSweep(const int ic, const int ip)
+{
+	Jobs jobs;
+	Model_UL496 ul496;
+	Copter copter;
+	CopterSolver solver;
+
+	ul496.GetProb();
+	ul496.GetModel();
+	copter.InitRotorCraft(ul496);
+
+	jobs.InitProject();
+	jobs.ParamSweep(copter);
+
+	jobs.SetSimCond(copter, ic);
+	jobs.UpdateParam(copter, ic, ip);
+	solver.CopterSimulation(copter);
+	//jobs.PostProcessMP(copter, ic, ip, s, e, np);
+}
+
+void OPT_RPMSweep(void)
+{
+	Optimization opt;
+	Model_UL496 ul496;
+	Copter copter;
+	CopterSolver solver;
+	int maxRepeat = 2;
+	int s, e, i, j, np, allcase, icount;
+	std::vector<int> _key(2), _keyup(2), _keydn(2), _ki(2);
+
+	ul496.GetProb();
+	ul496.GetModel();
+	copter.InitRotorCraft(ul496);
+
+	opt.InitOptimization();
+
+	s = i = j = icount = 0, e = opt.range[0], np = opt.range[1];
+	allcase = np*(e - s);
+
+#pragma omp parallel num_threads(7) shared(s,e,opt) firstprivate(i,j,icount,_key,solver,copter)
+	{
+		int k, kstart, kend;
+		int Nthrds = omp_get_num_threads(), id = omp_get_thread_num();
+		if (allcase / Nthrds == 0)
+		{
+			kstart = id*(allcase / Nthrds);
+			kend = (id + 1)*(allcase / Nthrds);
+		}
+		else
+		{
+			kstart = id*(allcase / Nthrds + 1);
+			kend = (id + 1)*(allcase / Nthrds + 1);
+		}
+		kend = Min(kend, allcase);
+
+		//printf("id = %d, kstart = %d, kend = %d \n", id, kstart, kend);
+
+		for (k = kstart; k < kend; k++)
+		{
+			i = k / np; // flight speed index
+			j = k % np; // parameter index
+			_key[0] = i, _key[1] = j;
+			if (opt.haveKey(_key))
+			{
+				icount = 0;
+				while (!opt.fitMap[_key].converge && icount < maxRepeat)
+				{
+					opt.SetSimCond(copter, _key);
+					opt.UpdateParam(copter, opt.deMap[_key]);
+					solver.CopterSimulation(copter);
+					opt.ResetParam(copter, opt.deMap[_key]);
+
+					if (solver.converge)
+					{
+						opt.RecordFitness(copter, solver, opt.fitMap[_key]);
+						opt.fitMap[_key].converge = true;
+						opt.DPMonitor(opt.deMap[_key], opt.fitMap[_key].converge, id, copter.Niter);
+					}
+					else
+					{
+						opt.fitMap[_key].converge = false;
+						opt.DPMonitor(opt.deMap[_key], opt.fitMap[_key].converge, id, copter.Niter);
+						opt.UpdateDesigns(_key);
+						++icount;
+					}
+
+				}
+
+				if (icount == maxRepeat)
+				{
+					opt.fitMap.erase(_key);
+					opt.deMap.erase(_key);
+				}
+			}
+		}
+#pragma omp barrier
+	}
+	opt.PostProcess();
 }

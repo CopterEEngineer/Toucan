@@ -3,11 +3,8 @@
 
 #include "Components.h"
 #include "Solver.h"
+#include "Optimization.h"
 
-enum JobsType
-{
-	SimTrim = 0, RPMSwp = 1
-};
 
 class Model_UL496 :public ModelCase
 {
@@ -40,6 +37,7 @@ public:
 	void PostProcess(Copter &C, const int ic, const int s, const int e);
 	void PostProcess(Copter &C, const int ic, const int ip, const int s, const int e);
 	void PostProcessMP(Copter &C, const int ic, const int s, const int e);
+	void PostProcessMP(Copter &C, const int ic, const int ip, const int s, const int e, const int np);
 
 	void ParamSweep(const Copter &C);
 	void UpdateParam(Copter &C, const int ic, const int ip);
@@ -51,17 +49,24 @@ private:
 	Matrix1<double> Mus, Pits, Vfs;
 	Matrix2<double> Consini;
 	Matrix1<int> Kwtips;
-	Matrix2<double> RPMs;
+	Matrix2<double> RPMs, Chds, Rads;
 	Matrix1<double> param0;
 	Matrix2<double> uctrl, beta;
 	Matrix2<double> _power, _torque;
+	Matrix3<double> uctrl3, beta3, _power3, _torque3, err3;
+	Matrix2<double> flightspeed2, wmega2;
 	int flg;
 public:
 	int nCase, nParams;
 	JobsType jtype;
+	Matrix1<JobsType> jtype_M;
 };
 
 void LevelFlight(void);
 void LevelFlightMP(void);
-
+void RPMSweepMP(void);
+void ChordSweepMP(void);
+void MultiSweepMP(void);
+void RPMSweep(const int ic, const int ip);
+void OPT_RPMSweep(void);
 
