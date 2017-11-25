@@ -1,12 +1,41 @@
 #include "stdafx.h"
 #include "Components.h"
 #include "Solver.h"
-
+#include <vector>
 
 void CopterSolver::CopterSimulation(Copter &C)
 {
 	InitCopterSolver();
 	simtype = C.simtype;
+	
+	std::vector<AeroDynType> ad;
+	for (auto it = C.RotorV.begin(); it != C.RotorV.end(); ++it)
+		ad.emplace_back(it->adyna);
+
+	if (C.RotorV[0].adyna>0 || C.RotorV[1].adyna>0)
+	{
+		C.RotorV[0].adyna = Averaged;
+		C.RotorV[1].adyna = Averaged;
+		switch (simtype)
+		{
+		case FreeTrim0:
+		case FreeTrim1:
+		case FreeTrim2:
+			_FreeTrimSolver(C);
+			break;
+		case WindTrim:
+			_WindTrimSolver(C);
+			break;
+		case Transient:
+			_TransientSolver(C);
+			break;
+		default:
+			break;
+		}
+	}
+
+	C.RotorV[0].adyna = ad[0];
+	C.RotorV[1].adyna = ad[1];
 	switch (simtype)
 	{
 	case FreeTrim0:
@@ -23,6 +52,7 @@ void CopterSolver::CopterSimulation(Copter &C)
 	default:
 		break;
 	}
+	
 }
 
 
@@ -192,7 +222,7 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 	C.sum_a2_del = sum_a2_del(niter);
 	C.max_c_del = max_c_del(niter);
 	C.Niter = niter;
-	if (Max(C.sum_a1_del, C.sum_a2_del) < 100 * err_a*err_a && C.max_c_del < 10 * err_c)
+	if (Max(C.sum_a1_del, C.sum_a2_del) < 1 * err_a*err_a && C.max_c_del < 1 * err_c)
 		converge = true;
 	else
 		converge = false;

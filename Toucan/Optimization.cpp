@@ -81,7 +81,6 @@ void Optimization::InitOptimization(std::map<std::vector<int>, Fitness> &_fitMap
 
 bool Optimization::haveKey(std::vector<int> k)
 {
-	bool havekey;
 	if (deMap.find(k) != deMap.end() && fitMap.find(k) != fitMap.end())
 		return true;
 	else

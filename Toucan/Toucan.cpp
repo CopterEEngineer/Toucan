@@ -24,10 +24,10 @@ int main()
 
 	//LevelFlight();
 	//LevelFlightMP(); //54 s
-	RPMSweepMP(); // 1043 s
+	//RPMSweepMP(); // 1043 s
 	//rpmsweep(); // 3483 s
 	//RPMSweep(6, 0);
-	//OPT_RPMSweep(); // 560s; 100+ s; 1219s; 2514s; 1531s
+	OPT_RPMSweep(); // 560s; 100+ s; 1219s; 2514s; 1531s
 
 	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
 

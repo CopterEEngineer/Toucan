@@ -99,7 +99,7 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	R.type = Mrotor;
 	R.teeter = true, R.nb = 2;
 	R.amb = amb;
-	R.bld.soltype = Rotation, R.adyna = PWake; // Averaged; // 
+	R.bld.soltype = Rotation, R.adyna = PWake; //  Averaged; //
 	R.nf = 72, R.ns = 40, R.ni = 10; 
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
 	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
@@ -276,9 +276,10 @@ void Wing::InitVariables(void)
 
 void CopterSolver::InitCopterSolver(void)
 {
-	err_a = err_c = 5.0e-3;
+	err_a = 5.0e-3;
+	err_c = 1.0e-2;
 	epsilon = 0.01;
-	nitermax = 35;
+	nitermax = 100;
 	sita_coll_max = RAD(50);
 	sita_cycl_max = RAD(30);
 	euler_max = RAD(40);
@@ -724,24 +725,6 @@ void LevelFlightMP(void)
 		}
 #pragma omp barrier
 	}
-
-	//std::vector<Jobs> subjobs(e);
-//#pragma omp parallel num_threads(6) shared(s, e, subjobs) firstprivate(i, jobs, solver, copter, ul496)
-//	{
-//#pragma omp for
-//		for (i = s; i < e; i++)
-//		{
-//			subjobs[i].InitProject(jobs, i);
-//
-//			subjobs[i].SetSimCond(copter);
-//			solver.CopterSimulation(copter);
-//
-//			subjobs[i].PostProcess(copter);
-//		}
-//#pragma omp barrier
-//
-//	}
-
 }
 
 void RPMSweepMP(void)
@@ -816,10 +799,8 @@ void OPT_RPMSweep(void)
 	Optimization opt;
 	Model_UL496 ul496;
 	Copter copter;
-	CopterSolver solver;
-	int maxRepeat = 2;
-	int s, e, i, j, np, allcase, icount;
-	std::vector<int> _key(2), _keyup(2), _keydn(2), _ki(2);
+	int maxRepeat = 6;
+	int s, e, np, allcase;
 
 	ul496.GetProb();
 	ul496.GetModel();
@@ -827,10 +808,10 @@ void OPT_RPMSweep(void)
 
 	opt.InitOptimization();
 
-	s = i = j = icount = 0, e = opt.range[0], np = opt.range[1];
+	s = 0, e = opt.range[0], np = opt.range[1];
 	allcase = np*(e - s);
 
-#pragma omp parallel num_threads(7) shared(s,e,opt) firstprivate(i,j,icount,_key,solver,copter)
+#pragma omp parallel num_threads(6) shared(opt) firstprivate(copter)
 	{
 		int k, kstart, kend;
 		int Nthrds = omp_get_num_threads(), id = omp_get_thread_num();
@@ -846,8 +827,11 @@ void OPT_RPMSweep(void)
 		}
 		kend = Min(kend, allcase);
 
-		//printf("id = %d, kstart = %d, kend = %d \n", id, kstart, kend);
+		int i, j;
+		std::vector<int> _key(2), _keyup(2), _keydn(2), _ki(2);
+		CopterSolver solver;
 
+		i = j = 0;
 		for (k = kstart; k < kend; k++)
 		{
 			i = k / np; // flight speed index
@@ -855,7 +839,7 @@ void OPT_RPMSweep(void)
 			_key[0] = i, _key[1] = j;
 			if (opt.haveKey(_key))
 			{
-				icount = 0;
+				int icount = 0;
 				while (!opt.fitMap[_key].converge && icount < maxRepeat)
 				{
 					opt.SetSimCond(copter, _key);
