@@ -15,7 +15,7 @@ void CopterSolver::CopterSimulation(Copter &C)
 	if (C.RotorV[0].adyna>0 || C.RotorV[1].adyna>0)
 	{
 		C.RotorV[0].adyna = Averaged;
-		C.RotorV[1].adyna = Averaged;
+		C.RotorV[1].adyna = Min(Averaged, ad[1]);
 		switch (simtype)
 		{
 		case FreeTrim0:

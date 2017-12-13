@@ -293,11 +293,11 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			printf("Translation Accelation: %f \n", sum_a1_del(iter));
 			printf("Angular Accelation: %f \n", sum_a2_del(iter));
 			printf("Max Controls Delt: %f \n", max_c_del(iter));
+#endif // OUTPUT_MODE
 
 			sum_a1_del.outputs("sum_a1_del.output", 8);
 			sum_a2_del.outputs("sum_a2_del.output", 8);
 			max_c_del.outputs("max_c_del.output", 8);
-#endif // OUTPUT_MODE
 
 			return false;
 		}

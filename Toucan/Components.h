@@ -15,7 +15,10 @@
 #define RAD(x) (PI*x)/180.0
 #define DEG(x) (x*180.0)/PI
 
-//#define OUTPUT_MODE
+#ifdef _DEBUG
+#define OUTPUT_MODE
+#endif // _DEBUG
+
 //#define OUTPUT_MODE_1
 
 // enum
@@ -33,7 +36,7 @@ enum SimType {
 };
 
 enum AeroDynType {
-	Averaged = 0, PWake = 1, FWake = 2
+	Averaged = 0, PWake = 1, FWake = 2, Simple = -1
 };
 
 enum JobsType
@@ -46,10 +49,10 @@ class Ambience
 public:
 	Ambience() { ; }
 	~Ambience() { ; }
-	void SetAmbience(void);
+	void SetAmbience(double);
 
 public:
-	myTYPE rho, vsound;
+	myTYPE rho, vsound, height;
 
 };
 
@@ -159,6 +162,7 @@ public:
 	void WakeInducedVel(void);
 	void OutPutWake(const int ic);
 	void GetPower(myTYPE p[6], myTYPE t[6]);
+	void DiskOutput(string s);
 private:
 	void _allocate(void);
 	void _initvariables(void);
@@ -212,7 +216,7 @@ private:
 	Matrix2<myTYPE> bflap, dbflap, sfth;
 	Matrix2<myTYPE> ut, un, up, ua, ma_n;
 	Matrix1<myTYPE> _cl, _cd, _ua, _incidn, _inflow, _factor;
-	Matrix2<myTYPE> incidn, cl, cd;
+	Matrix2<myTYPE> incidn, inflow, cl, cd;
 	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdy, lambdx;
 
 	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
@@ -303,11 +307,11 @@ public:
 private:
 	myTYPE airforce_sigma[3], airmoment_sigma[3]; // synthesized airdynamics												  
 
-	Ambience amb;
 	ModelCase model;
 	//CopterSolver CSolver;
 
 public:
+	Ambience amb;
 	SimType simtype;
 	std::vector<Wing> WingV;
 	std::vector<Rotor> RotorV;

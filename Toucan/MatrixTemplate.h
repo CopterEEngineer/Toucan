@@ -2027,6 +2027,12 @@ public:
 	inline Matrix1<Type> operator()(const Matrix1<int> &A, int j);
 
 
+	//inline Matrix2<Type> & operator()(int i, const Matrix1<int> &A);
+	//
+
+	//inline Matrix2<Type> & operator()(const Matrix1<int> &A, int i);
+
+
 	inline Matrix2<Type> operator()(const Matrix2<int> &A);
 
 
@@ -2350,9 +2356,7 @@ public:
 		nk = NK;
 		string _file;
 		for (int k = 0; k < nk; ++k)
-		{
-			//printf("k = %d \n", k);
-			//OutFile << "k = " << k << endl;
+		{			
 			_file = "id" + std::to_string(k) + "-" + filename;
 			ofstream OutFile(_file, std::ios::out | std::ios::trunc);
 			if (OutFile)
@@ -2387,6 +2391,7 @@ public:
 			OutFile.precision(presc);
 			for (int k = 0; k < nk; ++k)
 			{
+				OutFile << "k = " << k << endl;
 				for (int i = 0; i < ni; ++i) {
 					for (int j = 0; j < nj; ++j) {
 						OutFile << std::right << std::setw(presc + 2) << std::setprecision(presc) << std::fixed << std::showpoint;
@@ -4456,6 +4461,28 @@ inline Matrix1<double> Matrix2<double>::operator()(int i, const Matrix1<int> &A)
 	for (int k = anv - 1; k >= 0; --k) { temp.v_p[k] = (*this)(i, A.v_p[k]); }
 	return temp;
 }
+
+
+//inline Matrix2<double> & Matrix2<double>::operator()(int i, const Matrix1<int> &A) {
+//	check_bound(i, *(A.v_p));
+//	check_bound(i, *(A.v_p + A.Nv - 1));
+//	int anv = Min(A.Nv, NJ);
+//	
+//	for (int k = anv - 1; k >= 0; --k)
+//		(*this)(i, k) = A(k);
+//	return (*this);
+//}
+//
+//
+//inline Matrix2<double> & Matrix2<double>::operator()(const Matrix1<int> &A, int i) {
+//	check_bound(i, *(A.v_p));
+//	check_bound(i, *(A.v_p + A.Nv - 1));
+//	int anv = Min(A.Nv, NI);
+//
+//	for (int k = anv - 1; k >= 0; --k)
+//		(*this)(k, i) = A(k);
+//	return (*this);
+//}
 
 
 inline Matrix1<int> Matrix2<int>::operator()(int i, const Matrix1<int> &A) {

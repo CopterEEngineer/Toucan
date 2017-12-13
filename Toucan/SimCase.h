@@ -15,6 +15,7 @@ public:
 
 	void GetModel(void);
 	void GetProb(void);
+	void GetProb(double);
 	void InitMainRotor(Rotor &R);
 	void InitTailRotor(Rotor &R, double w);
 	void ParamSweep(void);
@@ -29,7 +30,7 @@ public:
 	Jobs() { ; }
 	~Jobs() { ; }
 
-	void InitProject(void);
+	void InitProject(JobsType);
 	void InitProject(Jobs &J, const int ic);
 	void SetSimCond(Copter &C, const int ic);
 	void SetSimCond(Copter &C);
@@ -51,11 +52,19 @@ private:
 	Matrix1<int> Kwtips;
 	Matrix2<double> RPMs, Chds, Rads;
 	Matrix1<double> param0;
-	Matrix2<double> uctrl, beta;
+	Matrix2<double> uctrl, beta, err;
 	Matrix2<double> _power, _torque;
 	Matrix3<double> uctrl3, beta3, _power3, _torque3, err3;
+
+	Matrix2<double> uctrl_tr, beta_tr;
+	Matrix2<double> _power_tr, _torque_tr;
+	Matrix3<double> uctrl3_tr, beta3_tr, _power3_tr, _torque3_tr, err3_tr;
+
+	Matrix2<int> niter;
+
 	Matrix2<double> flightspeed2, wmega2;
 	int flg;
+	string path;
 public:
 	int nCase, nParams;
 	JobsType jtype;
@@ -63,8 +72,8 @@ public:
 };
 
 void LevelFlight(void);
-void LevelFlightMP(void);
-void RPMSweepMP(void);
+void LevelFlightMP(int);
+void RPMSweepMP(int);
 void ChordSweepMP(void);
 void MultiSweepMP(void);
 void RPMSweep(const int ic, const int ip);

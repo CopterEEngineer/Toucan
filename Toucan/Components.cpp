@@ -289,3 +289,11 @@ void ModelCase::GetProb(void)
 	printf("Undefined Problem. \n");
 	return;
 }
+
+void Ambience::SetAmbience(double h)
+{
+	double temperature = 15 - 1.983*h / 304.8;
+	rho = 0.002378*exp(-0.0297*h / 1000);
+	vsound = sqrt(1.4 * 287 * (temperature + 273)) / 0.3048; // ft/s
+	height = h;
+}
