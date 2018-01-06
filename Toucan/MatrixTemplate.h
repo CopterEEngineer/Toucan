@@ -770,6 +770,12 @@ public:
 	}
 
 
+	inline Type & operator[](int i) {
+		check_bound(i);
+		return *(v_p + (i - I0));
+	}
+
+
 	inline Matrix1<Type> operator()(const Matrix1<int> &A);
 
 

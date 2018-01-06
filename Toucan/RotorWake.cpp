@@ -392,3 +392,84 @@ void Rotor::_wakeInducedVelMP()
 	lambdh = lambdi - vel[2] / vtipa;
 }
 
+void Rotor::_wakeInducedVelMP(int nb)
+{
+	myTYPE temp_lambdi, temp_lambdx, temp_lambdy;
+	myTYPE xblade, yblade, zblade, ri0, rj0, rk0, ri1, rj1, rk1;
+	Matrix2<myTYPE> tipgeoexpand, tempM(3, 3);
+	Matrix3<myTYPE> tipgeoathub(nk, nf, 3);
+	int tipstr_NI = tipstr.NI;
+	int tipgeo_NI = nk;
+	int tipgeo_NJ = nf;
+	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
+	myTYPE rcros[3], _temp;
+
+	rc04 = rc0 * rc0 * rc0 * rc0;
+	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); // 应该要减去在TPP坐标系下TPP原点指向HUB原点的向量
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j)
+			tempM(i, j) = tppcoord.Ttransf[i][j];
+	tipgeoexpand = tempM.transpose().matrixmultiplyTP(tipgeoexpand);
+	for (int k = 0; k < 3; ++k)
+		for (int j = 0; j < nk*nf; ++j)
+			tipgeoathub(j%nk, j / nk, k) = tipgeoexpand(k, j);
+
+	for (int iz = nf - 1; iz >= 0; iz--)
+	{	
+		for (int ir = ns - 1; ir >= 0; --ir)
+		{
+			temp_lambdi = 0;
+			temp_lambdx = 0;
+			temp_lambdy = 0;
+
+			for (int ib = 0; ib < nb; ib++)
+			{
+				iz += nf / nb*ib;
+				if (iz >= nf)
+					iz -= nf;
+
+				xblade = bladedeform(iz, ir, 0);
+				yblade = bladedeform(iz, ir, 1);
+				zblade = bladedeform(iz, ir, 2);
+
+				// balde 1 $ik == nk - 1$ element points to blade 1 
+				ri0 = xblade - tipgeoathub(nk - 1, iz, 0);
+				rj0 = yblade - tipgeoathub(nk - 1, iz, 1);
+				rk0 = zblade - tipgeoathub(nk - 1, iz, 2);
+				r0len = norm(ri0, rj0, rk0);
+				for (int ik = nk - 2; ik >= 0; --ik)
+				{
+					ri1 = xblade - tipgeoathub(ik, iz, 0);
+					rj1 = yblade - tipgeoathub(ik, iz, 1);
+					rk1 = zblade - tipgeoathub(ik, iz, 2);
+					r1len = norm(ri1, rj1, rk1);
+
+					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
+					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
+					rdot = dot(ri0, rj0, rk0, ri1, rj1, rk1);
+					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
+					geofunc *= (1 - 0.5 * rc04 / height2 / height2);
+					geofunc *= 0.5*(tipstr(ik, iz) + tipstr(ik + 1, iz));
+
+					_temp = 0.25 / PI * geofunc;
+
+					temp_lambdx -= rcros[0] * _temp;
+					temp_lambdy -= rcros[1] * _temp;
+					temp_lambdi -= rcros[2] * _temp;
+
+					ri0 = ri1;
+					rj0 = rj1;
+					rk0 = rk1;
+					r0len = r1len;
+				}
+
+				lambdi(iz, ir) = temp_lambdi / radius / vtipa;
+				lambdx(iz, ir) = temp_lambdx / radius / vtipa;
+				lambdy(iz, ir) = temp_lambdy / radius / vtipa;
+
+			}
+		}
+	}
+	lambdh = lambdi - vel[2] / vtipa;
+}
+
