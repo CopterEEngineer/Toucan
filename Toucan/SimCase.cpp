@@ -15,8 +15,15 @@ void Model_UL496::GetProb(void)
 
 void Model_UL496::GetProb(double h)
 {
-	simtype = FreeTrim1;
+	simtype = FreeTrim1;// FreeTrim1;// Transient;
 	nfree = 6;
+	amb.SetAmbience(h);
+}
+
+void Model_UL496::GetProb(int nf, double h, SimType st)
+{
+	simtype = st;
+	nfree = nf;
 	amb.SetAmbience(h);
 }
 
@@ -26,7 +33,7 @@ void Model_UL496::GetModel(void)
 	Wing wing, fin1, fin2;
 	Rotor mrotor, trotor;
 	Coordinate *BASE_COORD = NULL;
-
+	si_unit = false;
 	// reference coordinate
 	origin[0] = origin[1] = origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
@@ -35,11 +42,15 @@ void Model_UL496::GetModel(void)
 	refcoord.SetBase(BASE_COORD);
 
 	// fuselage
+	fuselage.fmdling = Parasite;
 	fuselage.amb = amb;
+	fuselage.si_unit = si_unit;
 	fuselage.dragA = 0.0315*PI*132.25;
 	origin[0] = origin[1] = origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+	fuselage.cxtc.allocate(1, 1), fuselage.cytc.allocate(1, 1), fuselage.cztc.allocate(1, 1);
+	fuselage.cmtc.allocate(1, 1), fuselage.cntc.allocate(1, 1);
 	//fuselage.refcoord.SetCoordinate(origin, euler, fuselage.refcoord.base);
 	//BASE_COORD = &fuselage.refcoord;
 	//fuselage.refcoord.SetBase(BASE_COORD);
@@ -47,6 +58,7 @@ void Model_UL496::GetModel(void)
 	// wing
 	wing.type = Hwing;
 	wing.amb = amb;
+	wing.si_unit = si_unit;
 	origin[0] = -7.87, origin[1] = 0, origin[2] = 0;
 	euler[0] = 0, euler[1] = 4 * PI / 180, euler[2] = 0;
 	wing.refcoord.SetCoordinate(origin, euler, BASE_COORD);
@@ -55,6 +67,7 @@ void Model_UL496::GetModel(void)
 	//fin1
 	fin1.type = Vwing;
 	fin1.amb = amb;
+	fin1.si_unit = si_unit;
 	fin1.span = 1.33, fin1.chord = 1.13, fin1.taper = 0.51;
 	fin1.a0 = 5.3, fin1.cd0 = 0.0105, fin1.cd1 = 0, fin1.cd2 = 0.01325;
 	origin[0] = -(7.87 + 0.164), origin[1] = 3.75 / 2, origin[2] = 0;
@@ -63,6 +76,7 @@ void Model_UL496::GetModel(void)
 	// fin2
 	fin2.type = Vwing;
 	fin2.amb = amb;
+	fin2.si_unit = si_unit;
 	fin2.span = 1.33, fin2.chord = 1.13, fin2.taper = 0.51;
 	fin2.a0 = 5.3, fin2.cd0 = 0.0105, fin2.cd1 = 0, fin2.cd2 = 0.01325;
 	origin[0] = -(7.87 - 0.164), origin[1] = -3.75 / 2, origin[2] = 0;
@@ -108,7 +122,10 @@ void Model_UL496::InitMainRotor(Rotor &R)
 	double temp = 1.0;
 	R.type = Mrotor;
 	R.teeter = true, R.nb = 2;
+	R.hingetype = Teeter;
 	R.amb = amb;
+	R.si_unit = false;
+	R.airfoil = C81Table;
 	R.bld.soltype = Rotation, R.adyna = PWake; //  Averaged; //PWake
 	R.nf = 72, R.ns = 40, R.ni = 10; 
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
@@ -167,9 +184,13 @@ void Model_UL496::InitMainRotor(Rotor &R)
 
 void Model_UL496::InitTailRotor(Rotor &R, double w)
 {
+	R.FT = 1.0; 
 	R.type = Trotor;
 	R.amb = amb;
+	R.si_unit = false;
+	R.airfoil = C81Table;
 	R.teeter = false, R.nb = 4;
+	R.hingetype = Hinged;
 	R.bld.soltype = HubFixed, R.adyna = Averaged; // Simple; // Averaged;
 
 	if (R.adyna > -1)
@@ -232,7 +253,570 @@ void Model_UL496::InitTailRotor(Rotor &R, double w)
 	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// define wake
-	if (R.adyna > 0)
+	if (R.adyna > 100)
+		printf("Undefined tail wake func. \n");
+}
+
+void Model_BO105::GetProb(int nf, double h, SimType st)
+{
+	simtype = st;
+	nfree = nf;
+	amb.rho = 1.225;
+	amb.vsound = 340.0;
+}
+
+void Model_BO105::GetModel(void)
+{
+	// SI unit
+	myTYPE origin[3], euler[3];
+	Wing wing, fin;
+	Rotor mrotor, trotor;
+	Coordinate *BASE_COORD = NULL;
+
+	si_unit = true;
+
+	// entire parameters
+	mass = 2200; 
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			inmatx[i][j] = 0;
+		}
+	}
+	inmatx[0][0] = 1433;
+	inmatx[1][1] = 4973;
+	inmatx[2][2] = 4099;
+	inmatx[0][2] = inmatx[2][0] = 660;
+
+	inmatx_M.allocate(3, 3);
+	inmatx_M(0, 0) = inmatx[0][0];
+	inmatx_M(1, 1) = inmatx[1][1];
+	inmatx_M(2, 2) = inmatx[2][2];
+	inmatx_M(0, 2) = inmatx_M(2, 0) = inmatx[0][2];
+
+	// reference coordinate, mass center
+	origin[1] = origin[2] = 0;
+	origin[0] = 0; 
+	euler[0] = euler[1] = euler[2] = 0;
+	refcoord.SetCoordinate(origin, euler, BASE_COORD);
+	BASE_COORD = &refcoord;
+	refcoord.SetBase(BASE_COORD);
+
+	// fuselage
+	InitFuselage();
+	fuselage.dragA=0.0315*PI*4.91*4.91;
+	fuselage.amb = amb;
+	fuselage.si_unit = si_unit;
+	origin[0] = 0;
+	origin[1] = origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+
+	// wing
+	wing.type = Hwing;
+	wing.amb = amb;
+	wing.si_unit = si_unit;
+	InitWing(wing);
+	origin[0] = -4.56 - 0.0163, origin[1] = 0, origin[2] = -0.5;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	wing.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+	
+	//fin
+	fin.type = Vwing;
+	fin.amb = amb;
+	fin.si_unit = si_unit;
+	InitFin(fin);
+	origin[0] = -5.416 - 0.0163, origin[1] = 0, origin[2] = -1.0;
+	euler[0] = PI / 2, euler[1] = 0, euler[2] = 0;
+	fin.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+
+	// main rotor
+	InitMainRotor(mrotor);
+	mrotor.SetCoordBase(BASE_COORD);
+
+	// tail rotor
+	InitTailRotor(trotor, 44.4);
+	trotor.SetCoordBase(BASE_COORD);
+
+	WingV.clear(), RotorV.clear();
+	WingV.emplace_back(wing);
+	WingV.emplace_back(fin);
+	RotorV.emplace_back(mrotor);
+	RotorV.emplace_back(trotor);
+}
+
+void Model_BO105::InitFuselage(void)
+{
+	fuselage.fmdling = Fitting; // Fitting;
+	fuselage.Vtest = 30.48; //m/s
+	fuselage.xf0 = -580.6, fuselage.xf1 = -454.0, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
+	fuselage.yf0 = -6.9, fuselage.yf1 = -2399.0, fuselage.yf2 = -1.7, fuselage.yf3 = 12.7;
+	fuselage.zf0 = -51.1, fuselage.zf1 = -1202.0, fuselage.zf2 = 1515.7, fuselage.zf3 = -604.2;
+	fuselage.mf0 = -1191.8, fuselage.mf1 = 12752.0, fuselage.mf2 = 8201.3, fuselage.mf3 = -5796.7;
+	fuselage.nf0 = fuselage.nf2 = fuselage.nf3 = 0;
+	fuselage.nf1 = -10028.0;
+	fuselage.cxtc.allocate(9, 2), fuselage.cytc.allocate(11, 2), fuselage.cztc.allocate(11, 2);
+	fuselage.cmtc.allocate(10, 2), fuselage.cntc.allocate(9, 2);
+	fuselage.cxtc.input("fuselage_cx.txt"), fuselage.cytc.input("fuselage_cy.txt"), fuselage.cztc.input("fuselage_cz.txt");
+	fuselage.cmtc.input("fuselage_cm.txt"), fuselage.cntc.input("fuselage_cn.txt");
+	fuselage.Sp = 14, fuselage.Lf = 20, fuselage.Ss = 80;
+}
+
+void Model_BO105::InitWing(Wing &W)
+{
+	W.wmdling = WFitting;
+	W.a1 = 3.262, W.a3 = W.a5 = 0;
+	W.alpha0 = 0.0698;
+	W.cd0 = 0, W.cd1 = 0, W.cd2 = 0;
+	W.span = 2, W.chord = 0.4015, W.taper = 1;
+}
+
+void Model_BO105::InitFin(Wing &F)
+{
+	F.wmdling = WFitting;
+	F.a1 = 2.704, F.a3 = F.a5 = 0;
+	F.alpha0 = -0.08116;
+	F.cd0 = F.cd1 = F.cd2 = 0;
+	F.span = 1, F.chord = 0.805, F.taper = 1;
+}
+
+void Model_BO105::InitMainRotor(Rotor &R)
+{
+	R.type = Mrotor;
+	R.teeter = false;
+	R.hingetype = Hingeless;
+	R.nb = 4;
+	R.amb = amb;
+	R.si_unit = true;
+	R.airfoil = Padfield;
+	R.bld.soltype = HubFixed, R.adyna = LinearInflow;
+	R.nf = 72, R.ns = 40, R.ni = 10;
+	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
+	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
+	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
+	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
+
+	R.a0 = 6.113, R.del0 = 0.0074, R.del2 = 38.66, R.alpha0 = 0.0;
+	R.eflap = 0;
+	R.khub = 113330, R.del = 0, R.pitchroot = RAD(0);
+	R.radius = 4.91, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.precone = 0;
+	R.omega = 44.4;
+	R.vtipa = R.omega*R.radius;
+	R.outboard = 0.3;
+	R.rc0 = 0.004852173913043;
+	//R.cltc.allocate(1, 1), R.cdtc.allocate(1, 1);
+	R.cltc.allocate(40, 12), R.cltc.input("naca0012_cl_c81.txt");
+	R.cdtc.allocate(66, 12), R.cdtc.input("naca0012_cd_c81.txt");
+	R.iflap = 231.7, R.m1 = 1.5*R.iflap/R.radius;
+	R.sigma = 0.07, R.gama = 5.087;
+	R.chord.setvalue(0.27);
+	R.sweep.setvalue(0);
+	myTYPE temp_twist, temp_azimuth, temp_station;
+	for (int j = R.ns - 1; j >= 0; --j) {
+		temp_station = R.rroot + j*(1.0 - R.rroot) / (R.ns - 1); // uniform seperated accepted so far.
+																 //temp_twist = (-8 * PI / 180) * j / (ns - 1);
+		R.twist(j) = -0.14 * j / (R.ns - 1);
+		for (int i = R.nf - 1; i >= 0; --i) {
+			//twist(i, j) = temp_twist;
+			R.rastation(i, j) = temp_station;
+			R.azstation(i, j) = i * 2 * PI / R.nf;
+		}
+	}
+
+	myTYPE origin[3], euler[3];
+	origin[0] = -0.0163, origin[1] = 0, origin[2] = -1.48;
+	euler[0] = 0, euler[1] = PI + RAD(3), euler[2] = 0;
+	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
+	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	//原点在铰的位置，沿桨叶轴线指向外，具有挥舞和摆振自由度
+	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
+	euler[0] = R.precone, euler[1] = 0, euler[2] = -PI/2;
+	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
+	
+	//原点在叶素当地，参考自hubfxcoord
+	origin[0] = 0, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.bemrefcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	//原点在叶素当地，参考自hubfxcoord，具有当地的扭转自由度（变形后）
+	origin[0] = 0, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.bemcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	R.windcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = 0, origin[1] = 0, origin[2] = R.precone * (1 - R.eflap);
+	euler[0] = euler[1] = euler[2] = 0;
+	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
+}
+
+void Model_BO105::InitTailRotor(Rotor &R, double w)
+{
+	R.FT = 0.787;
+	R.type = Trotor;
+	R.amb = amb;
+	R.si_unit = si_unit;
+	R.airfoil = Padfield;
+	R.hingetype = Teeter; 
+	R.teeter = true;
+	R.nb = 2;
+	R.bld.soltype = HubFixed, R.adyna = Averaged; // Simple; // Averaged;
+
+	if (R.adyna > -1)
+		R.nf = 72, R.ns = 40, R.ni = 40;
+	else
+		R.nf = 1, R.ns = 1, R.ni = 1;
+
+	R.kwtip = 0, R.kwrot = 0, R.nk = 1;
+	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
+	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
+	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
+
+	R.a0 = 5.7, R.del0 = 0.008, R.del2 = 9.5, R.alpha0 = 0;
+	R.eflap = 0, R.khub = 0, R.del = 45, R.pitchroot = 0;
+	R.radius = 0.95, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.precone = RAD(0.5), R.omega = 5.25*w, R.vtipa = R.omega*R.radius;
+	R.outboard = 0, R.rc0 = 0;
+	
+	//R.iflap = -99, R.m1 = -99, R.gama = -99;
+	R.iflap = 2.9, R.m1 = 1.5*R.iflap / R.radius, R.gama = 0.1764; // 猜测值
+	R.sigma = 0.12;
+	R.chord.setvalue(0.09);
+
+	if (R.adyna > -1)
+	{
+		//R.cltc.allocate(1, 1);
+		//R.cdtc.allocate(1, 1);
+		R.cltc.allocate(40, 12), R.cltc.input("naca0012_cl_c81.txt");
+		R.cdtc.allocate(66, 12), R.cdtc.input("naca0012_cd_c81.txt");
+
+		myTYPE temp_twist, temp_azimuth, temp_station;
+		for (int j = R.ns - 1; j >= 0; --j) {
+			temp_station = R.rroot + j*(1.0 - R.rroot) / (R.ns - 1); // uniform seperated accepted so far.
+																	 //temp_twist = (-8 * PI / 180) * j / (ns - 1);
+			R.twist(j) = (0.0 * PI / 180) * j / (R.ns - 1);
+			for (int i = R.nf - 1; i >= 0; --i) {
+				//twist(i, j) = temp_twist;
+				R.rastation(i, j) = temp_station;
+				R.azstation(i, j) = i * 2 * PI / R.nf;
+			}
+		}
+	}
+
+	myTYPE origin[3], euler[3];
+	origin[0] = -6 - 0.0163, origin[1] = 0, origin[2] = -1.72;
+	euler[0] = -PI / 2, euler[1] = PI, euler[2] = 0;
+	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
+	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubrtcoord
+	//原点在铰的位置，y轴沿桨叶轴线指向外，具有挥舞和摆振自由度
+	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
+	euler[0] = R.precone, euler[1] = 0, euler[2] = -PI/2;
+	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	//原点在叶素当地，参考自blade坐标
+	origin[0] = 0, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.bemrefcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	//原点在叶素当地，参考自blade坐标，具有当地的扭转自由度（变形后）
+	origin[0] = 0, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	R.bemcoord.SetCoordinate(origin, euler, R.refcoord.base); 
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	R.windcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = 0, origin[1] = 0, origin[2] = R.precone * (1 - R.eflap);
+	euler[0] = euler[1] = euler[2] = 0;
+	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// define wake
+	if (R.adyna > 100)
+		printf("Undefined tail wake func. \n");
+}
+
+void Model_Puma330::GetProb(int nf, double h, SimType st, bool unit)
+{
+	simtype = st;
+	nfree = nf;
+	amb.SetAmbience(h/0.3048);
+	if (unit)
+	{
+		amb.rho = amb.rho / 0.002378*1.225;
+		amb.vsound = amb.vsound / 1115 * 340;
+	}
+}
+
+void Model_Puma330::GetModel(void)
+{
+	// SI unit
+	myTYPE origin[3], euler[3];
+	Wing wing, fin;
+	Rotor mrotor, trotor;
+	Coordinate *BASE_COORD = NULL;
+
+	si_unit = true;
+
+	// entire parameters
+	mass = 5805;
+	for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			inmatx[i][j] = 0;
+		}
+	}
+	inmatx[0][0] = 9638;
+	inmatx[1][1] = 33240;
+	inmatx[2][2] = 25889;
+	inmatx[0][2] = inmatx[2][0] = 2226;
+
+	inmatx_M.allocate(3, 3);
+	inmatx_M(0, 0) = inmatx[0][0];
+	inmatx_M(1, 1) = inmatx[1][1];
+	inmatx_M(2, 2) = inmatx[2][2];
+	inmatx_M(0, 2) = inmatx_M(2, 0) = inmatx[0][2];
+
+	// reference coordinate
+	origin[1] = origin[2] = 0;
+	origin[0] = 0.005;
+	euler[0] = euler[1] = euler[2] = 0;
+	refcoord.SetCoordinate(origin, euler, BASE_COORD);
+	BASE_COORD = &refcoord;
+	refcoord.SetBase(BASE_COORD);
+
+	// fuselage
+	InitFuselage();
+	fuselage.dragA = 0.0315*PI*7.5*7.5;
+	fuselage.amb = amb;
+	fuselage.si_unit = si_unit;
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+
+	// wing
+	wing.type = Hwing;
+	wing.amb = amb;
+	wing.si_unit = si_unit;
+	InitWing(wing);
+	origin[0] = -9, origin[1] = -1, origin[2] = -1.087;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	wing.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+
+	//fin
+	fin.type = Vwing;
+	fin.amb = amb;
+	fin.si_unit = si_unit;
+	InitFin(fin);
+	origin[0] = -9, origin[1] = 0, origin[2] = -1.087;
+	euler[0] = PI / 2, euler[1] = 0, euler[2] = 0;
+	fin.refcoord.SetCoordinate(origin, euler, BASE_COORD);
+
+	// main rotor
+	InitMainRotor(mrotor);
+	mrotor.SetCoordBase(BASE_COORD);
+
+	// tail rotor
+	InitTailRotor(trotor, 27);
+	trotor.SetCoordBase(BASE_COORD);
+
+	WingV.clear(), RotorV.clear();
+	WingV.emplace_back(wing);
+	WingV.emplace_back(fin);
+	RotorV.emplace_back(mrotor);
+	RotorV.emplace_back(trotor);
+}
+
+void Model_Puma330::InitFuselage(void)
+{
+	fuselage.fmdling = Fitting; // Fitting;
+	fuselage.Vtest = 30.48; //m/s
+	fuselage.xf0 = -822.9, fuselage.xf1 = 44.5, fuselage.xf2 = 911.9, fuselage.xf3 = 1663.6;
+	fuselage.yf0 = -11672.0, fuselage.yf1 = 0, fuselage.yf2 = 0, fuselage.yf3 = 0;
+	fuselage.zf0 = -458.2, fuselage.zf1 = -5693.7, fuselage.zf2 = 2077.3, fuselage.zf3 = -3958.9;
+	fuselage.mf0 = -1065.7, fuselage.mf1 = 8745.0, fuselage.mf2 = 12473.5, fuselage.mf3 = -10033.0;
+	fuselage.nf0 = fuselage.nf2 = 0;
+	fuselage.nf1 = -24269.2, fuselage.nf3 = 97619.0;
+}
+
+void Model_Puma330::InitWing(Wing &W)
+{
+	W.wmdling = WFitting;
+	W.a1 = 3.7, W.a3 = -3.92*3.7, W.a5 = 0;
+	W.alpha0 = -0.0262;
+	W.cd0 = 0, W.cd1 = 0, W.cd2 = 0;
+	W.span = 2.11, W.chord = 0.635, W.taper = 1;
+}
+
+void Model_Puma330::InitFin(Wing &F)
+{
+	F.wmdling = WFitting;
+	F.span = 1.395, F.chord = 1, F.taper = 1;
+	F.cd0 = 0, F.cd1 = 0, F.cd2 = 0;
+	F.alpha0 = 0.0175;
+	F.a1 = 0, F.a3 = 3.5*11.143, F.a5 = -3.5*85.714;
+}
+
+void Model_Puma330::InitMainRotor(Rotor &R)
+{
+	R.type = Mrotor;
+	R.teeter = false;
+	R.hingetype = Hinged;
+	R.nb = 4;
+	R.amb = amb;
+	R.si_unit = true;
+	R.airfoil = C81Table;
+	R.bld.soltype = Rotation, R.adyna = Averaged;
+	R.nf = 72, R.ns = 40, R.ni = 10;
+	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
+	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
+	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
+	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
+
+	R.a0 = 5.73, R.del0 = 0.0074, R.del2 = 9.5, R.alpha0 = -0.0262;
+	R.eflap = 0.038; // 
+	R.khub = 48149, R.del = 0, R.pitchroot = RAD(0);
+	R.radius = 7.5, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.precone = 0;
+	R.omega = 27;
+	R.vtipa = R.omega*R.radius;
+	R.outboard = 0.3;
+	R.rc0 = 0.004852173913043;
+
+	R.cltc.allocate(40, 12), R.cltc.input("naca0012_cl_c81.txt");
+	R.cdtc.allocate(66, 12), R.cdtc.input("naca0012_cd_c81.txt");
+	R.iflap = 1280, R.m1 = 1.5*R.iflap / R.radius;
+	R.sigma = 0.09169, R.gama = 9.374;
+	R.chord.setvalue(0.5401);
+	R.sweep.setvalue(0);
+
+	myTYPE temp_twist, temp_azimuth, temp_station;
+	for (int j = R.ns - 1; j >= 0; --j) {
+		temp_station = R.rroot + j*(1.0 - R.rroot) / (R.ns - 1); // uniform seperated accepted so far.
+																 //temp_twist = (-8 * PI / 180) * j / (ns - 1);
+		R.twist(j) = -0.14 * j / (R.ns - 1);
+		for (int i = R.nf - 1; i >= 0; --i) {
+			//twist(i, j) = temp_twist;
+			R.rastation(i, j) = temp_station;
+			R.azstation(i, j) = i * 2 * PI / R.nf;
+		}
+	}
+
+	myTYPE origin[3], euler[3];
+	origin[0] = 0, origin[1] = 0, origin[2] = -2.157;
+	euler[0] = 0, euler[1] = 0.0873, euler[2] = 0;
+	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
+	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = 0, euler[1] = PI, euler[2] = 0;
+	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = R.precone, euler[2] = 0;
+	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = 0, origin[1] = -R.precone * (1 - R.eflap), origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
+}
+
+void Model_Puma330::InitTailRotor(Rotor &R, double w)
+{
+	R.type = Trotor;
+	R.amb = amb;
+	R.si_unit = si_unit;
+	R.airfoil = C81Table;
+	R.teeter = false, R.nb = 5;
+	R.hingetype = Hinged;
+	R.bld.soltype = Rotation, R.adyna = Averaged; // Simple; // Averaged;
+
+	if (R.adyna > -1)
+		R.nf = 72, R.ns = 40, R.ni = 40;
+	else
+		R.nf = 1, R.ns = 1, R.ni = 1;
+
+	R.kwtip = 0, R.kwrot = 0, R.nk = 1;
+	R.haveGeo = false, R.haveStr = false, R.outputWake = false;
+	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
+	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
+
+	R.a0 = 5.7, R.del0 = 0.008, R.del2 = 9.5, R.alpha0 = 0;
+	R.eflap = 0, R.khub = 0, R.del = 0, R.pitchroot = 0;
+	R.radius = 1.56, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.precone = 0, R.omega = 4.82*w, R.vtipa = R.omega*R.radius;
+	R.outboard = 0, R.rc0 = 0;
+
+	//R.iflap = -99, R.m1 = -99, R.gama = -99;
+	R.iflap = 4.96, R.m1 = 1.5*R.iflap / R.radius, R.gama = 1.952; // 猜测值
+	R.sigma = 0.19;
+	R.chord.setvalue(0.2328);
+
+	if (R.adyna > -1)
+	{
+		//R.cltc.allocate(1, 1);
+		//R.cdtc.allocate(1, 1);
+		R.cltc.allocate(40, 12), R.cltc.input("naca0012_cl_c81.txt");
+		R.cdtc.allocate(66, 12), R.cdtc.input("naca0012_cd_c81.txt");
+
+		myTYPE temp_twist, temp_azimuth, temp_station;
+		for (int j = R.ns - 1; j >= 0; --j) {
+			temp_station = R.rroot + j*(1.0 - R.rroot) / (R.ns - 1); // uniform seperated accepted so far.
+																	 //temp_twist = (-8 * PI / 180) * j / (ns - 1);
+			R.twist(j) = (0.0 * PI / 180) * j / (R.ns - 1);
+			for (int i = R.nf - 1; i >= 0; --i) {
+				//twist(i, j) = temp_twist;
+				R.rastation(i, j) = temp_station;
+				R.azstation(i, j) = i * 2 * PI / R.nf;
+			}
+		}
+	}
+
+	myTYPE origin[3], euler[3];
+	origin[0] = -9, origin[1] = 0, origin[2] = -1.587;
+	euler[0] = PI / 2, euler[1] = 0, euler[2] = 0;
+	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
+	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = origin[1] = origin[2] = 0;
+	euler[0] = 0, euler[1] = PI, euler[2] = 0;
+	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubrtcoord
+	//定义扭转，摆振，挥舞的三个桨叶坐标
+	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
+	euler[0] = 0, euler[1] = R.precone, euler[2] = 0;
+	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// referred to hubfxcoord
+	origin[0] = 0, origin[1] = -R.precone * (1 - R.eflap), origin[2] = 0;
+	euler[0] = euler[1] = euler[2] = 0;
+	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
+
+	// define wake
+	if (R.adyna > 100)
 		printf("Undefined tail wake func. \n");
 }
 
@@ -265,6 +849,7 @@ void Rotor::InitVariables(void)
 		bld.GAf.pho = 1.0;
 		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
 		bld.sol.allocate(bld.nitermax);
+		bld.azmuth.allocate(bld.nitermax);
 		break;
 	case Trotor:
 		power = power_c = power_i = power_f = power_o = 0;
@@ -278,6 +863,7 @@ void Rotor::InitVariables(void)
 		bld.GAf.pho = 1.0;
 		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
 		bld.sol.allocate(bld.nitermax);
+		bld.azmuth.allocate(bld.nitermax);
 		break;
 	default:
 		break;
@@ -307,22 +893,9 @@ void Wing::InitVariables(void)
 	}
 }
 
-void CopterSolver::InitCopterSolver(void)
-{
-	err_a = 5.0e-3;
-	err_c = 1.0e-2;
-	epsilon = 0.01;
-	nitermax = 30;
-	sita_coll_max = RAD(35);
-	sita_cycl_max = RAD(35);
-	euler_max = RAD(40);
-	niter_r.allocate(2), niter = 0, converge = false;
-	sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
-}
-
 void Jobs::InitProject(JobsType jt)
 {
-	nCase = 13;
+	nCase = 8;
 	Mus.allocate(nCase), Vfs.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
 	Consini.allocate(nCase, 6);
 	uctrl.allocate(nCase, 6), beta.allocate(nCase, 3), err.allocate(nCase, 3);
@@ -330,14 +903,58 @@ void Jobs::InitProject(JobsType jt)
 	uctrl_tr.allocate(nCase, 6), beta_tr.allocate(nCase, 3);
 	_power_tr.allocate(nCase, 6), _torque_tr.allocate(nCase, 6);
 	flg = 0, jtype = jt; // RadiusSwp; // RPMSwp; //ChordSwp; //SimTrim
+	niter.allocate(nCase, 1);
 	path.clear();
 	//jtype_M.allocate(2), jtype_M(0) = RadiusSwp, jtype_M(1) = RPMSwp;
-	
-	Mus.input("Mus.in");
-	Vfs.input("Vfs.in");
-	Pits.input("Pits.in");
-	Kwtips.input("Kwtips.in");
-	Consini.input("Controls.in");
+
+	//Mus.input("Mus.in");
+	//Vfs.input("Vfs.in");
+	Vfs.input("Vfs-bo105.in");
+	//Pits.input("Pits.in");
+	//Kwtips.input("Kwtips.in");
+	Consini.input("ControlsInit-bo105.in");
+
+	if (remove("max_c_del.output") != 0)
+		printf("Remove max_c_del.output failed. \n");
+	if (remove("sum_a1_del.output") != 0)
+		printf("Remove sum_a1_del.output failed. \n");
+	if (remove("sum_a2_del.output") != 0)
+		printf("Remove sum_a2_del.output failed. \n");
+}
+
+void Jobs::InitProject(JobsType jt, string fn)
+{
+	nCase = 8;
+	Mus.allocate(nCase), Vfs.allocate(nCase), Pits.allocate(nCase), Kwtips.allocate(nCase);
+	Consini.allocate(nCase, 6);
+	uctrl.allocate(nCase, 6), beta.allocate(nCase, 3), err.allocate(nCase, 3);
+	_power.allocate(nCase, 6), _torque.allocate(nCase, 6);
+	uctrl_tr.allocate(nCase, 6), beta_tr.allocate(nCase, 3);
+	_power_tr.allocate(nCase, 6), _torque_tr.allocate(nCase, 6);
+
+	dXdvel.allocate(nCase, 3), dYdvel.allocate(nCase, 3), dZdvel.allocate(nCase, 3);
+	dXdomg.allocate(nCase, 3), dYdomg.allocate(nCase, 3), dZdomg.allocate(nCase, 3);
+	dXdeul.allocate(nCase, 2), dYdeul.allocate(nCase, 2), dZdeul.allocate(nCase, 2);
+	dXdctrl.allocate(nCase, 4), dYdctrl.allocate(nCase, 4), dZdctrl.allocate(nCase, 4);
+
+	dLdvel.allocate(nCase, 3), dMdvel.allocate(nCase, 3), dNdvel.allocate(nCase, 3);
+	dLdomg.allocate(nCase, 3), dMdomg.allocate(nCase, 3), dNdomg.allocate(nCase, 3);
+	dLdeul.allocate(nCase, 2), dMdeul.allocate(nCase, 2), dNdeul.allocate(nCase, 2);
+	dLdctrl.allocate(nCase, 4), dMdctrl.allocate(nCase, 4), dNdctrl.allocate(nCase, 4);
+
+	AMatrix.allocate(9, 9, nCase), BMatrix.allocate(9, 4, nCase);
+	AMatrixRe.allocate(9, 9, nCase);
+	ALongM.allocate(4, 4, nCase), ALateM.allocate(5, 5, nCase);
+	ALongMRe.allocate(4, 4, nCase), ALateMRe.allocate(5, 5, nCase);
+
+	flg = 0, jtype = jt; 
+	niter.allocate(nCase, 1);
+	path.clear();
+
+	//StableInitPara.allocate(nCase, 2);
+	//StableInitPara.input("StableInitPara.in");
+	Vfs.input("Vfs-bo105.in");
+	Consini.input(fn);
 
 	if (remove("max_c_del.output") != 0)
 		printf("Remove max_c_del.output failed. \n");
@@ -365,7 +982,10 @@ void Jobs::SetSimCond(Copter &C, const int ic)
 	double _uctrl[6] = { 0,0,0,0,0,0 };
 
 	//C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
-	C.vel_g[0] = Vfs(ic);
+	if (C.fuselage.si_unit)
+		C.vel_g[0] = Vfs(ic)*0.5144444;
+	else
+		C.vel_g[0] = Vfs(ic);
 	//euler[1] = RAD(Pits(ic));
 	//C.refcoord.SetCoordinate(euler, "euler");
 
@@ -383,7 +1003,7 @@ void Jobs::SetSimCond(Copter &C, const int ic)
 	{		
 		if (jtype > SimTrim)
 			C.RotorV[i].InitVariables();
-		if (C.RotorV[i].adyna > 0)
+		if (C.RotorV[i].adyna > 100)
 			C.RotorV[i].WakeModelPrams(Kwtips(ic));
 	}
 }
@@ -402,7 +1022,7 @@ void Jobs::SetSimCond(Copter &C)
 	{
 		if (jtype > SimTrim)
 			C.RotorV[i].InitVariables();
-		if (C.RotorV[i].adyna > 0)
+		if (C.RotorV[i].adyna > 100)
 			C.RotorV[i].WakeModelPrams(Kwtips(0));
 	}
 }
@@ -432,6 +1052,178 @@ void Jobs::PostProcess(Copter &C)
 		beta(0, i) = DEG(_beta[i]);
 	printf("\nMain rotor power: %f \n", C.RotorV[0].power);
 	// vel test
+	printf("Vel g test: %f \n", C.vel_g[0]);
+}
+
+void Jobs::PostProcess(Copter &C, string pf)
+{
+	if (path.empty())
+	{
+		time_t rawtime;
+		struct tm * timeinfo;
+		char buffer[80];
+
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
+
+		strftime(buffer, sizeof(buffer), "%Y%m%d%I%M%S", timeinfo);
+		std::string str(buffer);
+
+		path = pf + '-' + std::to_string(int(C.mass)) + '-' + std::to_string(int(C.vel_g[0])) + '-' + str;
+
+		mkdir(path.c_str());
+	}
+
+	// input parameters check
+	for (int i = C.nfree - 1; i >= 0; i--)
+		uctrl(0, i) = DEG(C.controls[i]);
+	
+	flightspeed2.allocate(1, 1);
+	flightspeed2(0, 0) = C.vel_g[0];
+	flightspeed2.output(path + "//" + pf + "-Vfs.output", 5);
+	printf("Velocity check: %f, %f, %f \n", C.vel_g[0], C.vel_g[1], C.vel_g[2]);
+	uctrl.output(path + "//" + pf + "-Controls.output", 6);
+
+	C.AMatrix.output(path + "//" + pf + "-AMatrix.output", 10);
+	C.BMatrix.output(path + "//" + pf + "-BMatrix.output", 10);
+}
+
+void Jobs::PostProcess(Copter &C, string pf, const int ic, const int s, const int e)
+{
+	if (flg++ < e - s)
+	{
+		for (int i = C.nfree - 1; i >= 0; --i)
+			uctrl(ic, i) = DEG(C.controls[i]);
+
+		//flightspeed2(0, ic) = C.vel_g[0];
+
+		for (int j = 0; j < dXdvel.NJ; j++)
+		{
+			dXdvel(ic, j) = C.dXdvel(j);
+			dYdvel(ic, j) = C.dYdvel(j);
+			dZdvel(ic, j) = C.dZdvel(j);
+			dXdomg(ic, j) = C.dXdomg(j);
+			dYdomg(ic, j) = C.dYdomg(j);
+			dZdomg(ic, j) = C.dZdomg(j);
+
+			dLdvel(ic, j) = C.dLdvel(j);
+			dMdvel(ic, j) = C.dMdvel(j);
+			dNdvel(ic, j) = C.dNdvel(j);
+			dLdomg(ic, j) = C.dLdomg(j);
+			dMdomg(ic, j) = C.dMdomg(j);
+			dNdomg(ic, j) = C.dNdomg(j);
+		}
+		for (int j = 0; j < dXdeul.NJ; j++)
+		{
+			dXdeul(ic, j) = C.dXdeul(j);
+			dYdeul(ic, j) = C.dYdeul(j);
+			dZdeul(ic, j) = C.dZdeul(j);
+
+			dLdeul(ic, j) = C.dLdeul(j);
+			dMdeul(ic, j) = C.dMdeul(j);
+			dNdeul(ic, j) = C.dNdeul(j);
+		}
+		for (int j = 0; j < dXdctrl.NJ; j++)
+		{
+			dXdctrl(ic, j) = C.dXdctrl(j);
+			dYdctrl(ic, j) = C.dYdctrl(j);
+			dZdctrl(ic, j) = C.dZdctrl(j);
+
+			dLdctrl(ic, j) = C.dLdctrl(j);
+			dMdctrl(ic, j) = C.dMdctrl(j);
+			dNdctrl(ic, j) = C.dNdctrl(j);
+		}
+
+		for (int j = 0; j < C.AMatrix.NJ; j++)
+			for (int i = 0; i < C.AMatrix.NI; i++)
+			{
+				AMatrix(i, j, ic) = C.AMatrix(i, j);
+				AMatrixRe(i, j, ic) = C.AMatrixRe(i, j);
+			}
+		for (int j = 0; j < C.BMatrix.NJ; j++)
+			for (int i = 0; i < C.BMatrix.NI; i++)
+				BMatrix(i, j, ic) = C.BMatrix(i, j);
+		for(int j=0;j<4;j++)
+			for (int i = 0; i < 4; i++)
+			{
+				ALongM(i, j, ic) = C.ALongM(i, j);
+				ALongMRe(i, j, ic) = C.ALongMRe(i, j);
+				ALateM(i, j, ic) = C.ALateM(i, j);
+				ALateMRe(i, j, ic) = C.ALateMRe(i, j);
+			}
+	}
+
+	if (path.empty())
+	{
+		time_t rawtime;
+		struct tm * timeinfo;
+		char buffer[80];
+
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
+
+		strftime(buffer, sizeof(buffer), "%Y%m%d%I%M%S", timeinfo);
+		std::string str(buffer);
+
+		path = pf + '-' + std::to_string(int(C.mass)) + '-' + std::to_string(int(C.vel_g[0])) + '-' + str;
+
+		mkdir(path.c_str());
+	}
+
+	if (flg == e - s)
+	{
+		uctrl.output(path + "//" + pf + "-Controls.output", 6);
+		//flightspeed2.output(path + "//" + pf + "-Vfs.output", 5);
+
+		AMatrix.output2(path + "//" + pf + "-AMatrix.output", 10);
+		BMatrix.output2(path + "//" + pf + "-BMatrix.output", 10);
+		AMatrixRe.output2(path + "//" + pf + "-AMatrixRe.output", 10);
+
+		ALongM.output2(path + "//" + pf + "-ALongM.output", 10);
+		ALongMRe.output2(path + "//" + pf + "-ALongMRe.output", 10);
+		ALateM.output2(path + "//" + pf + "-ALateM.output", 10);
+		ALateMRe.output2(path + "//" + pf + "-ALateMRe.output", 10);
+
+		dXdvel.output(path + "//" + pf + "-dXdvel.output", 10);
+		dYdvel.output(path + "//" + pf + "-dYdvel.output", 10);
+		dZdvel.output(path + "//" + pf + "-dZdvel.output", 10);
+
+		dXdomg.output(path + "//" + pf + "-dXdomg.output", 10);
+		dYdomg.output(path + "//" + pf + "-dYdomg.output", 10);
+		dZdomg.output(path + "//" + pf + "-dZdomg.output", 10);
+
+		dXdeul.output(path + "//" + pf + "-dXdeul.output", 10);
+		dYdeul.output(path + "//" + pf + "-dYdeul.output", 10);
+		dZdeul.output(path + "//" + pf + "-dZdeul.output", 10);
+
+		dLdvel.output(path + "//" + pf + "-dLdvel.output", 10);
+		dMdvel.output(path + "//" + pf + "-dMdvel.output", 10);
+		dNdvel.output(path + "//" + pf + "-dNdvel.output", 10);
+
+		dLdomg.output(path + "//" + pf + "-dLdomg.output", 10);
+		dMdomg.output(path + "//" + pf + "-dMdomg.output", 10);
+		dNdomg.output(path + "//" + pf + "-dNdomg.output", 10);
+
+		dLdeul.output(path + "//" + pf + "-dLdeul.output", 10);
+		dMdeul.output(path + "//" + pf + "-dMdeul.output", 10);
+		dNdeul.output(path + "//" + pf + "-dNdeul.output", 10);
+
+		dXdctrl.output(path + "//" + pf + "-dXdctrl.output", 10);
+		dYdctrl.output(path + "//" + pf + "-dYdctrl.output", 10);
+		dZdctrl.output(path + "//" + pf + "-dZdctrl.output", 10);
+
+		dLdctrl.output(path + "//" + pf + "-dLdctrl.output", 10);
+		dMdctrl.output(path + "//" + pf + "-dMdctrl.output", 10);
+		dNdctrl.output(path + "//" + pf + "-dNdctrl.output", 10);
+
+		// save helicopter model as a .txt
+		std::ifstream src("SimCase.cpp", std::ios::binary);
+		std::ofstream dst(path + "//" + "simcase.txt", std::ios::binary);
+		dst << src.rdbuf();
+	}
+
+	// vel test
+	printf("Flag: %d\n", flg);
 	printf("Vel g test: %f \n", C.vel_g[0]);
 }
 
@@ -615,6 +1407,12 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		err(ic, 0) = C.sum_a1_del;
 		err(ic, 1) = C.sum_a2_del;
 		err(ic, 2) = C.max_c_del;		
+
+		niter(ic, 0) = C.Niter;
+		//cout << niter(ic, 0) << endl;
+
+		//C.RotorV[0].GetAirfm(_beta, _beta_tr);
+		//cout << _beta[1] << endl;
 	}
 
 	string prefix = "LF";
@@ -647,6 +1445,8 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		beta_tr.output(path + "//" + prefix + "-TR-Betas.output", 4);
 		_power_tr.output(path + "//" + prefix + "-TR-Powers.output", 10);
 		_torque_tr.output(path + "//" + prefix + "-TR-Torques.output", 10);
+
+		niter.output(path + "//" + prefix + "-Niter.output", 1);
 
 		// save helicopter model as a .txt
 		std::ifstream src("SimCase.cpp", std::ios::binary);
@@ -715,6 +1515,12 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int ip, const int s, con
 		wmega2(ic, ip) = C.RotorV[0].omega / param0(0);
 
 		niter(ic, ip) = C.Niter;
+
+		for (int i = 0; i < C.RotorV[0].bld.nitermax; i++)
+		{
+			sol3_mr(ic, i, ip) = C.RotorV[0].bld.sol(i);
+			azmth_mr(ic, i, ip) = C.RotorV[0].bld.azmuth(i);
+		}
 	}
 
 	string prefix = "RPM";
@@ -761,6 +1567,8 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int ip, const int s, con
 		_power3_tr.output2(path + "//" + prefix + "-TR-Powers.output", 10);
 		_torque3_tr.output2(path + "//" + prefix + "-TR-Torques.output", 10);
 
+		sol3_mr.output2(path + "//" + prefix + "-MR-BetaSol.output", 10);
+		azmth_mr.output2(path + "//" + prefix + "-MR-Azmth.output", 10);
 
 		// save helicopter model as a .txt
 		std::ifstream src("SimCase.cpp", std::ios::binary);
@@ -788,7 +1596,7 @@ void Jobs::ParamSweep(const Copter &C)
 		break;
 	case RPMSwp:
 		RPMs.allocate(2, nCase), param0.allocate(2);
-		nParams = 41;
+		nParams = 5;
 		RPMs.input("RPMs.in");
 		param0(0) = C.RotorV[0].omega, param0(1) = C.RotorV[0].vtipa;
 		break;
@@ -819,7 +1627,10 @@ void Jobs::ParamSweep(const Copter &C)
 		_power3_tr.allocate(nCase, 6, nParams), _torque3_tr.allocate(nCase, 6, nParams);
 		err3_tr.allocate(nCase, 3, nParams);
 		flightspeed2.allocate(nCase, nParams), wmega2.allocate(nCase, nParams);
+		niter.deallocate();
 		niter.allocate(nCase, nParams);
+		sol3_mr.allocate(nCase, 720, nParams);
+		azmth_mr.allocate(nCase, 720, nParams);
 	}
 
 }
@@ -870,6 +1681,30 @@ void Rotor::OutPutWake(const int ic)
 	}
 }
 
+void CopterSolver::InitCopterSolver(void)
+{
+	err_a = 5.0e-3;
+	err_c = 1.0e-2;
+	epsilon = 0.01;
+	nitermax = 30;
+	sita_coll_max = RAD(35);
+	sita_cycl_max = RAD(35);
+	euler_max = RAD(35);
+	niter_r.allocate(2), niter = 0, converge = false;
+	sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
+
+	xdof = 8, udof = 4;
+	dXdvel.allocate(3), dYdvel.allocate(3), dZdvel.allocate(3);
+	dXdomg.allocate(3), dYdomg.allocate(3), dZdomg.allocate(3);
+	dLdvel.allocate(3), dMdvel.allocate(3), dNdvel.allocate(3);
+	dLdomg.allocate(3), dMdomg.allocate(3), dNdomg.allocate(3);
+	dXdeul.allocate(2), dYdeul.allocate(2), dZdeul.allocate(2);
+	dLdeul.allocate(2), dMdeul.allocate(2), dNdeul.allocate(2);
+	dXdctrl.allocate(4), dYdctrl.allocate(4), dZdctrl.allocate(4);
+	dLdctrl.allocate(4), dMdctrl.allocate(4), dNdctrl.allocate(4);
+	AMatrix.allocate(xdof, xdof), BMatrix.allocate(xdof, udof);
+}
+
 void LevelFlight(void)
 {
 	Jobs jobs;
@@ -898,29 +1733,62 @@ void LevelFlight(void)
 void LevelFlightMP(int nth)
 {
 	Jobs jobs;
-	Model_UL496 ul496;
+	//Model_UL496 ul496;
+	Model_BO105 bo105;
+	//Model_Puma330 puma330;
 	Copter copter;
 	CopterSolver solver;
 	int s, e, i;
 	
 	jobs.InitProject(SimTrim);
-	i = s = jobs.nCase-1, e = jobs.nCase;
+	i = s = 0, e = jobs.nCase;
 
-	ul496.GetProb(0);
-	ul496.GetModel();
-	copter.InitRotorCraft(ul496);
+	bo105.GetProb(6, 0, FreeTrim1);
+	bo105.GetModel();
+	copter.InitRotorCraft(bo105);
 
 #pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
 	{
+		AeroDynType adytemp = copter.RotorV[0].adyna;
 #pragma omp for
 		for (i = s; i < e; i++)
 		{
-			if (i < 4)
-				copter.RotorV[1].adyna = Simple;
+			if (i < 3)
+				copter.RotorV[0].adyna = LinearInflow;
+			else
+				copter.RotorV[0].adyna = adytemp;
 			
 			jobs.SetSimCond(copter, i);
 			solver.CopterSimulation(copter);
 			jobs.PostProcessMP(copter, i, s, e);
+		}
+#pragma omp barrier
+	}
+}
+
+void LinearModel(int nth)
+{
+	Jobs jobs;
+	Model_BO105 bo105;
+	Copter copter;
+	CopterSolver solver;
+	int s, e, i;
+
+	jobs.InitProject(Stable, "Controls_Bo105.in");
+	bo105.GetProb(6, 0, Transient);
+	bo105.GetModel();
+	copter.InitRotorCraft(bo105);
+
+	i = s = 0, e = jobs.nCase; // 10; //
+
+#pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
+	{
+#pragma omp for
+		for (int i = s; i < e; i++)
+		{
+			jobs.SetSimCond(copter, i);
+			solver.CopterSimulation(copter);
+			jobs.PostProcess(copter, "St", i, s, e);
 		}
 #pragma omp barrier
 	}
@@ -940,7 +1808,7 @@ void RPMSweepMP(int nth)
 
 	jobs.InitProject(RPMSwp);
 	jobs.ParamSweep(copter);
-	s = i = j = k = 0, e = 1, np = jobs.nParams;
+	s = i = j = k = 0, e = jobs.nCase, np = jobs.nParams;
 	allcase = np*(e - s);
 
 #pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, j, k, solver, copter)
@@ -953,6 +1821,7 @@ void RPMSweepMP(int nth)
 			
 			if (i < 4)
 				copter.RotorV[1].adyna = Simple;
+
 			jobs.SetSimCond(copter, i);
 			jobs.UpdateParam(copter, i, j); 
 			solver.CopterSimulation(copter);

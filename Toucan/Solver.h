@@ -20,6 +20,9 @@ private:
 	void _CompsSetAirFM(Copter &C);
 	void _Assemble(Copter &C);
 	void _EnableWake(Copter &C);
+	void _GetSigmaFM(Copter &C, myTYPE f[3], myTYPE m[3]);
+	void _ComputeAMatrix(Matrix2<double> &A, Copter &);
+	void _ComputeBMatrix(Matrix2<double> &B, Copter &);
 
 	template <class _Ty>
 	void _CompsSetStates(Copter &C, const _Ty *vc, const _Ty *wc, const _Ty *dvc, const _Ty *dwc);
@@ -59,6 +62,17 @@ public:
 	int niter;
 	Matrix1<int> niter_r;
 	bool converge;
+	Matrix2<double> AMatrix, BMatrix;
+	int xdof, udof;
+
+private:
+	//double dXdvel[3], dYdvel[3], dZdvel[3], dXdomg[3], dYdomg[3], dZdomg[3], dXdeul[2], dYdeul[2], dZdeul[2];
+	//double dMdvel[3], dNdvel[3], dLdvel[3], dMdomg[3], dNdomg[3], dLdomg[3], dMdeul[2], dNdeul[2], dLdeul[2];
+	//double dXdctrl[4], dYdctrl[4], dZdctrl[4], dMdctrl[4], dNdctrl[4], dLdctrl[4];
+
+	Matrix1<double> dXdvel, dYdvel, dZdvel, dXdomg, dYdomg, dZdomg, dXdeul, dYdeul, dZdeul;
+	Matrix1<double> dMdvel, dNdvel, dLdvel, dMdomg, dNdomg, dLdomg, dMdeul, dNdeul, dLdeul;
+	Matrix1<double> dXdctrl, dYdctrl, dZdctrl, dMdctrl, dNdctrl, dLdctrl;
 };
 
 
@@ -89,9 +103,19 @@ void CopterSolver::_SetDerivs(_Ty dv[3], _Ty dw[3], const _Ty *f, const _Ty *m, 
 	Cross(temp_cross_o, C.omg_c, temp_omg);
 	Cross(temp_cross_v, C.omg_c, C.vel_c);
 
-	for (int i = 2; i >= 0; --i) {
-		dv[i] = f[i] / (C.mass / SLUG_CONST) + C.refcoord.Ttransf[i][2] * UNIT_CONST * SLUG_CONST - temp_cross_v[i];
-		dw[i] = m[i] - temp_cross_o[i];
+	if (!C.fuselage.si_unit)
+	{
+		for (int i = 2; i >= 0; --i) {
+			dv[i] = f[i] / (C.mass / SLUG_CONST) + C.refcoord.Ttransf[i][2] * UNIT_CONST * SLUG_CONST - temp_cross_v[i];
+			dw[i] = m[i] - temp_cross_o[i];
+		}
+	}
+	else
+	{
+		for (int i = 2; i >= 0; --i) {
+			dv[i] = f[i] / C.mass + C.refcoord.Ttransf[i][2] * 9.8 - temp_cross_v[i];
+			dw[i] = m[i] - temp_cross_o[i];
+		}
 	}
 
 	Msolver(C.inmatx_M.v_p, dw, 3, 1);
@@ -125,6 +149,9 @@ void CopterSolver::_UpdateEuler(_Ty *xctrl, Copter &C)
 		euler[2] = xctrl[4];
 		break;
 	default:
+		euler[0] = xctrl[4];
+		euler[1] = xctrl[5];
+		euler[2] = 0;
 		break;
 	}
 	C.refcoord.SetCoordinate(euler, "euler");
@@ -295,9 +322,9 @@ bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 			printf("Max Controls Delt: %f \n", max_c_del(iter));
 #endif // OUTPUT_MODE
 
-			sum_a1_del.outputs("sum_a1_del.output", 8);
-			sum_a2_del.outputs("sum_a2_del.output", 8);
-			max_c_del.outputs("max_c_del.output", 8);
+			//sum_a1_del.outputs("sum_a1_del.output", 8);
+			//sum_a2_del.outputs("sum_a2_del.output", 8);
+			//max_c_del.outputs("max_c_del.output", 8);
 
 			return false;
 		}

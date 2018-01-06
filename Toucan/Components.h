@@ -17,6 +17,7 @@
 
 #ifdef _DEBUG
 #define OUTPUT_MODE
+#define OUTPUT_MODE_1
 #endif // _DEBUG
 
 //#define OUTPUT_MODE_1
@@ -36,12 +37,28 @@ enum SimType {
 };
 
 enum AeroDynType {
-	Averaged = 0, PWake = 1, FWake = 2, Simple = -1
+	Simple = -1, Averaged = 0, LinearInflow = 1, PWake = 101, FWake = 102,
 };
 
 enum JobsType
 {
-	SimTrim = 0, RPMSwp = 1, ChordSwp = 2, RadiusSwp = 3
+	SimTrim = 0, RPMSwp = 1, ChordSwp = 2, RadiusSwp = 3, Stable = 4,
+};
+
+enum HingeType {
+	Teeter = 0, Cantilever = 1, Hinged = 2, Hingeless = 3
+};
+
+enum FuseModeling {
+	Parasite = 0, Fitting = 1
+};
+
+enum WingModeling {
+	WSimple = 0, WFitting = 1
+};
+
+enum AirfoilAero {
+	Liftslope = 0, C81Table = 1, Padfield = 2
 };
 
 class Ambience
@@ -62,6 +79,7 @@ public:
 	Fuselage() { ; }
 	~Fuselage() { ; }
 	void SetAirfm(void);
+	void SetAirfm(double);
 	void GetAirfm(myTYPE f[3], myTYPE m[3]);
 	void GetAirfm_cg(myTYPE f[3], myTYPE m[3]);
 	void SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc);
@@ -74,8 +92,17 @@ private:
 	myTYPE vel[3], omg[3], dvel[3], domg[3];
 public:
 	Coordinate refcoord;
-	myTYPE dragA;
+	myTYPE dragA, Sp, Ss, Lf;
 	Ambience amb;
+	bool si_unit;
+	FuseModeling fmdling;
+	double Vtest;
+	double xf0, xf1, xf2, xf3;
+	double yf0, yf1, yf2, yf3;
+	double zf0, zf1, zf2, zf3;
+	double mf0, mf1, mf2, mf3;
+	double nf0, nf1, nf2, nf3;
+	Matrix2<double> cxtc, cytc, cztc, cmtc, cntc;
 };
 
 class Wing
@@ -84,6 +111,7 @@ public:
 	Wing() { ; }
 	~Wing() { ; }
 	void SetAirfm(void);
+	void SetAirfm(double);
 	void GetAirfm(myTYPE f[3], myTYPE m[3]);
 	void SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc);
 	void SetAirfm_cg(const Coordinate *base);
@@ -97,9 +125,11 @@ private:
 public:
 	Coordinate refcoord;
 	CompType type;
-	myTYPE a0, cd0, cd1, cd2;
 	myTYPE span, chord, taper;
 	Ambience amb;
+	bool si_unit;
+	WingModeling wmdling;
+	double a0, a1, a3, a5, alpha0, cd0, cd1, cd2;
 };
 
 class BladeSolver
@@ -120,7 +150,7 @@ public:
 	//Matrix2<myTYPE> Marf22, Carf22, Karf22, Ka22;
 	myTYPE Qt, q0, dq0, ddq0, q1, q, dq, ddq;
 	//Matrix1<myTYPE> Qt22, q02, dq02, ddq02, q12, dq2, ddq2;
-	Matrix1<myTYPE> sol;
+	Matrix1<myTYPE> sol, azmuth;
 
 	int nitermax, niter, dff, nperiod;
 	myTYPE beta[3];
@@ -132,20 +162,6 @@ class Rotor
 {
 public:
 	Rotor() { ; }
-	//Rotor(const Rotor &R)
-	//{
-	//	chord = R.chord, twist = R.twist, sweep = R.sweep;
-	//	cltc = R.cltc, cdtc = R.cdtc, cmtc = R.cmtc; //
-	//	rastation = R.rastation, ristation = R.ristation, azstation = R.azstation; //, chord , twist, sweep;
-	//	bflap = R.bflap, dbflap = R.dbflap, sfth = R.sfth;
-	//	ut = R.ut, un = R.un, up = R.up, ua = R.ua, ma_n = R.ma_n;
-	//	_cl = R._cl, _ua = R._ua;
-	//	incidn = R.incidn, cl = R.cl, cd = R.cd;
-	//	lambdi = R.lambdi, lambdh = R.lambdh, lambdt = R.lambdt, lambdy = R.lambdy, lambdx = R.lambdx;
-
-	//	tipstr = R.tipstr, rotstr = R.rotstr, shdstr = R.shdstr, trlstr = R.trlstr, cirlb = R.cirlb;
-	//	bladedeform = R.bladedeform, tipgeometry = R.tipgeometry;
-	//}
 	~Rotor() { ; }
 	void SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc);
 	void SetAirfm_cg(const Coordinate *base);
@@ -163,6 +179,7 @@ public:
 	void OutPutWake(const int ic);
 	void GetPower(myTYPE p[6], myTYPE t[6]);
 	void DiskOutput(string s);
+	double GetLambdi(void);
 private:
 	void _allocate(void);
 	void _initvariables(void);
@@ -176,6 +193,7 @@ private:
 	void _wakeStarter(void);
 	void _wakeInducedVel(void);
 	void _wakeInducedVelMP(void);
+	void _wakeInducedVelMP(int);
 	void _bonVortexStr(void);
 	bool _tipVortexStr(void);
 	void _bladePosition(void);
@@ -184,18 +202,31 @@ private:
 
 	void _teeterdynamics_rt(void);
 	void _hingedynamics_rt(void);
+	void _hingelessdynamics_rt(void);
 	void _teeterdynamics_fx(void);
 	void _hingedynamics_fx(void);
+	void _hingelessdynamics_fx(void);
 
 	void _teeterflap_rt(void);
 	void _hingeflap_rt(void);
+	void _hingelessflap_rt(void);
 	void _teeterflap_fx(void);
 	void _hingeflap_fx(void);
+	void _hingelessflap_fx(void);
+	void _flapMBC(double, double);
+	void _flapWang(void);
+
+	double _aerodynamics(double, double *);
+	void _windcoordVel(double v[3], double dv[3]);
+	void _windcoordOmg(double w[3], double dw[3]);
+	void _velTransform(double v[3], double dv[3], Coordinate &);
 
 	void _setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<double> &_dfr, const double &it, const double &b, const double &db, const int ia);
 	void _setairfm(Matrix1<float> &_dfx, Matrix1<float> &_dfz, Matrix1<float> &_dfr, const float &it, const float &b, const float &db);
+	void _setairfm(Matrix1<double> &, Matrix1<double> &, const double &, const double &);
 	void _setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia, const double &it, const double &b, const double &db);
 	void _setbladevelc(Matrix1<float> &_ut, Matrix1<float> &_up, float &ia, const float &it, const float &b, const float &db);
+	void _setbladevelc(double &, double &, const double &, const double &);
 	void _setairfm_sp(double f[3], double m[3]);
 	void _setairfm_sp(float f[3], double m[3]);
 
@@ -206,41 +237,50 @@ private:
 	template <class _Ty>
 	void _aerodynacoef(Matrix2<_Ty> &_cl, Matrix2<_Ty> &_cd, Matrix2<_Ty> &incidn, Matrix2<_Ty> &ma_n);
 
+	template<class _Ty>
+	void _aerodynacoef(_Ty &_cl, _Ty &_cd, _Ty &incidn, _Ty &ma_n);
+
 private:
 	myTYPE airforce[3], airmoment[3];
 	myTYPE airforce_cg[3], airmoment_cg[3];
-	myTYPE vel[3], omg[3], dvel[3], domg[3];
+	myTYPE vel[3], omg[3], dvel[3], domg[3]; // hub coordinate
+	myTYPE velw[3], dvelw[3], omgw[3], domgw[3]; // hub wind coordinate
+	myTYPE velh[3], omgh[3], dvelh[3], domgh[3]; // copter states
 	myTYPE mul;
 	myTYPE beta[3];
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
 	Matrix2<myTYPE> bflap, dbflap, sfth;
 	Matrix2<myTYPE> ut, un, up, ua, ma_n;
 	Matrix1<myTYPE> _cl, _cd, _ua, _incidn, _inflow, _factor;
-	Matrix2<myTYPE> incidn, inflow, cl, cd;
+	Matrix2<myTYPE> incidn, inflow, cl, cd, dt;
 	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdy, lambdx;
 
 	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
 	Matrix3<myTYPE> bladedeform, tipgeometry;
+
 	//Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
 	//myTYPE beta[3];
 	
 public:
 	CompType type;
 	bool teeter;
+	HingeType hingetype;
 	Coordinate refcoord;
 	int nb, nf, ns, ni;
 	myTYPE eflap, khub, del, pitchroot, radius, bt, rroot, disk_A;
 	myTYPE precone, omega, vtipa;
-	myTYPE sigma, gama, a0;
+	myTYPE sigma, gama, a0, del0, del2, alpha0;
 	Matrix1<myTYPE> chord, twist, sweep;
 	myTYPE iflap, m1;
-	Coordinate hubfxcoord, hubrtcoord, bladecoord, tppcoord;
+	Coordinate hubfxcoord, hubrtcoord, bladecoord, tppcoord, windcoord, bemcoord, bemrefcoord;
 	Matrix2<myTYPE> cltc, cdtc, cmtc; //
 	Matrix2<myTYPE> rastation, ristation, azstation; //, chord , twist, sweep;
 	myTYPE t0;
 	//GenArf Gaf;
 	BladeSolver bld;
 	Ambience amb;
+	bool si_unit;
+	AirfoilAero airfoil;
 
 	myTYPE sita[3];
 	AeroDynType adyna;
@@ -254,6 +294,8 @@ public:
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
 	myTYPE power_iid, torque_iid;
 	int niter_w, niter_a;
+
+	double FT;
 };
 
 class ModelCase
@@ -264,7 +306,9 @@ public:
 	~ModelCase() { ; }
 	virtual void GetModel();
 	virtual void GetProb();
-
+	virtual void GetProb(double);
+	virtual void GetProb(int, double, SimType);
+	virtual void GetProb(int, double, SimType, bool);
 public:
 	std::vector<Wing> WingV;
 	std::vector<Rotor> RotorV;
@@ -275,6 +319,7 @@ public:
 	Coordinate refcoord;
 	SimType simtype;
 	int nfree;
+	bool si_unit;
 };
 
 class Copter
@@ -306,7 +351,6 @@ public:
 
 private:
 	myTYPE airforce_sigma[3], airmoment_sigma[3]; // synthesized airdynamics												  
-
 	ModelCase model;
 	//CopterSolver CSolver;
 
@@ -329,6 +373,11 @@ public:
 	int Niter;
 	myTYPE controls[6];
 	myTYPE sum_a1_del, sum_a2_del, max_c_del;
+	Matrix2<double> AMatrix, BMatrix, AMatrixRe;
+	Matrix2<double> ALongM, ALateM, ALongMRe, ALateMRe;
+	Matrix1<double> dXdvel, dYdvel, dZdvel, dXdomg, dYdomg, dZdomg, dXdeul, dYdeul, dZdeul;
+	Matrix1<double> dMdvel, dNdvel, dLdvel, dMdomg, dNdomg, dLdomg, dMdeul, dNdeul, dLdeul;
+	Matrix1<double> dXdctrl, dYdctrl, dZdctrl, dMdctrl, dNdctrl, dLdctrl;
 
 private:
 	void _Allocate(void);
@@ -342,20 +391,20 @@ void _setstates(_Ty _vel[3], _Ty _omg[3], _Ty _dvel[3], _Ty _domg[3], const _Ty 
 	// transfer needed component base coordinate to copter.
 
 	//Type temp_a1[3] = { 0,0,0 };
-	_Ty temp_v[3], temp_w[3], temp_dv[3], temp_dw[3];
+	_Ty temp_v[3], temp_dv[3], temp_ddv[3];
 	for (int i = 2; i >= 0; --i) {
 		_vel[i] = _omg[i] = _dvel[i] = _domg[i] = 0;
-		temp_v[i] = temp_w[i] = temp_dv[i] = temp_dw[i] = 0;
+		temp_v[i] = temp_dv[i] = temp_ddv[i] = 0;
 	}
-	Cross(_vel, wc, refcoord.origin);
+	Cross(temp_v, wc, refcoord.origin);
 	Cross(temp_dv, wc, _vel); // w x (w x r)
-	Cross(_dvel, dwc, refcoord.origin); // e x r
+	Cross(temp_ddv, dwc, refcoord.origin); // e x r
 
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
-			_vel[i] += refcoord.Ttransf[i][j] * (_vel[j] + vc[j]);
+			_vel[i] += refcoord.Ttransf[i][j] * (temp_v[j] + vc[j]);
 			_omg[i] += refcoord.Etransf[i][j] * wc[j];
-			_dvel[i] += refcoord.Ttransf[i][j] * (temp_dv[j] + dvc[j] + _dvel[j]);
+			_dvel[i] += refcoord.Ttransf[i][j] * (temp_dv[j] + dvc[j] + temp_ddv[j]);
 			_domg[i] += refcoord.Etransf[i][j] * dwc[j];
 		}
 	}
@@ -434,15 +483,117 @@ void BladeSolver::_GenArfTimeMarch(_Ty _Qt, _Ty dt, int niter)
 template <class _Ty>
 void Rotor::_aerodynacoef(Matrix1<_Ty> &_cl, Matrix1<_Ty> &_cd, Matrix1<_Ty> &incidn, Matrix1<_Ty> &ma_n)
 {
-	_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
-	_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
+	double _a = 0;
+	double ct = 0;
+
+	//if (Abs(airforce[2]) > 0.01*t0)
+	//{
+	//	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
+	//}
+	//else
+	//{
+	//	if (si_unit)
+	//		ct = t0 * 9.8 / amb.rho / disk_A / vtipa / vtipa;
+	//	else
+	//		ct = t0 * UNIT_CONST * SLUG_CONST / amb.rho / disk_A / vtipa / vtipa;
+	//}
+	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
+	switch (airfoil)
+	{
+	case C81Table:
+		_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
+		_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
+		break;
+	case Liftslope:
+		for (int i = incidn.Nv - 1; i >= 0; i--)
+		{
+			_a = incidn(i);
+			_cl(i) = a0*(_a - alpha0);
+			_cd(i) = del0 + del2*_a*_a;
+		}
+		break;
+	case Padfield:
+		for (int i = incidn.Nv - 1; i >= 0; i--)
+		{
+			_a = incidn(i);
+			_cl(i) = a0*(_a - alpha0);
+			_cd(i) = del0 + del2*ct*ct;
+		}
+		break;
+	}
+
 }
 
 template <class _Ty>
 void Rotor::_aerodynacoef(Matrix2<_Ty> &_cl, Matrix2<_Ty> &_cd, Matrix2<_Ty> &incidn, Matrix2<_Ty> &ma_n)
 {
-	_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
-	_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
+	double _a = 0;
+	double ct = 0;
+
+	//if (Abs(airforce[2]) > 0.01*t0)
+	//{
+	//	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
+	//}
+	//else
+	//{
+	//	if (si_unit)
+	//		ct = t0 * 9.8 / amb.rho / disk_A / vtipa / vtipa;
+	//	else
+	//		ct = t0 * UNIT_CONST * SLUG_CONST / amb.rho / disk_A / vtipa / vtipa;
+	//}
+
+	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
+
+	switch (airfoil)
+	{
+	case C81Table:
+		_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
+		_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
+		break;
+	case Liftslope:
+		for (int i = incidn.Nv - 1; i >= 0; i--)
+		{
+			_a = incidn(i);
+			_cl(i) = a0*(_a - alpha0);
+			_cd(i) = del0 + del2*_a*_a;
+		}
+		break;
+	case Padfield:
+		for (int i = incidn.Nv - 1; i >= 0; i--)
+		{
+			_a = incidn(i);
+			_cl(i) = a0*(_a - alpha0);
+			_cd(i) = del0 + del2*ct*ct;
+		}
+		break;
+	}
+}
+
+template<class _Ty>
+void Rotor::_aerodynacoef(_Ty &_cl, _Ty &_cd, _Ty &incidn, _Ty &ma_n)
+{
+	double _a = 0;
+	double ct = 0;
+
+	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
+
+	switch (airfoil)
+	{
+	case C81Table:
+		_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
+		_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
+		break;
+	case Liftslope:
+		_a = incidn;
+		_cl = a0*(_a - alpha0);
+		_cd = del0 + del2*_a*_a;	
+		break;
+	case Padfield:
+		_a = incidn;
+		_cl = a0*(_a - alpha0);
+		_cd = del0 + del2*ct*ct;
+		break;
+	}
 }
 
 template <class _Ty> 
@@ -478,6 +629,8 @@ void Copter::GetCtrl(_Ty *xctrl)
 		xctrl[5] = refcoord.euler[1];
 		break;
 	default:
+		xctrl[4] = refcoord.euler[0];
+		xctrl[5] = refcoord.euler[1];
 		break;
 	}
 }
@@ -529,8 +682,12 @@ void Copter::SetStates(_Ty v[3], _Ty w[3], _Ty dv[3], _Ty dw[3])
 	case GeneralTrim:
 		break;
 	case Transient:
+		dv[0] = dv[1] = dv[2] = 0;
+		dw[0] = dw[1] = dw[2] = 0;
 		break;
 	default:
+		dv[0] = dv[1] = dv[2] = 0;
+		dw[0] = dw[1] = dw[2] = 0;
 		break;
 	}
 }
