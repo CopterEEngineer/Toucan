@@ -503,21 +503,21 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 
 #ifdef OUTPUT_MODE
 	double ftemp[3], mtemp[3];
-	printf("Component aerodynamics.\n");
-	for (int i = C.RotorV.size() - 1; i >= 0; --i)
-	{
-		C.RotorV[i].GetAirfm(ftemp, mtemp);
-		printf("Rotor Comps: %d \n", C.RotorV[i].type);
-		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-	}
-	for (int i = C.WingV.size() - 1; i >= 0; --i)
-	{
-		C.WingV[i].GetAirfm(ftemp, mtemp);
-		printf("WingV Comps: %d \n", C.WingV[i].type);
-		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-	}	
+	//printf("Component aerodynamics.\n");
+	//for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	//{
+	//	C.RotorV[i].GetAirfm(ftemp, mtemp);
+	//	printf("Rotor Comps: %d \n", C.RotorV[i].type);
+	//	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	//	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+	//}
+	//for (int i = C.WingV.size() - 1; i >= 0; --i)
+	//{
+	//	C.WingV[i].GetAirfm(ftemp, mtemp);
+	//	printf("WingV Comps: %d \n", C.WingV[i].type);
+	//	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	//	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+	//}	
 	C.fuselage.GetAirfm(ftemp, mtemp);
 	printf("Fuselage \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);

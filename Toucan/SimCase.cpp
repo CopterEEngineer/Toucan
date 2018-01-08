@@ -425,17 +425,17 @@ void Model_BO105::InitMainRotor(Rotor &R)
 
 	myTYPE origin[3], euler[3];
 	origin[0] = -0.0163, origin[1] = 0, origin[2] = -1.48;
-	euler[0] = 0, euler[1] = 0.0524, euler[2] = 0;
+	euler[0] = 0, euler[1] = PI+RAD(3), euler[2] = 0;
 	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
 	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
 	origin[0] = origin[1] = origin[2] = 0;
-	euler[0] = 0, euler[1] = PI, euler[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
 	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
-	euler[0] = 0, euler[1] = R.precone, euler[2] = 0;
+	euler[0] = R.precone, euler[1] = 0, euler[2] = -PI/2;
 	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
@@ -444,7 +444,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.windcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
-	origin[0] = 0, origin[1] = -R.precone * (1 - R.eflap), origin[2] = 0;
+	origin[0] = 0, origin[1] = 0, origin[2] = R.precone * (1 - R.eflap);
 	euler[0] = euler[1] = euler[2] = 0;
 	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
 }
@@ -504,19 +504,19 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 
 	myTYPE origin[3], euler[3];
 	origin[0] = -6 - 0.0163, origin[1] = 0, origin[2] = -1.72;
-	euler[0] = PI / 2, euler[1] = 0, euler[2] = 0;
+	euler[0] = -PI / 2, euler[1] = PI, euler[2] = 0;
 	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
 	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
 	origin[0] = origin[1] = origin[2] = 0;
-	euler[0] = 0, euler[1] = PI, euler[2] = 0;
+	euler[0] = 0, euler[1] = 0, euler[2] = 0;
 	R.hubrtcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubrtcoord
 	//定义扭转，摆振，挥舞的三个桨叶坐标
 	origin[0] = R.eflap, origin[1] = 0, origin[2] = 0;
-	euler[0] = 0, euler[1] = R.precone, euler[2] = 0;
+	euler[0] = R.precone, euler[1] = 0, euler[2] = -PI/2;
 	R.bladecoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
@@ -525,7 +525,7 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.windcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
 	// referred to hubfxcoord
-	origin[0] = 0, origin[1] = -R.precone * (1 - R.eflap), origin[2] = 0;
+	origin[0] = 0, origin[1] = 0, origin[2] = R.precone * (1 - R.eflap);
 	euler[0] = euler[1] = euler[2] = 0;
 	R.tppcoord.SetCoordinate(origin, euler, R.refcoord.base);
 

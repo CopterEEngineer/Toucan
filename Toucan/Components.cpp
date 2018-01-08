@@ -367,7 +367,7 @@ void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, con
 	}
 	double euler_temp[3], omgw_temp[3], domgw_temp[3];
 	euler_temp[0] = euler_temp[1] =0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // wind coordinate
+	euler_temp[2] = -Atan2(vel[1], -vel[0]); // wind coordinate
 	windcoord.SetCoordinate(euler_temp, "euler");
 
 	_windcoordVel(velw, dvelw);
@@ -380,7 +380,7 @@ void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, con
 	domgw[0] = domgw_temp[0] * cos(windcoord.euler[2]) + domgw_temp[1] * sin(windcoord.euler[2]);
 	domgw[1] = -domgw_temp[0] * sin(windcoord.euler[2]) + domgw_temp[1] * cos(windcoord.euler[2]);
 
-	mul = velw[0] / vtipa;
+	mul = -velw[0] / vtipa;
 }
 
 void Rotor::GetAirfm(myTYPE f[3], myTYPE m[3])

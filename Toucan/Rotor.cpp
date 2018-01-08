@@ -185,11 +185,13 @@ void Rotor::_avrgInducedVel_TRFx(void)
 	myTYPE lambtpp[itermax] = { 0 };
 	myTYPE err_w = 5e-3;
 	myTYPE veltpp[3] = { 0.0,0.0,0.0 };
+	myTYPE dveltpp[3] = { 0.0,0.0,0.0 };
+	myTYPE euler_temp[3] = { 0.0,0.0,0.0 };
 	myTYPE ct, ch_tpp, cy_tpp, twistt;
 
 	twistt = twist(ns - 1) - twist(0);
 
-	lambtpp[0] = 0.01;
+	lambtpp[0] = -0.01;
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
 	lambdh.setvalue(lambdh_ag);
@@ -202,45 +204,15 @@ void Rotor::_avrgInducedVel_TRFx(void)
 		else
 			_hingeflap_fx();
 
-		veltpp[0] = veltpp[1] = veltpp[2] = 0;
-		for (int i = 2; i >= 0; --i) {
-			for (int j = 2; j >= 0; --j) {
-				veltpp[i] += tppcoord.Ttransf[i][j] * vel[j];
-			}
-		}
+		_velTransform(veltpp, dveltpp, tppcoord);
+
+		euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
+		veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
+		veltpp[1] = 0;
 		
 		lambdt_ag = _aerodynamics(lambtpp[i - 1], veltpp);
 		lambtpp[i] = lambdt_ag;
-		//switch (adyna)
-		//{
-		//case Averaged:
-		//	// blade element ct
-		//	_setairfm_sp(airforce, airmoment);
-		//	lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp[i - 1] * lambtpp[i - 1]);
-		//	lambdi_ag /= 2.0;
-		//	break;
-		//case Simple:
-		//	// simple ct
-		//	ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp[i - 1]);
-		//	lambdi_ag += ct / 2.0 / sqrt(mul*mul + lambtpp[i - 1] * lambtpp[i - 1]);
-		//	lambdi_ag /= 2.0;
-		//	airforce[2] = -ct*amb.rho*PI*radius*radius*vtipa*vtipa;
-		//	break;
-		//default:
-		//	// simple ct
-		//	ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp[i - 1]);
-		//	lambdi_ag += ct / 2.0 / sqrt(mul*mul + lambtpp[i - 1] * lambtpp[i - 1]);
-		//	lambdi_ag /= 2.0;
-		//	airforce[2] = -ct*amb.rho*PI*radius*radius*vtipa*vtipa;
-		//	break;
-		//}
-		//
-		//lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
-		//lambtpp[i] = lambdt_ag;
-
-		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
-		//lambdh.setvalue(lambdh_ag);
-		//lambdi.setvalue(lambdi_ag);
+		
 
 		iter = i;
 		if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) 
@@ -433,16 +405,25 @@ void Rotor::_teeterflap_fx(void)
 {
 	Matrix2<myTYPE> m22(2, 2), k22(2, 2), d22(2, 2), kk(2, 2);
 	Matrix1<myTYPE> f22(2), dq0(2), q0(2), temp_M(2);
-	Matrix1<myTYPE> ddq2(2), ddq(2), dq(2), q(2), qq(2); 
+	Matrix1<myTYPE> ddq2(2), ddq(2), dq(2), q(2), qq(2);
 	int niter, nitermax = bld.nitermax;
 	myTYPE dt, bt, twistt;
-	myTYPE euler_temp[3], sita_temp[3];
-	myTYPE k1, p2, sb, _sum, temp;
+	myTYPE euler_temp[3], sitaw[3], betaw[3];
+	myTYPE k1, p2, sb, _sum, mb, temp;
 	Matrix2<myTYPE> sol(2, nitermax);
-	
+
 	niter = 0, dt = RAD(bld.dff) / omega;
 	bld.GAf.InitCoef(dt);
 	bt = 1.0 / bld.GAf.bt;
+
+	k1 = tan(RAD(del));
+	mb = m1*radius;
+	p2 = 1 + khub / iflap / omega / omega + eflap*mb / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
+
+	sitaw[0] = sita[0];
+	sitaw[1] = sita[1] * cos(windcoord.euler[2]) - sita[2] * sin(windcoord.euler[2]);
+	sitaw[2] = sita[1] * sin(windcoord.euler[2]) + sita[2] * cos(windcoord.euler[2]);
+	twistt = twist(ns - 1) - twist(0);
 
 	m22(0, 0) = m22(1, 1) = 1.0;
 
@@ -451,33 +432,25 @@ void Rotor::_teeterflap_fx(void)
 	d22(1, 0) = -2 * omega;
 	d22(1, 1) = omega*gama / 8.0;
 
-
-	sita_temp[0] = sita[0];
-	sita_temp[1] = sita[1];
-	sita_temp[2] = sita[2];
-	twistt = twist(ns - 1) - twist(0);
-
-	k1 = tan(del*PI / 180);
-	p2 = 1 + khub / iflap / omega / omega + eflap*m1*radius / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
 	k22(0, 0) = omega*omega*(p2 - 1 + gama*k1*mul*mul / 16.0);
 	k22(0, 1) = omega*omega*gama / 8.0*(1 + 0.5*mul*mul);
 	k22(1, 0) = -omega*omega*gama / 8.0*(1 - 0.5*mul*mul);
 	k22(1, 1) = omega*omega*(p2 - 1 + 3.0 / 16.0*gama*k1*mul*mul);
 
-	f22.v_p[0] = -omega*omega*(gama / 8.0*sita_temp[1] * (1 + 0.5*mul*mul));
-	f22.v_p[1] = omega*omega*(-1.0 / 3.0*gama*mul*sita_temp[0] - 1.0 / 4.0*gama*mul*(twistt)-gama / 8.0*sita_temp[2] * (1 + 1.5*mul*mul));
+	f22.v_p[0] = omega*omega*(gama / 8.0*sitaw[1] * (1 + 0.5*mul*mul));
+	f22.v_p[1] = omega*omega*(1.0 / 3.0*gama*mul*sitaw[0] + 1.0 / 4.0*gama*mul*(twistt)+gama / 8.0*sitaw[2] * (1 + 1.5*mul*mul));
 
-	f22.v_p[0] += omega*omega*(-2.0 / omega*omg[0] - gama / 8.0 / omega*omg[1] - 1.0 / omega / omega*domg[1]);
-	f22.v_p[1] += omega*omega*(-gama / 8.0 / omega*omg[0] + 2.0 / omega*omg[1] - 1.0 / omega / omega*domg[0]);
+	f22.v_p[0] += omega*omega*(2.0 / omega*omgw[0] + gama / 8.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[1]);
+	f22.v_p[1] += omega*omega*(gama / 8.0 / omega*omgw[0] - 2.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[0]);
 
-	f22.v_p[1] += omega*omega*(-0.25*gama*mul)*lambdh_ag;
+	f22.v_p[1] += omega*omega*(0.25*gama*mul)*lambdh_ag;
 
 	_sum = 0;
 	temp = 0;
 
 	sb = 8.0*(p2 - 1.0) / gama;
-	q0(0) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[1] - sita_temp[2] + (sb*16.0 / gama - 1)*omg[0] + (sb + 16.0 / gama)*omg[1]);
-	q0(1) = -1.0 / (1.0 + sb*sb)*(sb*sita_temp[2] + sita_temp[1] + (sb + 16.0 / gama)*omg[0] - (sb*16.0 / gama - 1)*omg[1]);
+	q0(0) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
+	q0(1) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
 	dq0.v_p[0] = 0.0;
 	dq0.v_p[1] = omega*sol(1, 0);
 
@@ -507,26 +480,34 @@ void Rotor::_teeterflap_fx(void)
 		sol(0, i + 1) = q(0);
 		sol(1, i + 1) = q(1);
 
-		// exit condition
-		_sum = 0;
-		for (int j = 0; j < 2; ++j) {
-			//temp = sol(j, i + 1) / sol(j, i) - 1.0;
-			temp = (sol(j, i + 1) - sol(j, i)) / (precone + 0.01*RAD(1));// in case of 0/0
-			temp *= temp;
-			_sum += temp;
-		}
-
 		niter = i + 1;
-		beta[0] = precone;
-		beta[1] = -sol(0, niter);
-		beta[2] = -sol(1, niter);
-		if (_sum < bld.err_b*bld.err_b) { break; }
+		betaw[0] = precone;
+		betaw[1] = sol(0, niter);
+		betaw[2] = sol(1, niter);
+
+		// exit condition
+		if (i > 10)
+		{
+			_sum = 0;
+			for (int j = 0; j < 2; ++j) {
+				//temp = sol(j, i + 1) / sol(j, i) - 1.0;
+				temp = (sol(j, i + 1) - sol(j, i)) / (sol(j, i) + RAD(0.01));// in case of 0/0
+				temp *= temp;
+				_sum += temp;
+			}
+
+			if (_sum < bld.err_b*bld.err_b) { break; }
+		}
 	}
 
 	if (niter == nitermax - 1)
 		;// printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
 
-	euler_temp[0] = -beta[2];
+	beta[0] = betaw[0];
+	beta[1] = betaw[2] * sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
+	beta[2] = betaw[2] * cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
+
+	euler_temp[0] = beta[2]; // -beta[2];
 	euler_temp[1] = beta[1];
 	//euler_temp[2] = 0.0;
 	euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
@@ -928,9 +909,9 @@ void Rotor::_hingelessdynamics_rt(void)
 	bld._GenArfPrepare(RAD(bld.dff) / omega);
 
 	if (si_unit)
-		lambtpp[0] = sqrt(0.5*t0*9.8 / amb.rho / PI / radius / radius / vtipa / vtipa);
+		lambtpp[0] = -sqrt(0.5*t0*9.8 / amb.rho / PI / radius / radius / vtipa / vtipa);
 	else
-		lambtpp[0] = sqrt(0.5*t0*UNIT_CONST / amb.rho / PI / radius / radius / vtipa / vtipa);
+		lambtpp[0] = -sqrt(0.5*t0*UNIT_CONST / amb.rho / PI / radius / radius / vtipa / vtipa);
 
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
@@ -941,7 +922,11 @@ void Rotor::_hingelessdynamics_rt(void)
 	{
 		_hingelessflap_rt();
 
-		_velTransform(veltpp, dveltpp, tppcoord);
+		_velTransform(veltpp, dveltpp, tppcoord); 
+
+		euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
+		veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
+		veltpp[1] = 0;
 
 		lambdt_ag = _aerodynamics(lambtpp[i-1], veltpp);
 		lambtpp[i] = lambdt_ag;
@@ -972,11 +957,12 @@ void Rotor::_hingelessdynamics_fx(void)
 	myTYPE dveltpp[3] = { 0.0,0.0,0.0 };
 	myTYPE ct, ch_tpp, cy_tpp;
 	double lamb_1s, lamb_1c;
+	myTYPE euler_temp[3] = { 0,0,0 };
 
 	if (si_unit)
-		lambtpp[0] = sqrt(0.5*t0*9.8 / amb.rho / PI / radius / radius / vtipa / vtipa);
+		lambtpp[0] = -sqrt(0.5*t0*9.8 / amb.rho / PI / radius / radius / vtipa / vtipa);
 	else
-		lambtpp[0] = sqrt(0.5*t0*UNIT_CONST / amb.rho / PI / radius / radius / vtipa / vtipa);
+		lambtpp[0] = -sqrt(0.5*t0*UNIT_CONST / amb.rho / PI / radius / radius / vtipa / vtipa);
 
 	lambdi_ag = lambtpp[0];
 	lambdh_ag = lambdi_ag;
@@ -987,12 +973,17 @@ void Rotor::_hingelessdynamics_fx(void)
 	for (int i = 1; i < itermax; ++i)
 	{
 		//_hingelessflap_fx();
-		_flapMBC(-lamb_1s*0.0, -lamb_1c*0.0);
+		_flapMBC(lamb_1s*0.0, lamb_1c*1.0);
 		//_flapWang();
 
 		_velTransform(veltpp, dveltpp, tppcoord);
-		lamb_1s = -2 * veltpp[0] / vtipa*lambdi_ag;
-		lamb_1c = tan(0.5*Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag))*lambdi_ag;
+
+		euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
+		veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
+		veltpp[1] = 0;
+
+		lamb_1s = 2 * veltpp[0] / vtipa*lambdi_ag;
+		lamb_1c = tan(0.5*atan2(-veltpp[0] / vtipa, veltpp[2] / vtipa - lambdi_ag))*lambdi_ag;
 
 		lambdt_ag = _aerodynamics(lambtpp[i - 1], veltpp);
 		lambtpp[i] = lambdt_ag;
@@ -1018,7 +1009,7 @@ void Rotor::_hingelessflap_rt(void)
 	niter = 0, nitermax = bld.nitermax, af = bld.GAf.af;
 	dt = RAD(bld.dff) / omega;
 	id_ns = step(0, ns - 1);
-	ra = rastation(0, id_ns);
+	ra = rastation(0, id_ns) - eflap;
 
 	mb = m1*radius;
 
@@ -1089,12 +1080,15 @@ void Rotor::_hingelessflap_rt(void)
 	beta[2] /= bld.nperiod;
 
 	if (niter == nitermax - 1)
-		printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). Count: %d \n", niter);
+		;// printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
 	//bld.sol.output("bld_mr.output", 10);
-	euler_temp[0] = -beta[2];
+	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
-	//euler_temp[2] = 0.0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
+	euler_temp[2] = 0;
+
+	//euler_temp[1] = beta[1] * cos(windcoord.euler[2]) - beta[2] * sin(windcoord.euler[2]);
+	//euler_temp[0] = beta[1] * sin(windcoord.euler[2]) + beta[2] * cos(windcoord.euler[2]);
+	//euler_temp[2] = windcoord.euler[2];
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
 
@@ -1168,7 +1162,7 @@ void Rotor::_flapWang(void)
 	sb = 8.0*(p2 - 1.0) / gama;
 	q0(1) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
 	q0(2) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
-	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) - lambdh_ag / 6.0);
+	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) + lambdh_ag / 6.0);
 
 	dq0.v_p[0] = 0.0;
 	dq0.v_p[1] = 0;
@@ -1230,10 +1224,10 @@ void Rotor::_flapWang(void)
 	beta[1] = betaw[2] * sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
 	beta[2] = betaw[2] * cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
 
-	euler_temp[0] = -beta[2];
+	euler_temp[0] = beta[2]; // -beta[2];
 	euler_temp[1] = beta[1];
-	//euler_temp[2] = 0.0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
+	euler_temp[2] = 0.0;
+	//euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
 
@@ -1337,7 +1331,7 @@ void Rotor::_hingelessflap_fx(void)
 	sb = 8.0*(p2 - 1.0) / gama;
 	q0(1) = -1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
 	q0(2) = -1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
-	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) - lambdh_ag / 6.0);
+	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) + lambdh_ag / 6.0);
 
 	dq0.v_p[0] = 0.0;
 	dq0.v_p[1] = 0;
@@ -1400,10 +1394,10 @@ void Rotor::_hingelessflap_fx(void)
 	beta[1] = betaw[2] * sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
 	beta[2] = betaw[2] * cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
 
-	euler_temp[0] = -beta[2];
+	euler_temp[0] = beta[2]; // -beta[2];
 	euler_temp[1] = beta[1];
-	//euler_temp[2] = 0.0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // 桨盘平面旋转，是因为Glauert入流模型是没有横向速度的
+	euler_temp[2] = 0.0;
+	//euler_temp[2] = Atan2(vel[1], vel[0]); // 桨盘平面旋转，是因为Glauert入流模型是没有横向速度的
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
 
@@ -1446,11 +1440,11 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	DD(3, 3) = p2 - 1;
 
 	HH(0) = sitaw[0] * (1 + mul*mul) + 4 * twistt*(1.0 / 5.0 + mul*mul / 6.0);
-	HH(0) += 4.0 / 3.0*mul*sitaw[2] + 4.0 / 3.0*lambdh_ag + 2.0 / 3.0*mul*(omgw[0] / omega - lamb_1s);
+	HH(0) += 4.0 / 3.0*mul*sitaw[2] + 4.0 / 3.0*lambdh_ag + 2.0 / 3.0*mul*(omgw[0] / omega + lamb_1s);
 	//HH(0) -= mb*9.8 / iflap / omega / omega;
-	HH(2) = 16 / gama*(omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega - lamb_1c);
+	HH(2) = 16 / gama*(omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega + lamb_1c);
 	HH(3) = -16 / gama*(omgw[1] / omega - domgw[0] / omega / omega / 2.0) + 8.0 / 3.0*mul*sitaw[0] + 2 * mul*twistt;
-	HH(3) += sitaw[2] * (1 + 3.0 / 2.0*mul*mul) + 2 * mul*lambdh_ag + (omgw[0] / omega - lamb_1s);
+	HH(3) += sitaw[2] * (1 + 3.0 / 2.0*mul*mul) + 2 * mul*lambdh_ag + (omgw[0] / omega + lamb_1s);
 
 
 	CC = CC * omega;
@@ -1463,7 +1457,7 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	q0(1) = 0.0;
 	q0(2) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
 	q0(3) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
-	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) - lambdh_ag / 6.0);
+	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) + lambdh_ag / 6.0);
 
 	dq0.v_p[0] = 0.0;
 	dq0.v_p[1] = 0.0;
@@ -1524,10 +1518,10 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	beta[1] = betaw[2]*sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
 	beta[2] = betaw[2]*cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
 
-	euler_temp[0] = -beta[2];
+	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
-	//euler_temp[2] = 0.0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // 桨盘平面旋转，是因为Glauert入流模型是没有横向速度的
+	euler_temp[2] = 0.0;
+	//euler_temp[2] = Atan2(vel[1], vel[0]); // 桨盘平面旋转，是因为Glauert入流模型是没有横向速度的
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
 
@@ -1581,11 +1575,20 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
 
-		lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		lambdh_ag = lambdi_ag - vel[2] / vtipa;
 		
-		ka = Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag);
-		ky = -2 * veltpp[0] / vtipa;
-		kx = tan(ka / 2);
+		//ka = Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag);
+		ka = atan2(-veltpp[0] / vtipa, -(-veltpp[2] / vtipa + lambdi_ag));
+		ky = 0* 2 * veltpp[0] / vtipa;
+		if (ka <= PI / 2 && ka >= -PI / 2)
+			kx = tan(ka * 0.5);
+		else if (ka<PI && ka>-PI)
+			kx = 1 / tan(ka * 0.5);
+		else
+			kx = 0.0;
+		//cout << kx << endl;
+		//kx = 1.2;
 		// non-uniform inflow model is doing in TPP wind coordinate
 		Iid_betaw = windcoord.euler[2] / (2 * PI / nf);
 		for (int j = lambdi.NJ - 1; j >= 0; j--)
@@ -1599,7 +1602,7 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 				lambdi_temp += ky*rastation(iz, j)*sin(azstation(iz, j));
 				lambdi_temp *= lambdi_ag;
 				lambdi(i, j) = lambdi_temp;
-				lambdh(i, j) = lambdi_temp*cos(beta[1])*cos(beta[2]) - vel[2] / vtipa; 
+				lambdh(i, j) = lambdi_temp - vel[2] / vtipa; 
 			}
 		}
 		//lambdh.output("_lambdh.output", 10);
@@ -1615,18 +1618,22 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
 
-		lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		lambdh_ag = lambdi_ag - vel[2] / vtipa;
+
 		lambdh.setvalue(lambdh_ag);
 		lambdi.setvalue(lambdi_ag);
 		break;
 	case Simple:
 		// simple ct
-		ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] - 0.5*lambtpp);
-		lambdi_ag += ct / 2.0 / sqrt(mul*mul + lambtpp * lambtpp);
+		ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] + 0.5*lambtpp);
+		lambdi_ag -= ct / 2.0 / sqrt(mul*mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
-		airforce[2] = -ct*amb.rho*PI*radius*radius*vtipa*vtipa;
+		airforce[2] = ct*amb.rho*PI*radius*radius*vtipa*vtipa;
 
-		lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		lambdh_ag = lambdi_ag - vel[2] / vtipa;
+
 		lambdh.setvalue(lambdh_ag);
 		lambdi.setvalue(lambdi_ag);
 		break;
@@ -1725,30 +1732,16 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		_yf = _dfx*cos(ia) - _dfr*sin(ia);
 		_hf = _dfx*sin(ia) + _dfr*cos(ia);
 
-		f[0] -= _hf.sum()*nb / nf;
+		f[0] += _hf.sum()*nb / nf;
 		f[1] -= _yf.sum()*nb / nf;
-		f[2] -= _dt.sum()*nb / nf;
+		f[2] += _dt.sum()*nb / nf;
 
 		//cout << f[2] << endl;
 
 		ra2 = (ra - eflap)*sin(b);
 		ra1 = (ra - eflap)*cos(b) + eflap;
-		//switch (hingetype)
-		//{
-		//case Hinged:
-		//	m[0] -= (_dt * ra1 * sin(ia) + _yf * ra2).sum()*radius*nb / nf;
-		//	m[1] -= (_dt * ra1 * cos(ia) + _hf * ra2).sum()*radius*nb / nf;
-		//	break;
-		//case Cantilever:
-		//	printf("Undefined Cantilever type in _setairfm_sp()");
-		//	system("pause");
-		//	break;
-		//default:
-		//	m[0] -= (_dt * ra1 * sin(ia) + _yf * ra2).sum()*radius*nb / nf;
-		//	m[1] -= (_dt * ra1 * cos(ia) + _hf * ra2).sum()*radius*nb / nf;
-		//	break;
-		//}
-		m[2] += (_dfx * ra1).sum()*radius*nb / nf;
+		
+		m[2] -= (_dfx * ra1).sum()*radius*nb / nf;
 
 		// power computation
 		_az.setvalue(ia);
@@ -1790,7 +1783,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		m[0] = -nb*khub / 2 * beta[2];
 		m[1] = -nb*khub / 2 * beta[1];
 	case Hingeless:
-		m[0] = -nb*khub / 2 * beta[2];
+		m[0] = nb*khub / 2 * beta[2];
 		m[1] = -nb*khub / 2 * beta[1];
 		break;
 	default:
@@ -1802,7 +1795,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	power_o *= vtipa*nb / nf;
 	power_f = f[0] * vel[0];
 	power_c = f[2] * vel[2];
-	power = m[2] * omega;
+	power = Abs(m[2]) * omega;
 	torque_i = power_i / omega;
 
 	torque_o = power_o / omega;
@@ -1841,6 +1834,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		power_o /= 1000.0;
 		power_f /= 1000.0;
 		power_c /= 1000.0;
+		power /= 1000.0;
 		if (adyna == Averaged)
 			power_iid /= 1000.0;
 	}
@@ -1865,11 +1859,11 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 	_ua = mmin(_ua, 1);
 
 	// blade pitch
-	if (ia > 2 * PI || ia < -2 * PI) {
+	if (ia > 2 * PI || ia < 0) {
 		ia = omega*it;
 		for (;;) {
 			if (ia > 2 * PI) { ia -= 2 * PI; }
-			else if (ia < -2 * PI) { ia += 2 * PI; }
+			else if (ia < 0) { ia += 2 * PI; }
 			else { break; }
 		}
 	}
@@ -1878,7 +1872,7 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 
 	// aoa
 	_inflow = atan2(_up, _ut);
-	_incidn = twist - _inflow + _sfth;
+	_incidn = twist + _inflow + _sfth;
 	for (int i = ns - 1; i >= 0; --i) {
 		for (;;) {
 			if (_incidn.v_p[i] > PI) { _incidn.v_p[i] -= 2 * PI; }
@@ -1898,8 +1892,8 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 	_dr.setvalue(rastation(0, 1) - rastation(0, 0));
 	_factor *= chord * _dr *amb.vsound*amb.vsound*0.5*amb.rho* radius;
 
-	_dfx = (_cl * msin(_inflow) + _cd * mcos(_inflow)) * _factor;
-	_dfz = (_cl * mcos(_inflow) - _cd * msin(_inflow)) * _factor;
+	_dfx = (_cd * mcos(_inflow) - _cl * msin(_inflow)) * _factor;
+	_dfz = (_cl * mcos(_inflow) + _cd * msin(_inflow)) * _factor;
 	_dfr = _dfz * (sin(b)) * (-1.0);
 
 }
@@ -1914,7 +1908,7 @@ void Rotor::_setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia
 	ia = it * omega;
 	for (;;) {
 		if (ia > 2 * PI) ia -= 2 * PI;
-		else if (ia < -2 * PI) ia += 2 * PI;
+		else if (ia < 0) ia += 2 * PI;
 		else { break; }
 	}
 	if (ia > azstation(nf - 1, 0))
@@ -1929,10 +1923,10 @@ void Rotor::_setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia
 #endif // TEST_MODE
 
 	// air velocity
-	_ut = (_ra - eflap) * cos(b) + eflap + (sin(ia) * vel[0] + cos(ia) * vel[1]) / vtipa;
-	_up = (_ra - eflap) * db / omega + (cos(ia) * vel[0] - sin(ia) * vel[1]) * sin(b) / vtipa + _lambdh * cos(b);
+	_ut = (_ra - eflap) * cos(b) + eflap - (sin(ia) * vel[0] - cos(ia) * vel[1]) / vtipa;
+	_up = (_ra - eflap) * (-1.0) * db / omega + (cos(ia) * vel[0] + sin(ia) * vel[1]) * sin(b) / vtipa + _lambdh * cos(b);
 	//_ut += _ra*(omg[0] / omega*cos(ia) - omg[1] / omega*sin(ia)) * b;
-	_up -= _ra*(omg[0] / omega*sin(ia) + omg[1] / omega*cos(ia)); 
+	_up += _ra*(-omg[0] / omega*sin(ia) + omg[1] / omega*cos(ia)); 
 
 	//_ut = (_ra - eflap) * cos(b) + eflap + sin(ia) * vel[0] / vtipa;
 	//_up = (_ra - eflap) * db / omega + cos(ia) * vel[0] * sin(b) / vtipa + _lambdh * cos(b);
