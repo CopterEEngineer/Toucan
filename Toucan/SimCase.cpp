@@ -425,7 +425,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 
 	myTYPE origin[3], euler[3];
 	origin[0] = -0.0163, origin[1] = 0, origin[2] = -1.48;
-	euler[0] = 0, euler[1] = PI+RAD(3), euler[2] = 0;
+	euler[0] = 0, euler[1] = PI + RAD(3), euler[2] = 0;
 	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
 	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
@@ -1757,7 +1757,7 @@ void LinearModel(int nth)
 	bo105.GetModel();
 	copter.InitRotorCraft(bo105);
 
-	i = s = 0, e = jobs.nCase; // 10; //
+	i = s = 4, e = jobs.nCase; // 10; //
 
 #pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
 	{

@@ -445,6 +445,11 @@ void Rotor::_teeterflap_fx(void)
 
 	f22.v_p[1] += omega*omega*(0.25*gama*mul)*lambdh_ag;
 
+	//if (!si_unit)
+	//	f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	//else
+	//	f22(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+
 	_sum = 0;
 	temp = 0;
 
@@ -660,7 +665,10 @@ void Rotor::_hingeflap_rt(void)
 	_setairfm(dfx, dfz, dfr, 0.0, q, dq, 0);
 
 	qt = 2 * (iflap + eflap*mb)* omega*(omg[0] * cos(0) - omg[1] * sin(0)) + iflap*(domg[0] * sin(0) + domg[1] * cos(0));
-	//qt += m1*(dvel[2] - vel[0] * omg[1] + vel[1] * omg[0]);
+	if (!si_unit)
+		qt += m1 *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	else
+		qt += m1 *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 	qt += (dfz*ra).sum()*radius;
 
 	if (bld._GenArfStarter(qt, q, dq))
@@ -672,7 +680,10 @@ void Rotor::_hingeflap_rt(void)
 			niter = i + 1;
 			_setairfm(dfx, dfz, dfr, t, q, dq, i);
 			qt = 2 * (iflap + eflap*mb)* omega*(omg[0] * cos(omega*t) - omg[1] * sin(omega*t)) + iflap*(domg[0] * sin(omega*t) + domg[1] * cos(omega*t));
-			//qt += m1*(dvel[2] - vel[0] * omg[1] + vel[1] * omg[0]);
+			if (!si_unit)
+				qt += m1 *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+			else
+				qt += m1 *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 			qt += (dfz*ra).sum()*radius;
 
 			bld._GenArfTimeMarch(qt, dt, niter);
@@ -814,10 +825,9 @@ void Rotor::_hingeflap_fx(void)
 	f22.v_p[2] += omega*omega*(-0.5*gama*mul)*(0.5 - eflap + 0.5*eflap*eflap)*lambdh_ag;
 
 	if (!si_unit)
-		f22.v_p[0] -= mb / iflap *9.8*0.3048*0.3048;
+		f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 	else
-		f22.v_p[0] -= mb / iflap*9.8;
-
+		f22(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 
 	_sum = 0;
 	temp = 0;
@@ -999,7 +1009,7 @@ void Rotor::_hingelessdynamics_fx(void)
 void Rotor::_hingelessflap_rt(void)
 {
 	int niter, nitermax;
-	myTYPE dt, af, mb;
+	myTYPE dt, af;
 	myTYPE qt, dq, q, t;
 	Matrix1<myTYPE> dfx(ns), dfr(ns), dfz(ns), ra(ns);
 	Matrix1<int> id_ns;
@@ -1011,18 +1021,16 @@ void Rotor::_hingelessflap_rt(void)
 	id_ns = step(0, ns - 1);
 	ra = rastation(0, id_ns) - eflap;
 
-	mb = m1*radius;
-
 	q = beta[0] - sita[2];
 	dq = omega*sita[1];
 
 	_setairfm(dfx, dfz, dfr, 0.0, q, dq, 0);
 
 	qt = 2 * iflap* omega*(omg[0] * cos(0) - omg[1] * sin(0)) + iflap*(domg[0] * sin(0) + domg[1] * cos(0));
-	//if (si_unit)
-	//	qt += mb*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
-	//else
-	//	qt += mb*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8*0.3048*0.3048);
+	if (si_unit)
+		qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
+	else
+		qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8*0.3048*0.3048);
 	qt += (dfz*ra).sum()*radius;
 
 	if (bld._GenArfStarter(qt, q, dq))
@@ -1034,10 +1042,10 @@ void Rotor::_hingelessflap_rt(void)
 			niter = i + 1;
 			_setairfm(dfx, dfz, dfr, t, q, dq, i);
 			qt = 2 * iflap * omega*(omg[0] * cos(omega*t) - omg[1] * sin(omega*t)) + iflap*(domg[0] * sin(omega*t) + domg[1] * cos(omega*t));
-			//if(si_unit)
-			//	qt += mb*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
-			//else
-			//	qt += mb*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8 * 0.3048 * 0.3048);
+			if(si_unit)
+				qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
+			else
+				qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8 * 0.3048 * 0.3048);
 
 			qt += (dfz*ra).sum()*radius;
 
@@ -1142,10 +1150,6 @@ void Rotor::_flapWang(void)
 	f22(0) += gama / 2.0 * (mul*(1.0 / 3.0 - 0.5*eflap))*sitaw[2];
 	f22(0) += gama / 2.0*((0.2 - 0.25*eflap) + mul*mul*0.5*(1.0 / 3.0 - 0.5*eflap))*twistt;
 	f22(0) += gama / 2.0*(1.0 / 3.0 - 0.5*eflap)*lambdh_ag + gama / 8.0*mul*(2.0 / 3.0 - eflap)*omgw[0] / omega;
-	//if (!si_unit)
-	//	f22(0) += mb / iflap / omega / omega *(-9.8*0.3048*0.3048 + dvel[2] - vel[0] * omg[1] + vel[1] * omg[0]);
-	//else
-	//	f22(0) += mb / iflap / omega / omega *(-9.8 + dvel[2] - vel[0] * omg[1] + vel[1] * omg[0]);
 
 	f22(1) = 2 * (1 + eflap*mb / iflap)*omgw[0] / omega + (1 + eflap*mb / iflap)*domgw[1] / omega / omega;
 	f22(1) += gama / 2.0*((0.25 - eflap / 3.0) + mul*mul / 4.0*(0.5 - eflap + 0.5*eflap*eflap))*sitaw[1] + gama / 2.0*(0.25 - eflap / 3.0)*omgw[1] / omega;
@@ -1156,6 +1160,11 @@ void Rotor::_flapWang(void)
 	f22(2) += gama*mul / 2.0*(0.5 - eflap + eflap*eflap / 2.0)*lambdh_ag + gama / 2.0*(0.25 - eflap / 3.0)*omgw[0] / omega;
 
 	f22 = f22 * (omega*omega);
+
+	if (!si_unit)
+		f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	else
+		f22(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 
 	_sum = 0;
 	temp = 0;
@@ -1441,15 +1450,19 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 
 	HH(0) = sitaw[0] * (1 + mul*mul) + 4 * twistt*(1.0 / 5.0 + mul*mul / 6.0);
 	HH(0) += 4.0 / 3.0*mul*sitaw[2] + 4.0 / 3.0*lambdh_ag + 2.0 / 3.0*mul*(omgw[0] / omega + lamb_1s);
-	//HH(0) -= mb*9.8 / iflap / omega / omega;
+	
 	HH(2) = 16 / gama*(omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega + lamb_1c);
 	HH(3) = -16 / gama*(omgw[1] / omega - domgw[0] / omega / omega / 2.0) + 8.0 / 3.0*mul*sitaw[0] + 2 * mul*twistt;
 	HH(3) += sitaw[2] * (1 + 3.0 / 2.0*mul*mul) + 2 * mul*lambdh_ag + (omgw[0] / omega + lamb_1s);
 
-
 	CC = CC * omega;
 	DD = DD * omega*omega;
 	HH = HH*omega*omega*gama / 8.0;
+
+	if (!si_unit)
+		HH(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	else
+		HH(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 
 	_sum = 0;
 	temp = 0;
@@ -1783,8 +1796,8 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		m[0] = -nb*khub / 2 * beta[2];
 		m[1] = -nb*khub / 2 * beta[1];
 	case Hingeless:
-		m[0] = nb*khub / 2 * beta[2];
-		m[1] = -nb*khub / 2 * beta[1];
+		m[0] = nb*khub *0.5  * beta[2];// -m[2] * beta[1] * 0.5;
+		m[1] = -nb*khub *0.5 * beta[1];// -m[2] * beta[2] * 0.5;
 		break;
 	default:
 		break;

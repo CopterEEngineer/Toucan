@@ -532,25 +532,25 @@ void CopterSolver::_Assemble(Copter &C)
 	SigmaF[0] = SigmaF[1] = SigmaF[2] = 0;
 	SigmaM[0] = SigmaM[1] = SigmaM[2] = 0;
 	
-	for (int i = C.WingV.size() - 1; i >= 0; --i)
-	{
-		C.WingV[i].SetAirfm_cg(C.refcoord.base);
-		C.WingV[i].GetAirfm_cg(ftemp, mtemp);
+	//for (int i = C.WingV.size() - 1; i >= 0; --i)
+	//{
+	//	C.WingV[i].SetAirfm_cg(C.refcoord.base);
+	//	C.WingV[i].GetAirfm_cg(ftemp, mtemp);
 
-		for (int j = 0; j < 3; ++j)
-		{
-			SigmaF[j] += ftemp[j];
-			SigmaM[j] += mtemp[j];
-		}
-	}
+	//	for (int j = 0; j < 3; ++j)
+	//	{
+	//		SigmaF[j] += ftemp[j];
+	//		SigmaM[j] += mtemp[j];
+	//	}
+	//}
 
-	C.fuselage.SetAirfm_cg(C.refcoord.base);
-	C.fuselage.GetAirfm_cg(ftemp, mtemp);
-	for (int j = 0; j < 3; ++j)
-	{
-		SigmaF[j] += ftemp[j];
-		SigmaM[j] += mtemp[j];
-	}
+	//C.fuselage.SetAirfm_cg(C.refcoord.base);
+	//C.fuselage.GetAirfm_cg(ftemp, mtemp);
+	//for (int j = 0; j < 3; ++j)
+	//{
+	//	SigmaF[j] += ftemp[j];
+	//	SigmaM[j] += mtemp[j];
+	//}
 
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
 	{
@@ -689,7 +689,7 @@ void CopterSolver::_ComputeAMatrix(Matrix2<double> &A, Copter &C)
 	C.dYdvel[1] = A(4, 4) = dYdvel[1];
 	C.dYdomg[0] = A(4, 5) = dYdomg[0] + C.vel_c[2];
 	A(4, 6) = Gg*cos(uctrl[4])*cos(-uctrl[5]);
-	C.dYdomg[2] = A(4, 7) = dYdomg[2] - C.vel_c[0];
+	C.dYdomg[2] = A(4, 7) = dYdomg[2] -C.vel_c[0];
 
 	//for (int i = 0; i < 8; i++)
 	//	cout << A(4, i) << '\t';
