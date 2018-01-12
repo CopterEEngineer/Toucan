@@ -69,6 +69,15 @@ void Rotor::SetAirfm(void)
 	{
 	case Mrotor:
 		AvrgInducedVel();
+		/*cout << endl;
+		printf("%d rotor induced velocity iter count: %d \n", type, niter_w);
+		printf("%d rotor flaps (degs): %f, %f, %f\n", type, DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
+		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
+		cout << endl;
+		printf("%d rotor airdynamics: \n", type);
+		printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
+		printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
+		cout << endl;*/
 		break;
 	case Trotor:
 		airforce[0] = airforce[1] = airmoment[0] = airmoment[1] = 0;
@@ -81,7 +90,7 @@ void Rotor::SetAirfm(void)
 	
 #ifdef OUTPUT_MODE_1
 
-	cout << endl;
+	/*cout << endl;
 	printf("%d rotor induced velocity iter count: %d \n", type, niter_w);
 	printf("%d rotor flaps (degs): %f, %f, %f\n", type, DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
 	printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
@@ -89,7 +98,7 @@ void Rotor::SetAirfm(void)
 	printf("%d rotor airdynamics: \n", type);
 	printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
 	printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
-	cout << endl;
+	cout << endl;*/
 
 #endif // OUTPUT_MODE_1
 }
@@ -407,23 +416,23 @@ void Rotor::_teeterflap_fx(void)
 	Matrix1<myTYPE> f22(2), dq0(2), q0(2), temp_M(2);
 	Matrix1<myTYPE> ddq2(2), ddq(2), dq(2), q(2), qq(2);
 	int niter, nitermax = bld.nitermax;
-	myTYPE dt, bt, twistt;
+	myTYPE dt, twistt;
 	myTYPE euler_temp[3], sitaw[3], betaw[3];
 	myTYPE k1, p2, sb, _sum, mb, temp;
 	Matrix2<myTYPE> sol(2, nitermax);
 
-	niter = 0, dt = RAD(bld.dff) / omega;
-	bld.GAf.InitCoef(dt);
-	bt = 1.0 / bld.GAf.bt;
-
-	k1 = tan(RAD(del));
+	
 	mb = m1*radius;
-	p2 = 1 + khub / iflap / omega / omega + eflap*mb / iflap + gama*k1*(1 - 4.0 / 3 * eflap);
+	k1 = tan(RAD(del));
+	p2 = 1 + khub / iflap / omega / omega + gama*k1;
 
 	sitaw[0] = sita[0];
-	sitaw[1] = sita[1] * cos(windcoord.euler[2]) - sita[2] * sin(windcoord.euler[2]);
-	sitaw[2] = sita[1] * sin(windcoord.euler[2]) + sita[2] * cos(windcoord.euler[2]);
+	sitaw[1] = sita[1] * cos(betawind) - sita[2] * sin(betawind);
+	sitaw[2] = sita[1] * sin(betawind) + sita[2] * cos(betawind);
 	twistt = twist(ns - 1) - twist(0);
+
+	niter = 0, dt = RAD(bld.dff) / omega;
+	bld.GAf.InitCoef(dt);
 
 	m22(0, 0) = m22(1, 1) = 1.0;
 
@@ -445,10 +454,10 @@ void Rotor::_teeterflap_fx(void)
 
 	f22.v_p[1] += omega*omega*(0.25*gama*mul)*lambdh_ag;
 
-	//if (!si_unit)
-	//	f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
-	//else
-	//	f22(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	if (!si_unit)
+		f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
+	else
+		f22(0) += m1 / iflap *(-9.8 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
 
 	_sum = 0;
 	temp = 0;
@@ -495,7 +504,6 @@ void Rotor::_teeterflap_fx(void)
 		{
 			_sum = 0;
 			for (int j = 0; j < 2; ++j) {
-				//temp = sol(j, i + 1) / sol(j, i) - 1.0;
 				temp = (sol(j, i + 1) - sol(j, i)) / (sol(j, i) + RAD(0.01));// in case of 0/0
 				temp *= temp;
 				_sum += temp;
@@ -509,13 +517,13 @@ void Rotor::_teeterflap_fx(void)
 		;// printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
 
 	beta[0] = betaw[0];
-	beta[1] = betaw[2] * sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
-	beta[2] = betaw[2] * cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
+	beta[1] = betaw[2] * sin(betawind) + betaw[1] * cos(betawind);
+	beta[2] = betaw[2] * cos(betawind) - betaw[1] * sin(betawind);
 
 	euler_temp[0] = beta[2]; // -beta[2];
 	euler_temp[1] = beta[1];
-	//euler_temp[2] = 0.0;
-	euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
+	euler_temp[2] = 0.0;
+	//euler_temp[2] = Atan2(vel[1], vel[0]); // TPP wind coordinate
 	tppcoord.SetCoordinate(euler_temp, "euler");
 }
 
@@ -1425,8 +1433,8 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	mb = m1*radius;
 	p2 = 1 + khub / iflap / omega / omega;
 	sitaw[0] = sita[0];
-	sitaw[1] = sita[1] *cos(windcoord.euler[2]) - sita[2] * sin(windcoord.euler[2]);
-	sitaw[2] = sita[1] *sin(windcoord.euler[2]) + sita[2] * cos(windcoord.euler[2]);
+	sitaw[1] = sita[1] *cos(betawind) - sita[2] * sin(betawind);
+	sitaw[2] = sita[1] *sin(betawind) + sita[2] * cos(betawind);
 	twistt = twist(ns - 1) - twist(0);
 
 	niter = 0, dt = RAD(bld.dff) / omega;
@@ -1523,13 +1531,13 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 				break;
 		}
 	}
-	//sol.output("_sol_temp_mr.output", 10);
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
+		sol.output("_sol_temp_mr.output", 10);
+		// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
 
 	beta[0] = betaw[0];
-	beta[1] = betaw[2]*sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
-	beta[2] = betaw[2]*cos(windcoord.euler[2]) - betaw[1] * sin(windcoord.euler[2]);
+	beta[1] = betaw[2]*sin(betawind) + betaw[1] * cos(betawind);
+	beta[2] = betaw[2]*cos(betawind) - betaw[1] * sin(betawind);
 
 	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
@@ -1603,7 +1611,7 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 		//cout << kx << endl;
 		//kx = 1.2;
 		// non-uniform inflow model is doing in TPP wind coordinate
-		Iid_betaw = windcoord.euler[2] / (2 * PI / nf);
+		Iid_betaw = betawind / (2 * PI / nf);
 		for (int j = lambdi.NJ - 1; j >= 0; j--)
 		{
 			for (int i = lambdi.NI - 1; i >= 0; i--)
@@ -1689,8 +1697,8 @@ void Rotor::_windcoordOmg(double w[3], double dw[3])
 	dw[0] = dw[1] = dw[2] = 0;
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
-			w[i] += windcoord.Etransf[i][j] * omg[j];
-			dw[i] += windcoord.Etransf[i][j] * domg[j];
+			w[i] += windcoord.Ttransf[i][j] * omg[j];
+			dw[i] += windcoord.Ttransf[i][j] * domg[j];
 		}
 	}
 }

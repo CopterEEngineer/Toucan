@@ -367,18 +367,20 @@ void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, con
 	}
 	double euler_temp[3], omgw_temp[3], domgw_temp[3];
 	euler_temp[0] = euler_temp[1] =0;
-	euler_temp[2] = -Atan2(vel[1], -vel[0]); // wind coordinate
+	//euler_temp[2] = -Atan2(vel[1], -vel[0]); // wind coordinate
+	betawind = atan2(vel[1], -vel[0]); // 从直升机右侧来流为正侧滑角
+	euler_temp[2] = -betawind;// +hubfxcoord.euler[1]; // 坐标轴转角，与坐标轴方向定义是有关的
 	windcoord.SetCoordinate(euler_temp, "euler");
 
 	_windcoordVel(velw, dvelw);
-	_windcoordOmg(omgw_temp, domgw_temp); 	// 欧拉角速率引起
+	_windcoordOmg(omgw, domgw); 	// 欧拉角速率引起
 	// y方向速度引起，既偏航
-	omgw[2] = omgw_temp[2];
-	omgw[0] = omgw_temp[0] * cos(windcoord.euler[2]) + omgw_temp[1] * sin(windcoord.euler[2]);
-	omgw[1] = -omgw_temp[0] * sin(windcoord.euler[2]) + omgw_temp[1] * cos(windcoord.euler[2]);
-	domgw[2] = domgw_temp[2];
-	domgw[0] = domgw_temp[0] * cos(windcoord.euler[2]) + domgw_temp[1] * sin(windcoord.euler[2]);
-	domgw[1] = -domgw_temp[0] * sin(windcoord.euler[2]) + domgw_temp[1] * cos(windcoord.euler[2]);
+	//omgw[2] = omgw_temp[2];
+	//omgw[0] = omgw_temp[0] * cos(windcoord.euler[2]) + omgw_temp[1] * sin(windcoord.euler[2]);
+	//omgw[1] = -omgw_temp[0] * sin(windcoord.euler[2]) + omgw_temp[1] * cos(windcoord.euler[2]);
+	//domgw[2] = domgw_temp[2];
+	//domgw[0] = domgw_temp[0] * cos(windcoord.euler[2]) + domgw_temp[1] * sin(windcoord.euler[2]);
+	//domgw[1] = -domgw_temp[0] * sin(windcoord.euler[2]) + domgw_temp[1] * cos(windcoord.euler[2]);
 
 	mul = -velw[0] / vtipa;
 }
@@ -494,6 +496,7 @@ void Copter::SetStates(void)
 	// will update class members
 	vel_c[0] = vel_c[1] = vel_c[2] = 0;
 	omg_c[0] = omg_c[1] = omg_c[2] = 0;
+	// omg_g是欧拉角速率
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
 			vel_c[i] += refcoord.Ttransf[i][j] * vel_g[j];

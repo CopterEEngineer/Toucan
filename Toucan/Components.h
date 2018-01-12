@@ -241,7 +241,7 @@ private:
 	myTYPE vel[3], omg[3], dvel[3], domg[3]; // hub coordinate
 	myTYPE velw[3], dvelw[3], omgw[3], domgw[3]; // hub wind coordinate
 	myTYPE velh[3], omgh[3], dvelh[3], domgh[3]; // copter states
-	myTYPE mul;
+	myTYPE mul, betawind;
 	myTYPE beta[3];
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
 	Matrix2<myTYPE> bflap, dbflap, sfth;
@@ -398,9 +398,9 @@ void _setstates(_Ty _vel[3], _Ty _omg[3], _Ty _dvel[3], _Ty _domg[3], const _Ty 
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
 			_vel[i] += refcoord.Ttransf[i][j] * (temp_v[j] + vc[j]);
-			_omg[i] += refcoord.Etransf[i][j] * wc[j];
+			_omg[i] += refcoord.Ttransf[i][j] * wc[j];
 			_dvel[i] += refcoord.Ttransf[i][j] * (temp_dv[j] + dvc[j] + temp_ddv[j]);
-			_domg[i] += refcoord.Etransf[i][j] * dwc[j];
+			_domg[i] += refcoord.Ttransf[i][j] * dwc[j];
 		}
 	}
 }

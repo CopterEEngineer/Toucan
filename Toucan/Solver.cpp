@@ -518,10 +518,10 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 	//	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	//	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 	//}	
-	C.fuselage.GetAirfm(ftemp, mtemp);
-	printf("Fuselage \n");
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+	//C.fuselage.GetAirfm(ftemp, mtemp);
+	//printf("Fuselage \n");
+	//printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	//printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif // OUTPUT_MODE
 }
 
@@ -532,27 +532,28 @@ void CopterSolver::_Assemble(Copter &C)
 	SigmaF[0] = SigmaF[1] = SigmaF[2] = 0;
 	SigmaM[0] = SigmaM[1] = SigmaM[2] = 0;
 	
-	//for (int i = C.WingV.size() - 1; i >= 0; --i)
-	//{
-	//	C.WingV[i].SetAirfm_cg(C.refcoord.base);
-	//	C.WingV[i].GetAirfm_cg(ftemp, mtemp);
+	/*for (int i = C.WingV.size() - 1; i >= 0; --i)
+	{
+		C.WingV[i].SetAirfm_cg(C.refcoord.base);
+		C.WingV[i].GetAirfm_cg(ftemp, mtemp);
 
-	//	for (int j = 0; j < 3; ++j)
-	//	{
-	//		SigmaF[j] += ftemp[j];
-	//		SigmaM[j] += mtemp[j];
-	//	}
-	//}
+		for (int j = 0; j < 3; ++j)
+		{
+			SigmaF[j] += ftemp[j];
+			SigmaM[j] += mtemp[j];
+		}
+	}*/
 
 	//C.fuselage.SetAirfm_cg(C.refcoord.base);
 	//C.fuselage.GetAirfm_cg(ftemp, mtemp);
-	//for (int j = 0; j < 3; ++j)
-	//{
-	//	SigmaF[j] += ftemp[j];
-	//	SigmaM[j] += mtemp[j];
-	//}
+	for (int j = 0; j < 3; ++j)
+	{
+		SigmaF[j] += ftemp[j];
+		SigmaM[j] += mtemp[j];
+	}
 
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	//for (int i = 0; i >= 0; --i)
 	{
 		C.RotorV[i].SetAirfm_cg(C.refcoord.base);
 		C.RotorV[i].GetAirfm_cg(ftemp, mtemp);

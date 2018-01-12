@@ -819,7 +819,7 @@ void Rotor::InitVariables(void)
 	case Mrotor:
 		power = power_c = power_i = power_f = power_o = 0;
 		torque = torque_c = torque_i = torque_f = torque_o = 0;
-		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.03;
+		mul = 0, betawind = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.03;
 		niter_a = niter_w = -1;
 		power = torque = 0;
 		//sita[0] = RAD(16.1), sita[1] = RAD(1.18), sita[2] = RAD(3.12);
@@ -832,7 +832,7 @@ void Rotor::InitVariables(void)
 	case Trotor:
 		power = power_c = power_i = power_f = power_o = 0;
 		torque = torque_c = torque_i = torque_f = torque_o = 0; 
-		mul = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.01;
+		mul = 0, betawind = 0, lambdi_ag = lambdt_ag = lambdh_ag = 0.01;
 		niter_a = niter_w = -1;
 		power = torque = 0;
 		//sita[0] = RAD(10.1);
@@ -1757,7 +1757,7 @@ void LinearModel(int nth)
 	bo105.GetModel();
 	copter.InitRotorCraft(bo105);
 
-	i = s = 4, e = jobs.nCase; // 10; //
+	i = s = 0, e = jobs.nCase; // 10; //
 
 #pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
 	{
