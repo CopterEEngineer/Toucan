@@ -1674,7 +1674,7 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 		lambdi.setvalue(lambdi_ag);
 		break;
 	}
-
+	KA = atan2(-veltpp[0] / vtipa, -(-veltpp[2] / vtipa + lambdi_ag));
 	// veltpp: tpp plane velocity with copter
 	return lambdi_ag - veltpp[2] / vtipa;
 }

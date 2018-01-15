@@ -305,8 +305,9 @@ void Model_BO105::GetModel(void)
 	InitFuselage();
 	fuselage.dragA=0.0315*PI*4.91*4.91;
 	fuselage.amb = amb;
+	fuselage.Krho = amb.rho / 1.225;
 	fuselage.si_unit = si_unit;
-	origin[0] = 0;
+	origin[0] = 0.091;
 	origin[1] = origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
@@ -317,7 +318,7 @@ void Model_BO105::GetModel(void)
 	wing.si_unit = si_unit;
 	InitWing(wing);
 	origin[0] = -4.56 - 0.0163, origin[1] = 0, origin[2] = -0.5;
-	euler[0] = 0, euler[1] = 0, euler[2] = 0;
+	euler[0] = 0, euler[1] = PI, euler[2] = 0;
 	wing.refcoord.SetCoordinate(origin, euler, BASE_COORD);
 	
 	//fin
@@ -326,7 +327,7 @@ void Model_BO105::GetModel(void)
 	fin.si_unit = si_unit;
 	InitFin(fin);
 	origin[0] = -5.416 - 0.0163, origin[1] = 0, origin[2] = -1.0;
-	euler[0] = PI / 2, euler[1] = 0, euler[2] = 0;
+	euler[0] = -PI / 2, euler[1] = PI, euler[2] = 0;
 	fin.refcoord.SetCoordinate(origin, euler, BASE_COORD);
 
 	// main rotor
@@ -359,6 +360,9 @@ void Model_BO105::InitFuselage(void)
 	fuselage.cxtc.input("fuselage_cx.txt"), fuselage.cytc.input("fuselage_cy.txt"), fuselage.cztc.input("fuselage_cz.txt");
 	fuselage.cmtc.input("fuselage_cm.txt"), fuselage.cntc.input("fuselage_cn.txt");
 	fuselage.Sp = 14, fuselage.Lf = 20, fuselage.Ss = 80;
+	fuselage.KLT = 0;//1.2886;
+	fuselage.Inter0 = -PI, fuselage.Inter1 = PI;
+	//fuselage.Inter0 = fuselage.Inter1 = 0;
 }
 
 void Model_BO105::InitWing(Wing &W)
@@ -368,6 +372,10 @@ void Model_BO105::InitWing(Wing &W)
 	W.alpha0 = 0.0698;
 	W.cd0 = 0, W.cd1 = 0, W.cd2 = 0;
 	W.span = 2, W.chord = 0.4015, W.taper = 1;
+	W.KLT = 0;//1.6887;
+	W.KLTail = 0;
+	W.Inter0 = RAD(-15.3);
+	W.Inter1 = RAD(75); // 180时 sita_1s高速结果更好
 }
 
 void Model_BO105::InitFin(Wing &F)
@@ -377,11 +385,18 @@ void Model_BO105::InitFin(Wing &F)
 	F.alpha0 = -0.08116;
 	F.cd0 = F.cd1 = F.cd2 = 0;
 	F.span = 1, F.chord = 0.805, F.taper = 1;
+	F.KLT = 1.7422;
+	F.KLTail = 0.0;
+	F.Inter0 = 0;
+	F.Inter1 = 0;
 }
 
 void Model_BO105::InitMainRotor(Rotor &R)
 {
 	R.type = Mrotor;
+	R.FT = R.KLT = 0;
+	R.Inter0 = R.Inter1 = 0;
+	R.KA = 0;
 	R.teeter = false;
 	R.hingetype = Hingeless;
 	R.nb = 4;
@@ -452,6 +467,10 @@ void Model_BO105::InitMainRotor(Rotor &R)
 void Model_BO105::InitTailRotor(Rotor &R, double w)
 {
 	R.FT = 0.787;
+	R.KLT = 0; //1.7741;
+	R.Inter0 = RAD(77.6);
+	R.Inter1 = RAD(87.7);
+	R.KA = 0;
 	R.type = Trotor;
 	R.amb = amb;
 	R.si_unit = si_unit;
@@ -474,11 +493,12 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.a0 = 5.7, R.del0 = 0.008, R.del2 = 9.5, R.alpha0 = 0;
 	R.eflap = 0, R.khub = 0, R.del = 45, R.pitchroot = 0;
 	R.radius = 0.95, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
-	R.precone = RAD(0.5), R.omega = 5.25*w, R.vtipa = R.omega*R.radius;
+	R.precone = RAD(0.0), R.omega = 5.25*w, R.vtipa = R.omega*R.radius;
 	R.outboard = 0, R.rc0 = 0;
 	
 	//R.iflap = -99, R.m1 = -99, R.gama = -99;
-	R.iflap = 2.9, R.m1 = 1.5*R.iflap / R.radius, R.gama = 0.1764; // 猜测值
+	//R.iflap = 2.9, R.m1 = 1.5*R.iflap / R.radius, R.gama = 0.1764; // 猜测值
+	R.iflap = 0.66, R.m1 = 1.1 * R.radius, R.gama = 0.1764; // 猜测值
 	R.sigma = 0.12;
 	R.chord.setvalue(0.09);
 

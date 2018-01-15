@@ -73,11 +73,11 @@ void Fuselage::SetAirfm(double _l)
 {
 	// AOA is positive when chord is above freestream
 	// slipe angle is positive when velocity vector is at the right.
-	double _alpha = atan2(vel[2]-_l, vel[0]);
+	double _alpha = atan2(vel[2]+_l, vel[0]);
 	double _beta = atan2(vel[1], vel[0]);
-	double v2 = vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2];
+	double v2 = vel[0] * vel[0] + vel[1] * vel[1] + (vel[2] + _l) * (vel[2] + _l);
 	double _cx, _cy, _cz, _cm, _cn;
-	//cout << _alpha << endl;
+	//cout << DEG(_alpha) << endl;
 	switch (fmdling)
 	{
 	case Parasite:
@@ -92,9 +92,9 @@ void Fuselage::SetAirfm(double _l)
 			airforce[0] = xf0 + (xf1 + (xf2 + xf3*_alpha)*_alpha)*_alpha;
 			airforce[2] = zf0 + (zf1 + (zf2 + zf3*_alpha)*_alpha)*_alpha;
 			airmoment[1] = mf0 + (mf1 + (mf2 + mf3*_alpha)*_alpha)*_alpha;
-			airforce[0] *= (v2 / Vtest / Vtest); //密度没有归一到数据点
-			airforce[2] *= (v2 / Vtest / Vtest);
-			airmoment[1] *= (v2 / Vtest / Vtest);
+			airforce[0] *= (v2 * Krho / Vtest / Vtest); 
+			airforce[2] *= (v2 * Krho / Vtest / Vtest);
+			airmoment[1] *= (v2 * Krho / Vtest / Vtest);
 		}
 		else
 		{
@@ -111,8 +111,8 @@ void Fuselage::SetAirfm(double _l)
 		{
 			airforce[1] = yf0 + (yf1 + (yf2 + yf3*_beta)*_beta)*_beta;
 			airmoment[2] = nf0 + (nf1 + (nf2 + nf3*_beta)*_beta)*_beta;
-			airforce[1] *= (v2 / Vtest / Vtest);
-			airmoment[2] *= (v2 / Vtest / Vtest);
+			airforce[1] *= (v2 * Krho / Vtest / Vtest);
+			airmoment[2] *= (v2 * Krho / Vtest / Vtest);
 		}
 		else
 		{
@@ -122,32 +122,6 @@ void Fuselage::SetAirfm(double _l)
 			airforce[1] = 0.5*amb.rho*v2*Ss*_cy;
 			airmoment[2] = 0.5*amb.rho*v2*Ss*Lf*_cn;
 		}
-
-		/*else if(_alpha > PI/9 && _alpha <= PI)
-		{
-			double _AOA = PI / 9;
-			airforce[0] = (xf1 + (xf2 + xf3*_AOA)*_AOA)*_AOA;
-			airforce[0] -= airforce[0] / (PI - _AOA)*(_alpha - _AOA);
-
-			airforce[2] = (zf1 + (zf2 + zf3*_AOA)*_AOA)*_AOA;
-			airforce[2] -= airforce[2] / (PI - _AOA)*(_alpha - _AOA);
-
-			airmoment[1] = (mf1 + (mf2 + mf3*_AOA)*_AOA)*_AOA;
-			airmoment[1] -= airmoment[1] / (PI - _AOA)*(_alpha - _AOA);
-		}
-		else if (_alpha < -PI / 9 && _alpha >= -PI)
-		{
-			double _AOA = -PI / 9;
-			airforce[0] = (xf1 + (xf2 + xf3*_AOA)*_AOA)*_AOA;
-			airforce[0] -= airforce[0] / (_AOA + PI)*(_AOA - _alpha);
-
-			airforce[2] = (zf1 + (zf2 + zf3*_AOA)*_AOA)*_AOA;
-			airforce[2] -= airforce[2] / (_AOA + PI)*(_AOA - _alpha);
-
-			airmoment[1] = (mf1 + (mf2 + mf3*_AOA)*_AOA)*_AOA;
-			airmoment[1] -= airmoment[1] / (_AOA + PI)*(_AOA - _alpha);
-		}*/
-
 		break;
 	default:
 		airforce[0] = -0.5*vel[0] * vel[0] * amb.rho * dragA;
@@ -155,6 +129,7 @@ void Fuselage::SetAirfm(double _l)
 		airmoment[0] = airmoment[1] = airmoment[2] = 0;
 		break;
 	}
+	airforce[0] *= 1.0;
 #ifdef TEST_MODE
 	//cout << endl;
 	//printf("Fuselage airdynamics: \n");
@@ -258,11 +233,8 @@ void Wing::SetAirfm(double _l)
 	myTYPE m[3] = { 0 };
 
 	stot = span * chord * (1 + taper) / 2;
-	_aoa = atan2(vel[2]-_l, vel[0]);
-	//_aoa = atan2(-(vel[2] - _l), vel[0]);
-	// ignore wake disturb, makes the freestream face to wing positive. 
-	// This treatmean is easily to follow blade, but, it is not agreed with the refcoord coordinate,
-	// which freestream facing to wing is negative.
+	//_aoa = atan2(vel[2]-_l, vel[0]);
+	_aoa = atan2(-vel[2]+_l, -vel[0]);
 	switch (wmdling)
 	{
 	case WFitting:
@@ -308,26 +280,17 @@ void Wing::SetAirfm(double _l)
 	}
 
 
-	vel2 = vel[0] * vel[0] + (vel[2] + _l)*(vel[2] + _l);
+	vel2 = vel[0] * vel[0] + (-vel[2] + _l)*(-vel[2] + _l);
 	// freestream direction forces and moments, not refcoord
 	f[0] = 0.5 * amb.rho * stot * vel2 * cd;
-	f[1] = 0;
 	f[2] = 0.5 * amb.rho * stot * vel2 * cl;
-	airforce[1] = 0;
-	airmoment[0] = 0;
-	airmoment[1] = 0;
-	airmoment[2] = 0;
+	
 	// forces and moments at refcoord
-	if (_aoa >= -PI / 2 && _aoa <= PI / 2)
-	{
-		airforce[2] = -(f[2] * cos(_aoa) + f[0] * sin(_aoa));
-		airforce[0] = f[2] * sin(_aoa) - f[0] * cos(_aoa);
-	}
-	else
-	{
-		airforce[2] = f[2] * cos(_aoa) - f[0] * sin(_aoa);
-		airforce[0] = -f[2] * sin(_aoa) - f[0] * cos(_aoa);
-	}
+	_aoa -= alpha0;
+	airforce[2] = f[2] * cos(_aoa) + f[0] * sin(_aoa);
+	airforce[0] = f[0] * cos(_aoa) - f[2] * sin(_aoa);
+	airforce[1] = 0;
+	airmoment[0] = airmoment[1] = airmoment[2] = 0;
 
 #ifdef TEST_MODE
 	//cout << endl;

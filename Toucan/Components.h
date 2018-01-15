@@ -103,6 +103,8 @@ public:
 	double mf0, mf1, mf2, mf3;
 	double nf0, nf1, nf2, nf3;
 	Matrix2<double> cxtc, cytc, cztc, cmtc, cntc;
+	double KLT, Inter0, Inter1;
+	double Krho;
 };
 
 class Wing
@@ -130,6 +132,7 @@ public:
 	bool si_unit;
 	WingModeling wmdling;
 	double a0, a1, a3, a5, alpha0, cd0, cd1, cd2;
+	double KLT, KLTail, Inter0, Inter1;
 };
 
 class BladeSolver
@@ -240,7 +243,6 @@ private:
 	myTYPE airforce_cg[3], airmoment_cg[3];
 	myTYPE vel[3], omg[3], dvel[3], domg[3]; // hub coordinate
 	myTYPE velw[3], dvelw[3], omgw[3], domgw[3]; // hub wind coordinate
-	myTYPE velh[3], omgh[3], dvelh[3], domgh[3]; // copter states
 	myTYPE mul, betawind;
 	myTYPE beta[3];
 	myTYPE lambdi_ag, lambdh_ag, lambdt_ag; // NOTE: these three variations defined at different coordinates
@@ -271,6 +273,8 @@ public:
 	Matrix2<myTYPE> cltc, cdtc, cmtc; //
 	Matrix2<myTYPE> rastation, ristation, azstation; //, chord , twist, sweep;
 	myTYPE t0;
+	myTYPE velh[3], omgh[3], dvelh[3], domgh[3]; // copter states
+
 	//GenArf Gaf;
 	BladeSolver bld;
 	Ambience amb;
@@ -290,7 +294,7 @@ public:
 	myTYPE power_iid, torque_iid;
 	int niter_w, niter_a;
 
-	double FT;
+	double FT, KLT, Inter0, Inter1, KA;
 };
 
 class ModelCase
@@ -331,6 +335,8 @@ public:
 	void PostProcess(void);
 	void functest(void);
 	void GetErr(myTYPE e[3]);
+
+	void MRtoTR_Disturb(void);
 
 	template <class _Ty> 
 	void GetCtrl(_Ty *xctrl);
