@@ -161,6 +161,75 @@ public:
 	BladeSolType soltype;
 };
 
+class Airfoil
+{
+public:
+	Airfoil() { ; }
+	~Airfoil() { ; }
+
+	void SetAirfoil(string s);
+
+public:
+	string nid;
+	Matrix1<double> Ma, CLa, alpha1, dalpha1, alpha0;
+	Matrix1<double> s1, s2, K0, K1, K2, CD0, Df, CNl;
+	Matrix1<double> Tp, Tf, Tv, Tvl;
+};
+
+class LBDynamicStall
+{
+public:
+	LBDynamicStall() { ; }
+	~LBDynamicStall() { ; }
+
+	void LBDSprepare(double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
+	void LBDScomplete(void);
+	void AttachFlow(int, int);
+	void SeparateFlow(void);
+	void DynamicStall(void);
+	bool isExit(int);
+
+	void FuncTest(void);
+
+public:
+	Airfoil airfoil;
+	Matrix1<double> alphaIn;
+	Matrix1<double> x1, y1, D1, D2;
+	Matrix1<double> CNC, CNI, CNP, CNaI, CNqI;
+	Matrix1<double> CNf, CNfC;
+	Matrix1<double> fpp, fp, Df, Dfp, alphaeff, alphaE;
+	Matrix1<double> CNPrevised, CNfrevised, Dp;
+	Matrix1<double> Cv, CNv;
+	Matrix1<double> CNT, CCf, CD;
+	Matrix1<double> alphak, qk;
+	double dt, ds, alphaLc, MaLc, CNILc, DFLc, vsound, Cd0Lc;
+	double A1, A2, b1, b2, beta2, CNMa;
+	double Tl, Ta, Tq, Tf, Tp, Tv, Tvl, dalpha1;
+	double s1, s2, alpha1, alpha0, yita;
+	Matrix2<double> aoa0M2, MaM2, q0M2;
+	Matrix2<double> CNCM2, CNIM2, CNPM2, CNaIM2, CNqIM2;
+	Matrix2<double> CNfM2, CNfCM2, CDM2;
+	Matrix2<double> CNPrevisedM2, CvM2, CNvM2, CNTM2, CCfM2;
+	int countk, countk1, Nf, Ns;
+	double fpptemp;
+	Matrix1<double> MaIn;
+	Matrix1<double> AoALSSave, AoATSSave, AoAATSave;
+	Matrix2<double> AoALSSaveM2, AoATSSaveM2, AoAATSaveM2;
+	double tv;
+	
+	enum FlowState
+	{
+		Attach = 0, Separate = 1, ReAttach = 2
+	};
+	enum VortexState
+	{
+		Novortex = 0, Conv = 1, Nearby = 2, Far = 3, Second = 4,
+	};
+
+	FlowState flowstate;
+	VortexState vortexstate;
+};
+
 class Rotor
 {
 public:
@@ -280,6 +349,8 @@ public:
 	Ambience amb;
 	bool si_unit;
 	AirfoilAero airfoil;
+
+	LBDynamicStall dstall;
 
 	myTYPE sita[3];
 	AeroDynType adyna;

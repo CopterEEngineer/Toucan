@@ -1794,7 +1794,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	//ua.output("Ma.output", 10);
 	//lambdi.output("lambdi.output", 10);
 	//dt.output("dt.output", 10);
-
+	//dstall.LBDSprepare(1, amb.vsound, bld.dff, nf, ns, incidn, ua, ua);
 	switch (hingetype)
 	{
 	case Teeter:
