@@ -307,8 +307,9 @@ void Model_BO105::GetModel(void)
 	fuselage.amb = amb;
 	fuselage.Krho = amb.rho / 1.225;
 	fuselage.si_unit = si_unit;
-	origin[0] = 0.091;
+	origin[0] = -0.091;
 	origin[1] = origin[2] = 0;
+	//origin[2] = 0.174;
 	euler[0] = euler[1] = euler[2] = 0;
 	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
 
@@ -360,7 +361,7 @@ void Model_BO105::InitFuselage(void)
 	fuselage.cxtc.input("fuselage_cx.txt"), fuselage.cytc.input("fuselage_cy.txt"), fuselage.cztc.input("fuselage_cz.txt");
 	fuselage.cmtc.input("fuselage_cm.txt"), fuselage.cntc.input("fuselage_cn.txt");
 	fuselage.Sp = 14, fuselage.Lf = 20, fuselage.Ss = 80;
-	fuselage.KLT = 0;//1.2886;
+	fuselage.KLT = 1.5;//1.2886;
 	fuselage.Inter0 = -PI, fuselage.Inter1 = PI;
 	//fuselage.Inter0 = fuselage.Inter1 = 0;
 }
@@ -368,14 +369,14 @@ void Model_BO105::InitFuselage(void)
 void Model_BO105::InitWing(Wing &W)
 {
 	W.wmdling = WFitting;
-	W.a1 = 3.262, W.a3 = W.a5 = 0;
-	W.alpha0 = 0.0698;
-	W.cd0 = 0, W.cd1 = 0, W.cd2 = 0;
-	W.span = 2, W.chord = 0.4015, W.taper = 1;
-	W.KLT = 0;//1.6887;
+	W.a1 = 3.762, W.a3 = W.a5 = 0;
+	W.alpha0 = -0.0698;
+	W.cd0 = 0., W.cd1 = 0, W.cd2 = 0.;
+	W.span = 2.76, W.chord = 0.376, W.taper = 1;
+	W.KLT = 1.6887;
 	W.KLTail = 0;
 	W.Inter0 = RAD(-15.3);
-	W.Inter1 = RAD(75); // 180时 sita_1s高速结果更好
+	W.Inter1 = RAD(85); // 180时 sita_1s高速结果更好
 }
 
 void Model_BO105::InitFin(Wing &F)
@@ -478,7 +479,7 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.hingetype = Teeter; 
 	R.teeter = true;
 	R.nb = 2;
-	R.bld.soltype = HubFixed, R.adyna = Simple; // Simple; // Averaged;
+	R.bld.soltype = HubFixed, R.adyna = Simple; // Simple; // Averaged;//LinearInflow
 
 	if (R.adyna > -1)
 		R.nf = 72, R.ns = 40, R.ni = 40;
@@ -524,7 +525,7 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 
 	myTYPE origin[3], euler[3];
 	origin[0] = -6 - 0.0163, origin[1] = 0, origin[2] = -1.72;
-	euler[0] = -PI / 2, euler[1] = PI, euler[2] = 0;
+	euler[0] = -RAD(90), euler[1] = PI, euler[2] = 0;
 	R.hubfxcoord.SetCoordinate(origin, euler, R.refcoord.base);
 	R.refcoord.SetCoordinate(origin, euler, R.refcoord.base);
 
@@ -945,6 +946,11 @@ void Jobs::InitProject(JobsType jt, string fn)
 	ALongM.allocate(4, 4, nCase), ALateM.allocate(5, 5, nCase);
 	ALongMRe.allocate(4, 4, nCase), ALateMRe.allocate(5, 5, nCase);
 
+	LongADerivate.allocate(nCase, 9), LateADerivate.allocate(nCase, 9);
+	LgLaADerivate.allocate(nCase, 9), LaLgADerivate.allocate(nCase, 9);
+	LongCDerivate.allocate(nCase, 6), LateCDerivate.allocate(nCase, 6);
+	TailCDerivate.allocate(nCase, 6);
+
 	flg = 0, jtype = jt; 
 	niter.allocate(nCase, 1);
 	path.clear();
@@ -1149,6 +1155,42 @@ void Jobs::PostProcess(Copter &C, string pf, const int ic, const int s, const in
 				ALateM(i, j, ic) = C.ALateM(i, j);
 				ALateMRe(i, j, ic) = C.ALateMRe(i, j);
 			}
+
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				LongADerivate(ic, i * 3 + j) = C.AMatrix(i, j);
+				
+		for (int i = 0; i < 3; i++)
+		{
+			for (int j = 0; j < 3; j++)
+			{		
+				if (i == 2 && j == 2)
+				{
+					LateADerivate(ic, i * 3 + j) = C.AMatrix(i + 5, j + 5);
+					LaLgADerivate(ic, i * 3 + j) = C.AMatrix(i, j + 5);
+					LgLaADerivate(ic, i * 3 + j) = C.AMatrix(i + 5, j);
+				}
+				else if (i == 2 && j != 2)
+				{
+					LateADerivate(ic, i * 3 + j) = C.AMatrix(i + 5, j + 4);
+					LaLgADerivate(ic, i * 3 + j) = C.AMatrix(i, j + 4);
+					LgLaADerivate(ic, i * 3 + j) = C.AMatrix(i + 5, j);
+				}
+				else if (i != 2 && j == 2)
+				{
+					LateADerivate(ic, i * 3 + j) = C.AMatrix(i + 4, j + 5);
+					LaLgADerivate(ic, i * 3 + j) = C.AMatrix(i, j + 5);
+					LgLaADerivate(ic, i * 3 + j) = C.ALateM(i + 4, j);
+				}
+				else
+				{
+					LateADerivate(ic, i * 3 + j) = C.AMatrix(i + 4, j + 4);
+					LaLgADerivate(ic, i * 3 + j) = C.AMatrix(i, j + 4);
+					LgLaADerivate(ic, i * 3 + j) = C.AMatrix(i + 4, j);
+				}
+			}
+		}
+			
 	}
 
 	if (path.empty())
@@ -1176,6 +1218,11 @@ void Jobs::PostProcess(Copter &C, string pf, const int ic, const int s, const in
 		AMatrix.output2(path + "//" + pf + "-AMatrix.output", 10);
 		BMatrix.output2(path + "//" + pf + "-BMatrix.output", 10);
 		AMatrixRe.output2(path + "//" + pf + "-AMatrixRe.output", 10);
+
+		LongADerivate.output(path + "//" + pf + "-LongAD.output", 10);
+		LateADerivate.output(path + "//" + pf + "-LateAD.output", 10);
+		LgLaADerivate.output(path + "//" + pf + "-Lg2LaAD.output", 10);
+		LaLgADerivate.output(path + "//" + pf + "-La2LgAD.output", 10);
 
 		ALongM.output2(path + "//" + pf + "-ALongM.output", 10);
 		ALongMRe.output2(path + "//" + pf + "-ALongMRe.output", 10);
@@ -1663,6 +1710,16 @@ void Jobs::UpdateParam(Copter &C, const int ic, const int ip)
 	
 }
 
+void Jobs::GetContrls(Matrix2<double> &ct)
+{
+	ct = uctrl;
+}
+
+void Jobs::SetContrls(Matrix2<double> ct)
+{
+	Consini = ct;
+}
+
 void Rotor::OutPutWake(const int ic)
 {
 	string _ic = std::to_string(ic);
@@ -1770,25 +1827,64 @@ void LinearModel(int nth)
 	Model_BO105 bo105;
 	Copter copter;
 	CopterSolver solver;
+	AeroDynType adytemp;
+	Matrix2<double> uctrl_temp;
 	int s, e, i;
 
-	jobs.InitProject(Stable, "Controls_Bo105.in");
+	switch (nth)
+	{
+	case 0:
+		jobs.InitProject(Stable, "Controls_Bo105.in");
+		break;
+	case 1:
+		jobs.InitProject(SimTrim);
+		i = s = 0, e = jobs.nCase;
+
+		bo105.GetProb(6, 0, FreeTrim1);
+		bo105.GetModel();
+		copter.InitRotorCraft(bo105);
+		adytemp = copter.RotorV[0].adyna;
+		for (i = s; i < e; i++)
+		{
+			if (i < 3)
+				copter.RotorV[0].adyna = LinearInflow;
+			else
+				copter.RotorV[0].adyna = adytemp;
+
+			jobs.SetSimCond(copter, i);
+			solver.CopterSimulation(copter);
+			jobs.PostProcessMP(copter, i, s, e);
+
+			printf("Hor Wing AoA = %f, Lift = %f\n", DEG(copter.WingV[0].monitor.AOA), copter.WingV[0].monitor.af[2]);
+			printf("Hor Wing Cl = %f\n", copter.WingV[0].monitor.CL);
+			printf("Wake KA = %f\n", DEG(copter.RotorV[0].monitor.KA));
+			printf("Fuse AoA = %f, Slid = %f\n", DEG(copter.fuselage.monitor.Alpha), DEG(copter.fuselage.monitor.Beta));
+			printf("Fuse Long Airloading Z = %f, M = %f \n", copter.fuselage.monitor.af[2], copter.fuselage.monitor.mf[1]);
+			printf("Fuse Cl = %f Cm = %f\n", copter.fuselage.monitor.CL, copter.fuselage.monitor.CM);
+			printf("Fuse Mcg = %f\n", copter.fuselage.monitor.mfcg[1]);
+		}
+
+		jobs.GetContrls(uctrl_temp);
+		jobs.InitProject(Stable, "Controls_Bo105.in");
+		jobs.SetContrls(uctrl_temp);
+
+		break;
+	default:
+		break;
+	}
+
 	bo105.GetProb(6, 0, Transient);
 	bo105.GetModel();
 	copter.InitRotorCraft(bo105);
 
 	i = s = 0, e = jobs.nCase; // 10; //
 
-#pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
+	for (int i = s; i < e; i++)
 	{
-#pragma omp for
-		for (int i = s; i < e; i++)
-		{
-			jobs.SetSimCond(copter, i);
-			solver.CopterSimulation(copter);
-			jobs.PostProcess(copter, "St", i, s, e);
-		}
-#pragma omp barrier
+		jobs.SetSimCond(copter, i);
+		solver.CopterSimulation(copter);
+		jobs.PostProcess(copter, "St", i, s, e);
+		
 	}
 }
 

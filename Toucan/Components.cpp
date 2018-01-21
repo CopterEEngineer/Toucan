@@ -137,6 +137,15 @@ void Fuselage::SetAirfm(double _l)
 	//printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
 	cout << endl;
 #endif // OUTPUT_MODE
+	monitor.Alpha = _alpha;
+	monitor.Beta = _beta;
+	for (int i = 0; i < 3; i++)
+	{
+		monitor.af[i] = airforce[i];
+		monitor.mf[i] = airmoment[i];
+	}
+	monitor.CL = airforce[2] / amb.rho / v2;
+	monitor.CM = airmoment[1] / amb.rho / v2;
 }
 
 void Fuselage::GetAirfm(myTYPE f[3], myTYPE m[3])
@@ -235,6 +244,7 @@ void Wing::SetAirfm(double _l)
 	stot = span * chord * (1 + taper) / 2;
 	//_aoa = atan2(vel[2]-_l, vel[0]);
 	_aoa = atan2(-vel[2]+_l, -vel[0]);
+
 	switch (wmdling)
 	{
 	case WFitting:
@@ -291,7 +301,6 @@ void Wing::SetAirfm(double _l)
 	airforce[0] = f[0] * cos(_aoa) - f[2] * sin(_aoa);
 	airforce[1] = 0;
 	airmoment[0] = airmoment[1] = airmoment[2] = 0;
-
 #ifdef TEST_MODE
 	//cout << endl;
 	//printf("%s wing airdynamics: \n", type);
@@ -299,6 +308,10 @@ void Wing::SetAirfm(double _l)
 	//printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
 	cout << endl;
 #endif // TEST_MODE
+	monitor.CL = cl;
+	monitor.AOA = _aoa;
+	for (int i = 0; i < 3; i++)
+		monitor.af[i] = airforce[i];
 }
 
 void Wing::GetAirfm(myTYPE f[3], myTYPE m[3])
@@ -384,7 +397,9 @@ void Rotor::SetAirfm_cg(const Coordinate *base)
 void Copter::InitRotorCraft(ModelCase &M)
 {
 	model = M, simtype = M.simtype, nfree = M.nfree;
-	WingV = M.WingV, RotorV = M.RotorV, fuselage = M.fuselage;
+	WingV = M.WingV;
+	RotorV = M.RotorV;
+	fuselage = M.fuselage;
 	amb = M.amb;
 	mass = M.mass, inmatx_M = M.inmatx_M;
 	InitCoord(M);

@@ -61,6 +61,19 @@ enum AirfoilAero {
 	Liftslope = 0, C81Table = 1, Padfield = 2
 };
 
+class Monitor
+{
+public:
+	Monitor() { ; }
+	~Monitor() { ; }
+
+public:
+	double AOA, CL, KA, Alpha, Beta, CM;
+	double af[3], mf[3];
+	double afcg[3], mfcg[3];
+};
+
+
 class Ambience
 {
 public:
@@ -105,6 +118,7 @@ public:
 	Matrix2<double> cxtc, cytc, cztc, cmtc, cntc;
 	double KLT, Inter0, Inter1;
 	double Krho;
+	Monitor monitor;
 };
 
 class Wing
@@ -133,6 +147,8 @@ public:
 	WingModeling wmdling;
 	double a0, a1, a3, a5, alpha0, cd0, cd1, cd2;
 	double KLT, KLTail, Inter0, Inter1;
+
+	Monitor monitor;
 };
 
 class BladeSolver
@@ -366,6 +382,7 @@ public:
 	int niter_w, niter_a;
 
 	double FT, KLT, Inter0, Inter1, KA;
+	Monitor monitor;
 };
 
 class ModelCase

@@ -80,7 +80,10 @@ public:
 
 	void ParamSweep(const Copter &C);
 	void UpdateParam(Copter &C, const int ic, const int ip);
-
+	void GetContrls(void);
+	void GetContrls(Matrix2<double> &);
+	void GetContrls(Matrix3<double> &);
+	void SetContrls(Matrix2<double>);
 	//void LevelFlight(void);
 	//void RPMSweep(void);
 
@@ -108,6 +111,8 @@ private:
 	Matrix2<double> dXdctrl, dYdctrl, dZdctrl, dMdctrl, dNdctrl, dLdctrl;
 	Matrix3<double> AMatrix, BMatrix, AMatrixRe;
 	Matrix3<double> ALongM, ALateM, ALongMRe, ALateMRe;
+	Matrix2<double> LongADerivate, LateADerivate, LgLaADerivate, LaLgADerivate;
+	Matrix2<double> LongCDerivate, LateCDerivate, TailCDerivate;
 
 	Matrix2<double> StableInitPara;
 
