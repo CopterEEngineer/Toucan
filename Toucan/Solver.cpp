@@ -230,6 +230,17 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 	else
 		converge = false;
 
+	C.RotorV[1].GetAirfm(C.RotorV[1].monitor.af, C.RotorV[1].monitor.mf);
+	C.RotorV[0].GetAirfm(C.RotorV[0].monitor.af, C.RotorV[0].monitor.mf);
+
+	C.RotorV[0].GetAirfm_cg(C.RotorV[0].monitor.afcg, C.RotorV[0].monitor.mfcg);
+	C.RotorV[1].GetAirfm_cg(C.RotorV[1].monitor.afcg, C.RotorV[1].monitor.mfcg);
+	C.RotorV[0].GetBeta(C.RotorV[0].monitor.flapc);
+
+	C.RotorV[0].GetStates(C.RotorV[0].monitor.vel, C.RotorV[0].monitor.omg);
+	C.RotorV[0].GetWStates(C.RotorV[0].monitor.velw, C.RotorV[0].monitor.omgw);
+	C.RotorV[0].monitor.Beta = -C.RotorV[0].windcoord.euler[2];
+	C.fuselage.GetAirfm_cg(C.fuselage.monitor.afcg, C.fuselage.monitor.mfcg);
 }
 
 void CopterSolver::_WindTrimSolver(Copter &C)
@@ -282,6 +293,7 @@ void CopterSolver::_TransientSolver(Copter &C)
 		//C.RotorV[0].AvrgInducedVel(); // should be dynamic inflow model
 		_EnableWake(C);
 		_CompsSetAirFM(C);
+		
 		//C.RotorV[0].DiskOutput("DiskVelP");
 		_Assemble(C);
 		_GetSigmaFM(C, ftempp, mtempp);
@@ -291,6 +303,7 @@ void CopterSolver::_TransientSolver(Copter &C)
 		//C.RotorV[0].AvrgInducedVel(); // should be dynamic inflow model
 		_EnableWake(C);
 		_CompsSetAirFM(C);
+		
 		//C.RotorV[0].DiskOutput("DiskVelN");
 		_Assemble(C);
 		_GetSigmaFM(C, ftempn, mtempn);
@@ -328,6 +341,12 @@ void CopterSolver::_TransientSolver(Copter &C)
 		_Assemble(C);
 		_GetSigmaFM(C, ftempp, mtempp);
 
+		C.RotorV[0].GetAirfm(C.RotorV[0].monitor.afpB[iq + 3], C.RotorV[0].monitor.mfpB[iq + 3]);
+		C.RotorV[0].GetAirfm_cg(C.RotorV[0].monitor.AfcgPB[iq + 3], C.RotorV[0].monitor.MfcgPB[iq + 3]);
+		C.RotorV[0].GetWStates(C.RotorV[0].monitor.VelwPB[iq + 3], C.RotorV[0].monitor.OmgwPB[iq + 3]);
+		if (iq == 2)
+			C.RotorV[0].monitor.Betad[0] = -C.RotorV[0].windcoord.euler[2];
+
 		_wc[iq] = otemp - delta; // otemp*(1 - delta);
 		_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
 		//C.RotorV[0].AvrgInducedVel(); // should be dynamic inflow model
@@ -335,6 +354,12 @@ void CopterSolver::_TransientSolver(Copter &C)
 		_CompsSetAirFM(C);
 		_Assemble(C);
 		_GetSigmaFM(C, ftempn, mtempn);
+
+		C.RotorV[0].GetAirfm(C.RotorV[0].monitor.afnB[iq + 3], C.RotorV[0].monitor.mfnB[iq + 3]);
+		C.RotorV[0].GetAirfm_cg(C.RotorV[0].monitor.AfcgNB[iq + 3], C.RotorV[0].monitor.MfcgNB[iq + 3]);
+		C.RotorV[0].GetWStates(C.RotorV[0].monitor.VelwNB[iq + 3], C.RotorV[0].monitor.OmgwNB[iq + 3]);
+		if (iq == 2)
+			C.RotorV[0].monitor.Betad[1] = -C.RotorV[0].windcoord.euler[2];
 
 		if (C.fuselage.si_unit)
 		{
@@ -485,6 +510,11 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 
 	double _ka = C.RotorV[0].KA;
 	double _vi = C.RotorV[0].GetLambdi();
+	double _vix, _viy, _viz;
+	_viz = _vi*cos(-_ka);
+	_vix = _vi*sin(-_ka)*cos(C.RotorV[0].windcoord.euler[2]);
+	_viy = _vi*sin(-_ka)*sin(C.RotorV[0].windcoord.euler[2]);
+
 
 	// tail rotor
 	if (_ka >= C.RotorV[1].Inter0 && _ka <= C.RotorV[1].Inter1)
@@ -523,7 +553,8 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 	}
 
 	if (C.vel_g[0] < 5 && _ka >= C.fuselage.Inter0 && _ka <= C.fuselage.Inter1 && _vi < 0)
-		C.fuselage.SetAirfm(C.fuselage.KLT*_vi);
+		//C.fuselage.SetAirfm(C.fuselage.KLT*_vi);
+		C.fuselage.SetAirfm(C.fuselage.KLT*_vix, C.fuselage.KLT*_viy, C.fuselage.KLT*_viz);
 	else
 		C.fuselage.SetAirfm(0.0);
 
@@ -541,7 +572,7 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 	printf("TAIL ROTOR: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-	
+
 	C.WingV[0].GetAirfm(ftemp, mtemp);
 	printf("HORIZONTAL WING: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
@@ -551,7 +582,7 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 	printf("VERTICAL WING: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-	
+
 	C.fuselage.GetAirfm(ftemp, mtemp);
 	printf("FUSELAGE: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
@@ -559,7 +590,12 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 	printf("################################################################ \n");
 
 #endif // OUTPUT_MODE
-}
+
+	if (niter_r(0) >= 20)
+		printf("Warning: M Rotor Vi Iteration May NOT be CONVERGENT. \n");
+	if (niter_r(1) >= 20)
+		printf("Warning: T Rotor Vi Iteration May NOT be CONVERGENT. \n");
+	}
 
 void CopterSolver::_Assemble(Copter &C)
 {
@@ -568,59 +604,56 @@ void CopterSolver::_Assemble(Copter &C)
 	SigmaF[0] = SigmaF[1] = SigmaF[2] = 0;
 	SigmaM[0] = SigmaM[1] = SigmaM[2] = 0;
 
-	if (simtype != Transient)
+	
+#ifdef OUTPUT_MODE
+
+	printf("################################################################ \n");
+#endif
+
+	C.RotorV[0].SetAirfm_cg(C.refcoord.base);
+	C.RotorV[0].GetAirfm_cg(ftemp, mtemp);
+	for (int j = 0; j < 3; ++j)
 	{
-#ifdef OUTPUT_MODE
-
-		printf("################################################################ \n");
-#endif
-		C.RotorV[0].SetAirfm_cg(C.refcoord.base);
-		C.RotorV[0].GetAirfm_cg(ftemp, mtemp);
-		for (int j = 0; j < 3; ++j)
-		{
-			SigmaF[j] += ftemp[j];
-			SigmaM[j] += mtemp[j];
-		}
-#ifdef OUTPUT_MODE
-		printf("MAIN ROTOR: \n");
-		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-#endif
-	
-
-		C.RotorV[1].SetAirfm_cg(C.refcoord.base);
-		C.RotorV[1].GetAirfm_cg(ftemp, mtemp);
-		for (int j = 0; j < 3; ++j)
-		{
-			SigmaF[j] += ftemp[j];
-			SigmaM[j] += mtemp[j];
-		}
-#ifdef OUTPUT_MODE
-		printf("TAIL ROTOR: \n");
-		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-#endif
+		SigmaF[j] += ftemp[j];
+		SigmaM[j] += mtemp[j];
 	}
+#ifdef OUTPUT_MODE
+	printf("MAIN ROTOR: \n");
+	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+#endif
+
+	C.RotorV[1].SetAirfm_cg(C.refcoord.base);
+	C.RotorV[1].GetAirfm_cg(ftemp, mtemp);
+	for (int j = 0; j < 3; ++j)
+	{
+		SigmaF[j] += ftemp[j];
+		SigmaM[j] += mtemp[j];
+	}
+#ifdef OUTPUT_MODE
+	printf("TAIL ROTOR: \n");
+	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+#endif
 	
-		C.fuselage.SetAirfm_cg(C.refcoord.base);
-		C.fuselage.GetAirfm_cg(ftemp, mtemp);
+	C.fuselage.SetAirfm_cg(C.refcoord.base);
+	C.fuselage.GetAirfm_cg(ftemp, mtemp);
+
+	if (!(simtype == Transient && C.vel_g[0] < 5))
+	{		
 		for (int j = 0; j < 3; ++j)
 		{
 			SigmaF[j] += ftemp[j];
 			SigmaM[j] += mtemp[j];
 			C.fuselage.monitor.mfcg[j] = mtemp[j];
 		}
+	}
 #ifdef OUTPUT_MODE
-		printf("FUSELAGE: \n");
-		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+	printf("FUSELAGE: \n");
+	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
 	
-
-		
-		if (simtype != Transient)
-		{
-
 	C.WingV[0].SetAirfm_cg(C.refcoord.base);
 	C.WingV[0].GetAirfm_cg(ftemp, mtemp);
 	for (int j = 0; j < 3; ++j)
@@ -634,7 +667,6 @@ void CopterSolver::_Assemble(Copter &C)
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
 
-
 	C.WingV[1].SetAirfm_cg(C.refcoord.base);
 	C.WingV[1].GetAirfm_cg(ftemp, mtemp);
 	for (int j = 0; j < 3; ++j)
@@ -642,13 +674,12 @@ void CopterSolver::_Assemble(Copter &C)
 		SigmaF[j] += ftemp[j];
 		SigmaM[j] += mtemp[j];
 	}
-#ifdef OUTPUT_MODE
+	#ifdef OUTPUT_MODE
 	printf("VERTICAL WING: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 	printf("################################################################ \n");
-#endif
-}
+	#endif
 }
 
 void CopterSolver::_EnableWake(Copter &C)
@@ -688,18 +719,18 @@ void CopterSolver::_ComputeAMatrix(Matrix2<double> &A, Copter &C)
 	vector3 = 1 / unit_factor / unit_factor * C.inmatx_M(0, 2) / (C.inmatx_M(0, 0)*C.inmatx_M(2, 2) - C.inmatx_M(0, 2)*C.inmatx_M(0, 2));
 	vector4 = 1 / unit_factor / unit_factor * C.inmatx_M(0, 0) / (C.inmatx_M(0, 0)*C.inmatx_M(2, 2) - C.inmatx_M(0, 2)*C.inmatx_M(0, 2));
 
-	Luu = dot(vector1, vector2, 0, dLdvel(0), dNdomg(0), 0);
-	Lvv = dot(vector1, vector2, 0, dLdvel(1), dNdomg(1), 0);
-	Lww = dot(vector1, vector2, 0, dLdvel(2), dNdomg(2), 0);
+	Luu = dot(vector1, vector2, 0, dLdvel(0), dNdvel(0), 0);
+	Lvv = dot(vector1, vector2, 0, dLdvel(1), dNdvel(1), 0);
+	Lww = dot(vector1, vector2, 0, dLdvel(2), dNdvel(2), 0);
 	Lpp = dot(vector1, vector2, 0, dLdomg(0), dNdomg(0), 0);
 	Lqq = dot(vector1, vector2, 0, dLdomg(1), dNdomg(1), 0);
 	Lrr = dot(vector1, vector2, 0, dLdomg(2), dNdomg[2], 0);
 	Lfi = dot(vector1, vector2, 0, dLdeul(0), dNdeul(1), 0);
 	Lsita = dot(vector1, vector2, 0, dLdeul(1), dNdeul(1), 0);
 
-	Nuu = dot(vector3, vector4, 0, dLdvel[0], dNdomg[0], 0);
-	Nvv = dot(vector3, vector4, 0, dLdvel[1], dNdomg[1], 0);
-	Nww = dot(vector3, vector4, 0, dLdvel[2], dNdomg[2], 0);
+	Nuu = dot(vector3, vector4, 0, dLdvel[0], dNdvel[0], 0);
+	Nvv = dot(vector3, vector4, 0, dLdvel[1], dNdvel[1], 0);
+	Nww = dot(vector3, vector4, 0, dLdvel[2], dNdvel[2], 0);
 	Npp = dot(vector3, vector4, 0, dLdomg[0], dNdomg[0], 0);
 	Nqq = dot(vector3, vector4, 0, dLdomg[1], dNdomg[1], 0);
 	Nrr = dot(vector3, vector4, 0, dLdomg[2], dNdomg[2], 0);
@@ -866,6 +897,10 @@ void CopterSolver::_ComputeAMatrix(Matrix2<double> &A, Copter &C)
 	C.AMatrixRe(4, 6) += dYdeul[0];
 	C.AMatrixRe(5, 6) += Lfi;
 	C.AMatrixRe(7, 6) += Nfi;
+
+
+	C.monitor.Npvel[1] = Nvv;
+	C.monitor.Nvel[1] = dNdvel[1];
 }
 
 void CopterSolver::_ComputeBMatrix(Matrix2<double> &B, Copter &C)

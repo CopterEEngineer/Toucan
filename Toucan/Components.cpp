@@ -143,9 +143,92 @@ void Fuselage::SetAirfm(double _l)
 	{
 		monitor.af[i] = airforce[i];
 		monitor.mf[i] = airmoment[i];
+		monitor.vel[i] = vel[i];
 	}
-	monitor.CL = airforce[2] / amb.rho / v2;
-	monitor.CM = airmoment[1] / amb.rho / v2;
+	monitor.CY = airforce[1] / amb.rho / v2;
+	monitor.CML = airmoment[0] / amb.rho / v2;
+	Alpha = _alpha;
+	Beta = _beta;
+}
+
+void Fuselage::SetAirfm(double _lx, double _ly, double _lz)
+{
+	double _alpha = atan2(vel[2] + _lz, vel[0] + _lx);
+	double _beta = atan2(vel[1] - _ly, vel[0] + _lx);
+	double v2 = (vel[0] + _lx)*(vel[0] + _lx) + (vel[1] - _ly)*(vel[1] - _ly) + (vel[2] + _lz)*(vel[2] + _lz);
+	double _cx, _cy, _cz, _cm, _cn;
+
+	switch (fmdling)
+	{
+	case Parasite:
+		airforce[0] = -0.5*vel[0] * vel[0] * amb.rho * dragA;
+		airforce[1] = airforce[2] = 0;
+		airmoment[0] = airmoment[1] = airmoment[2] = 0;
+		break;
+	case Fitting:
+		airmoment[0] = 0;
+		if (Abs(_alpha) <= PI / 9)
+		{
+			airforce[0] = xf0 + (xf1 + (xf2 + xf3*_alpha)*_alpha)*_alpha;
+			airforce[2] = zf0 + (zf1 + (zf2 + zf3*_alpha)*_alpha)*_alpha;
+			airmoment[1] = mf0 + (mf1 + (mf2 + mf3*_alpha)*_alpha)*_alpha;
+			airforce[0] *= (v2 * Krho / Vtest / Vtest);
+			airforce[2] *= (v2 * Krho / Vtest / Vtest);
+			airmoment[1] *= (v2 * Krho / Vtest / Vtest);
+		}
+		else
+		{
+			_cx = cxtc(step(0, cxtc.NI - 1), 1).interplinear_fast(cxtc(step(0, cxtc.NI - 1), 0), DEG(_alpha));
+			_cz = cztc(step(0, cztc.NI - 1), 1).interplinear_fast(cztc(step(0, cztc.NI - 1), 0), DEG(_alpha));
+			_cm = cmtc(step(0, cmtc.NI - 1), 1).interplinear_fast(cmtc(step(0, cmtc.NI - 1), 0), DEG(_alpha));
+
+			airforce[0] = 0.5*amb.rho*v2*Sp*_cx;
+			airforce[2] = 0.5*amb.rho*v2*Sp*_cz;
+			airmoment[1] = 0.5*amb.rho*v2*Sp*Lf*_cm;
+		}
+
+		if (Abs(_beta) <= PI / 9)
+		{
+			airforce[1] = yf0 + (yf1 + (yf2 + yf3*_beta)*_beta)*_beta;
+			airmoment[2] = nf0 + (nf1 + (nf2 + nf3*_beta)*_beta)*_beta;
+			airforce[1] *= (v2 * Krho / Vtest / Vtest);
+			airmoment[2] *= (v2 * Krho / Vtest / Vtest);
+		}
+		else
+		{
+			_cy = cytc(step(0, cytc.NI - 1), 1).interplinear_fast(cytc(step(0, cytc.NI - 1), 0), DEG(_beta));
+			_cn = cntc(step(0, cntc.NI - 1), 1).interplinear_fast(cntc(step(0, cntc.NI - 1), 0), DEG(_beta));
+
+			airforce[1] = 0.5*amb.rho*v2*Ss*_cy;
+			airmoment[2] = 0.5*amb.rho*v2*Ss*Lf*_cn;
+		}
+		break;
+	default:
+		airforce[0] = -0.5*vel[0] * vel[0] * amb.rho * dragA;
+		airforce[1] = airforce[2] = 0;
+		airmoment[0] = airmoment[1] = airmoment[2] = 0;
+		break;
+	}
+	airforce[0] *= 1.0;
+#ifdef TEST_MODE
+	//cout << endl;
+	//printf("Fuselage airdynamics: \n");
+	//printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
+	//printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
+	cout << endl;
+#endif // OUTPUT_MODE
+	monitor.Alpha = _alpha;
+	monitor.Beta = _beta;
+	for (int i = 0; i < 3; i++)
+	{
+		monitor.af[i] = airforce[i];
+		monitor.mf[i] = airmoment[i];
+		monitor.vel[i] = vel[i];
+	}
+	monitor.CY = airforce[1] / amb.rho / v2;
+	monitor.CML = airmoment[0] / amb.rho / v2;
+	Alpha = _alpha;
+	Beta = _beta;
 }
 
 void Fuselage::GetAirfm(myTYPE f[3], myTYPE m[3])
@@ -161,6 +244,21 @@ void Fuselage::GetAirfm_cg(myTYPE f[3], myTYPE m[3])
 	for (int i = 2; i >= 0; --i) {
 		f[i] = airforce_cg[i];
 		m[i] = airmoment_cg[i];
+	}
+}
+
+void Fuselage::GetAngle(double &a, double &b)
+{
+	a = Alpha;
+	b = Beta;
+}
+
+void Fuselage::GetStates(double v[3], double w[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		v[i] = vel[i];
+		w[i] = omg[i];
 	}
 }
 
@@ -268,27 +366,26 @@ void Wing::SetAirfm(double _l)
 	if (aoa <= PI / 9)
 	{
 		cl = _aoa*(a1 + _aoa*_aoa*(a3 + _aoa*_aoa*a5));
-		cd = cd0 + aoa * (cd1 + aoa*cd2);
 	}
 	else if (aoa < 3 * PI / 4)
 	{
 		cl = PI / 9 * (a1 + PI*PI / 81 * (a3 + PI*PI / 81 * a5));
 		cl -= cl / (PI / 18 * 7)*(aoa - PI / 9);
 		cl *= Sign(_aoa);
-
-		cd = cd0 + PI / 9 * (cd1 + PI / 9 * cd2);
-		cd -= cd / (PI / 2)*(aoa - PI / 2);
 	}
 	else if (aoa <= PI)
 	{
 		cl = PI / 9 * (a1 + PI*PI / 81 * (a3 + PI*PI / 81 * a5));
 		cl -= cl / (PI / 18 * 7)*(1.5 * PI - aoa - PI / 9);
 		cl *= Sign(_aoa);
-
-		cd = cd0 + PI / 9 * (cd1 + PI / 9 * cd2);
-		cd -= cd / (PI / 2)*(aoa - PI / 2);
 	}
 
+	if (aoa <= RAD(80))
+		cd = cd0 + aoa*(cd1 + aoa*cd2);
+	else if (aoa <= RAD(100))
+		cd = cd0 + RAD(80)*(cd1 + RAD(80)*cd2);
+	else if (aoa <= PI)
+		cd = cd0 + (PI - aoa)*(cd1 + (PI - aoa)*cd2);
 
 	vel2 = vel[0] * vel[0] + (-vel[2] + _l)*(-vel[2] + _l);
 	// freestream direction forces and moments, not refcoord
@@ -308,6 +405,7 @@ void Wing::SetAirfm(double _l)
 	//printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
 	cout << endl;
 #endif // TEST_MODE
+	AOA = _aoa;
 	monitor.CL = cl;
 	monitor.AOA = _aoa;
 	for (int i = 0; i < 3; i++)
@@ -330,9 +428,30 @@ void Wing::GetAirfm_cg(myTYPE f[3], myTYPE m[3])
 	}
 }
 
+void Wing::GetAngle(double &a)
+{
+	a = AOA;
+}
+
+void Wing::GetStates(double v[3], double w[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		v[i] = vel[i];
+		w[i] = omg[i];
+	}
+}
+
 void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc)
 {
 	_setstates(vel, omg, dvel, domg, vc, wc, dvc, dwc, refcoord);
+
+	if (type == Mrotor)
+	{
+		omg[0] = -wc[0];
+		omg[1] = wc[1];
+		omg[2] = -wc[2];
+	}
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -359,6 +478,7 @@ void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, con
 	//domgw[1] = -domgw_temp[0] * sin(windcoord.euler[2]) + domgw_temp[1] * cos(windcoord.euler[2]);
 
 	mul = -velw[0] / vtipa;
+	//omega = omega0 + omg[2];
 }
 
 void Rotor::GetAirfm(myTYPE f[3], myTYPE m[3])

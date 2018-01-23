@@ -68,9 +68,27 @@ public:
 	~Monitor() { ; }
 
 public:
-	double AOA, CL, KA, Alpha, Beta, CM;
-	double af[3], mf[3];
+	double TEMP[100];
+	double AOA, CL, KA, Alpha, Beta, CM, CX, CY, CZ, CML;
+	double af[3], mf[3], vel[3], omg[3];
 	double afcg[3], mfcg[3];
+	double afp[3], afn[3], mfp[3], mfn[3];
+	double afpB[9][3], afnB[9][3], mfpB[9][3], mfnB[9][3];
+	double afcgd[2][3], mfcgd[2][3];
+	double AfcgPB[9][3], AfcgNB[9][3], MfcgPB[9][3], MfcgNB[9][3];
+	double Alphad[2], Betad[2];
+	double KAd[2], AOAd[2];
+	double Nvel[3], Npvel[3];
+	double veld[2][3], omgd[2][3];
+	double niterw[2], errw[2];
+	double flapc[3];
+	double flapcd[2][3];
+	double velw[3], omgw[3];
+	double velwd[2][3], omgwd[2][3];
+	double errdb2[2], errdw2[2];
+	double VelPB[9][3], OmgPB[9][3], VelNB[9][3], OmgNB[9][3];
+	double VelwPB[9][3], OmgwPB[9][3], VelwNB[9][3], OmgwNB[9][3];
+
 };
 
 
@@ -93,16 +111,21 @@ public:
 	~Fuselage() { ; }
 	void SetAirfm(void);
 	void SetAirfm(double);
+	void SetAirfm(double, double, double);
 	void GetAirfm(myTYPE f[3], myTYPE m[3]);
 	void GetAirfm_cg(myTYPE f[3], myTYPE m[3]);
 	void SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, const myTYPE *dwc);
 	void SetAirfm_cg(const Coordinate *base);
 	void InitVariables(void);
+	void GetAngle(double &, double&);
+	void GetStates(double v[3], double w[3]);
 
 private:
 	myTYPE airforce[3], airmoment[3];
 	myTYPE airforce_cg[3], airmoment_cg[3];
 	myTYPE vel[3], omg[3], dvel[3], domg[3];
+	double Alpha, Beta;
+
 public:
 	Coordinate refcoord;
 	myTYPE dragA, Sp, Ss, Lf;
@@ -133,11 +156,13 @@ public:
 	void SetAirfm_cg(const Coordinate *base);
 	void GetAirfm_cg(myTYPE f[3], myTYPE m[3]);
 	void InitVariables(void);
-
+	void GetAngle(double &);
+	void GetStates(double v[3], double w[3]);
 private:
 	myTYPE airforce[3], airmoment[3];
 	myTYPE airforce_cg[3], airmoment_cg[3];
 	myTYPE vel[3], omg[3], dvel[3], domg[3];
+	double AOA;
 public:
 	Coordinate refcoord;
 	CompType type;
@@ -268,6 +293,8 @@ public:
 	void GetPower(myTYPE p[6], myTYPE t[6]);
 	void DiskOutput(string s);
 	double GetLambdi(void);
+	void GetStates(double v[3], double w[3]);
+	void GetWStates(double v[3], double w[3]);
 private:
 	void _allocate(void);
 	void _initvariables(void);
@@ -340,6 +367,7 @@ private:
 	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
 	Matrix3<myTYPE> bladedeform, tipgeometry;
 
+
 	//Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
 	//myTYPE beta[3];
 	
@@ -350,7 +378,7 @@ public:
 	Coordinate refcoord;
 	int nb, nf, ns, ni;
 	myTYPE eflap, khub, del, pitchroot, radius, bt, rroot, disk_A;
-	myTYPE precone, omega, vtipa;
+	myTYPE precone, omega0, omega, vtipa;
 	myTYPE sigma, gama, a0, del0, del2, alpha0;
 	Matrix1<myTYPE> chord, twist, sweep;
 	myTYPE iflap, m1;
@@ -380,7 +408,7 @@ public:
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
 	myTYPE power_iid, torque_iid;
 	int niter_w, niter_a;
-
+	double Errb2, Errw2;
 	double FT, KLT, Inter0, Inter1, KA;
 	Monitor monitor;
 };
@@ -467,7 +495,7 @@ public:
 	Matrix1<double> dXdvel, dYdvel, dZdvel, dXdomg, dYdomg, dZdomg, dXdeul, dYdeul, dZdeul;
 	Matrix1<double> dMdvel, dNdvel, dLdvel, dMdomg, dNdomg, dLdomg, dMdeul, dNdeul, dLdeul;
 	Matrix1<double> dXdctrl, dYdctrl, dZdctrl, dMdctrl, dNdctrl, dLdctrl;
-
+	Monitor monitor;
 private:
 	void _Allocate(void);
 	void _InitVariables(void);
@@ -478,9 +506,8 @@ template <class _Ty>
 void _setstates(_Ty _vel[3], _Ty _omg[3], _Ty _dvel[3], _Ty _domg[3], const _Ty *vc, const _Ty *wc, const _Ty *dvc, const _Ty *dwc, const Coordinate &refcoord)
 {
 	// transfer needed component base coordinate to copter.
-
-	//Type temp_a1[3] = { 0,0,0 };
 	_Ty temp_v[3], temp_dv[3], temp_ddv[3];
+
 	for (int i = 2; i >= 0; --i) {
 		_vel[i] = _omg[i] = _dvel[i] = _domg[i] = 0;
 		temp_v[i] = temp_dv[i] = temp_ddv[i] = 0;
@@ -492,8 +519,8 @@ void _setstates(_Ty _vel[3], _Ty _omg[3], _Ty _dvel[3], _Ty _domg[3], const _Ty 
 	for (int i = 2; i >= 0; --i) {
 		for (int j = 2; j >= 0; --j) {
 			_vel[i] += refcoord.Ttransf[i][j] * (temp_v[j] + vc[j]);
-			_omg[i] += refcoord.Ttransf[i][j] * wc[j];
 			_dvel[i] += refcoord.Ttransf[i][j] * (temp_dv[j] + dvc[j] + temp_ddv[j]);
+			_omg[i] += refcoord.Ttransf[i][j] * wc[j];
 			_domg[i] += refcoord.Ttransf[i][j] * dwc[j];
 		}
 	}

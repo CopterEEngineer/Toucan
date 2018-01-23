@@ -399,7 +399,7 @@ void Rotor::_teeterflap_rt(void)
 	}
 
 	if (niter == nitermax - 1)
-		;//printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
 
 	euler_temp[0] = -beta[2];
 	euler_temp[1] = beta[1];
@@ -446,13 +446,19 @@ void Rotor::_teeterflap_fx(void)
 	k22(1, 0) = -omega*omega*gama / 8.0*(1 - 0.5*mul*mul);
 	k22(1, 1) = omega*omega*(p2 - 1 + 3.0 / 16.0*gama*k1*mul*mul);
 
-	f22.v_p[0] = omega*omega*(gama / 8.0*sitaw[1] * (1 + 0.5*mul*mul));
-	f22.v_p[1] = omega*omega*(1.0 / 3.0*gama*mul*sitaw[0] + 1.0 / 4.0*gama*mul*(twistt)+gama / 8.0*sitaw[2] * (1 + 1.5*mul*mul));
+	//f22.v_p[0] = omega*omega*(gama / 8.0*sitaw[1] * (1 + 0.5*mul*mul));
+	//f22.v_p[1] = omega*omega*(1.0 / 3.0*gama*mul*sitaw[0] + 1.0 / 4.0*gama*mul*(twistt)+gama / 8.0*sitaw[2] * (1 + 1.5*mul*mul));
 
-	f22.v_p[0] += omega*omega*(2.0 / omega*omgw[0] + gama / 8.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[1]);
-	f22.v_p[1] += omega*omega*(gama / 8.0 / omega*omgw[0] - 2.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[0]);
+	//f22.v_p[0] += omega*omega*(2.0 / omega*omgw[0] + gama / 8.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[1]);
+	//f22.v_p[1] += omega*omega*(gama / 8.0 / omega*omgw[0] - 2.0 / omega*omgw[1] + 1.0 / omega / omega*domgw[0]);
 
-	f22.v_p[1] += omega*omega*(0.25*gama*mul)*lambdh_ag;
+	//f22.v_p[1] += omega*omega*(0.25*gama*mul)*lambdh_ag;
+
+	f22(0) = 16 / gama*(omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega + 0);
+	f22(1) = -16 / gama*(omgw[1] / omega - domgw[0] / omega / omega / 2.0) + 8.0 / 3.0*mul*sitaw[0] + 2 * mul*twistt;
+	f22(1) += sitaw[2] * (1 + 3.0 / 2.0*mul*mul) + 2 * mul*lambdh_ag + (omgw[0] / omega + 0);
+
+	f22 = f22*omega*omega*gama / 8.0;
 
 	if (!si_unit)
 		f22(0) += m1 / iflap *(-9.8*0.3048*0.3048 + dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0]);
@@ -463,11 +469,19 @@ void Rotor::_teeterflap_fx(void)
 	temp = 0;
 
 	sb = 8.0*(p2 - 1.0) / gama;
+	//q0(0) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
+	//q0(1) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
+	//dq0.v_p[0] = 0.0;
+	//dq0.v_p[1] = omega * q0(1);// omega*sol(1, 0);
+
 	q0(0) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
 	q0(1) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
-	dq0.v_p[0] = 0.0;
-	dq0.v_p[1] = omega*sol(1, 0);
 
+	dq0(0) = 0.0;
+	dq0(1) = omega*q0(1);
+
+	//cout << q0(1) << endl;
+	//cout << sol(1, 0) << endl;
 
 	temp_M = d22.matrixmultiplyP2(dq0) + k22.matrixmultiplyP2(q0) - f22;
 	Msolver(m22.v_p, temp_M.v_p, 2);
@@ -504,7 +518,7 @@ void Rotor::_teeterflap_fx(void)
 		{
 			_sum = 0;
 			for (int j = 0; j < 2; ++j) {
-				temp = (sol(j, i + 1) - sol(j, i)) / (sol(j, i) + RAD(0.01));// in case of 0/0
+				temp = (sol(j, i + 1) - sol(j, i)) / (sol(j, i) + RAD(0.01));
 				temp *= temp;
 				_sum += temp;
 			}
@@ -514,7 +528,7 @@ void Rotor::_teeterflap_fx(void)
 	}
 
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _teeterflap_rt(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _teeterflap_fx(). \n");
 
 	beta[0] = betaw[0];
 	beta[1] = betaw[2] * sin(betawind) + betaw[1] * cos(betawind);
@@ -900,7 +914,7 @@ void Rotor::_hingeflap_fx(void)
 	}
 	//sol.output("_sol_temp_tr.output", 10);
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
 
 	euler_temp[0] = -beta[2];
 	euler_temp[1] = beta[1];
@@ -968,7 +982,7 @@ void Rotor::_hingelessdynamics_rt(void)
 void Rotor::_hingelessdynamics_fx(void)
 {
 	const int itermax = 20;
-	int iter = 0;
+	int iter = 1;
 	myTYPE lambtpp[itermax] = { 0 };
 	myTYPE err_w = 0.0001;
 	myTYPE veltpp[3] = { 0.0,0.0,0.0 };
@@ -1012,6 +1026,7 @@ void Rotor::_hingelessdynamics_fx(void)
 	}
 	//lambtpp.outputs("_lambtpp.output", 4);
 	niter_w = iter;
+	Errw2 = (lambdt_ag / lambtpp[niter_w - 1] - 1)*(lambdt_ag / lambtpp[niter_w - 1] - 1);
 }
 
 void Rotor::_hingelessflap_rt(void)
@@ -1096,7 +1111,7 @@ void Rotor::_hingelessflap_rt(void)
 	beta[2] /= bld.nperiod;
 
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
+		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
 	//bld.sol.output("bld_mr.output", 10);
 	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
@@ -1235,7 +1250,7 @@ void Rotor::_flapWang(void)
 	}
 	//sol.output("_sol_temp_mr.output", 10);
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _flapWang(). \n");
 
 	beta[0] = betaw[0];
 	beta[1] = betaw[2] * sin(windcoord.euler[2]) + betaw[1] * cos(windcoord.euler[2]);
@@ -1404,7 +1419,7 @@ void Rotor::_hingelessflap_fx(void)
 	}
 	//sol.output("_sol_temp_mr.output", 10);
 	if (niter == nitermax - 1)
-		;// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_fx(). \n");
 
 	
 	beta[0] = betaw[0];
@@ -1459,7 +1474,7 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	HH(0) = sitaw[0] * (1 + mul*mul) + 4 * twistt*(1.0 / 5.0 + mul*mul / 6.0);
 	HH(0) += 4.0 / 3.0*mul*sitaw[2] + 4.0 / 3.0*lambdh_ag + 2.0 / 3.0*mul*(omgw[0] / omega + lamb_1s);
 	
-	HH(2) = 16 / gama*(omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega + lamb_1c);
+	HH(2) = 16 / gama*(-omgw[0] / omega + domgw[1] / omega / omega / 2.0) + sitaw[1] * (1 + mul*mul / 2.0) + (omgw[1] / omega + lamb_1c);
 	HH(3) = -16 / gama*(omgw[1] / omega - domgw[0] / omega / omega / 2.0) + 8.0 / 3.0*mul*sitaw[0] + 2 * mul*twistt;
 	HH(3) += sitaw[2] * (1 + 3.0 / 2.0*mul*mul) + 2 * mul*lambdh_ag + (omgw[0] / omega + lamb_1s);
 
@@ -1476,8 +1491,8 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	temp = 0;
 	sb = 8.0*(p2 - 1.0) / gama;
 	q0(1) = 0.0;
-	q0(2) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
-	q0(3) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb + 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
+	q0(2) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[1] - sitaw[2] + (-sb*16.0 / gama - 1)*omgw[0] + (sb + 16.0 / gama)*omgw[1]);
+	q0(3) = 1.0 / (1.0 + sb*sb)*(sb*sitaw[2] + sitaw[1] + (sb - 16.0 / gama)*omgw[0] - (sb*16.0 / gama - 1)*omgw[1]);
 	q0(0) = gama / p2*(sitaw[0] * 0.125*(1.0 + mul*mul) + 0.1*twistt*(1 + 5.0 / 6.0*mul*mul) + 1.0 / 6.0*mul*(q0(1) + sitaw[2]) + lambdh_ag / 6.0);
 
 	dq0.v_p[0] = 0.0;
@@ -1532,8 +1547,7 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 		}
 	}
 	if (niter == nitermax - 1)
-		sol.output("_sol_temp_mr.output", 10);
-		// printf("Warning: Flap solving may not be convergent in Func _hingeflap_fx(). \n");
+		printf("Warning: Flap solving may not be convergent in Func _flapMBC(). \n");
 
 	beta[0] = betaw[0];
 	beta[1] = betaw[2]*sin(betawind) + betaw[1] * cos(betawind);
@@ -1544,6 +1558,8 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 	euler_temp[2] = 0.0;
 	//euler_temp[2] = Atan2(vel[1], vel[0]); // 桨盘平面旋转，是因为Glauert入流模型是没有横向速度的
 	tppcoord.SetCoordinate(euler_temp, "euler");
+
+	Errb2 = _sum;
 }
 
 
@@ -1694,14 +1710,25 @@ void Rotor::_windcoordVel(double v[3], double dv[3])
 
 void Rotor::_windcoordOmg(double w[3], double dw[3])
 {
+	double _E[9];
+	double euler_temp1[3], euler_temp2[3];
+
 	w[0] = w[1] = w[2] = 0;
 	dw[0] = dw[1] = dw[2] = 0;
-	for (int i = 2; i >= 0; --i) {
-		for (int j = 2; j >= 0; --j) {
-			w[i] += windcoord.Ttransf[i][j] * omg[j];
-			dw[i] += windcoord.Ttransf[i][j] * domg[j];
-		}
-	}
+
+	w[2] = omg[2];
+	dw[2] = domg[2];
+	w[0] = omg[0] * cos(windcoord.euler[2]) + omg[1] * sin(windcoord.euler[2]);
+	dw[0] = domg[0] * cos(windcoord.euler[2]) + domg[1] * sin(windcoord.euler[2]);
+	w[1] = -omg[0] * sin(windcoord.euler[2]) + omg[1] * cos(windcoord.euler[2]);
+	dw[1] = -domg[0] * sin(windcoord.euler[2]) + domg[1] * cos(windcoord.euler[2]);
+
+	//for (int i = 2; i >= 0; --i) {
+	//	for (int j = 2; j >= 0; --j) {
+	//		w[i] += windcoord.Ttransf[i][j] * omg[j];
+	//		dw[i] += windcoord.Ttransf[i][j] * domg[j];
+	//	}
+	//}
 }
 
 void Rotor::_velTransform(double v[3], double dv[3], Coordinate & coord)
@@ -1990,6 +2017,23 @@ void Rotor::DiskOutput(string s)
 	//printf("Max AoA angle %f\n", incidn.findmax());
 }
 
+void Rotor::GetStates(double v[3], double w[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		v[i] = vel[i];
+		w[i] = omg[i];
+	}
+}
+
+void Rotor::GetWStates(double v[3], double w[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		v[i] = velw[i];
+		w[i] = omgw[i];
+	}
+}
 
 bool BladeSolver::isGenArfExit(int niter)
 {

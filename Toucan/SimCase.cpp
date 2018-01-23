@@ -294,8 +294,9 @@ void Model_BO105::GetModel(void)
 	inmatx_M(0, 2) = inmatx_M(2, 0) = inmatx[0][2];
 
 	// reference coordinate, mass center
-	origin[1] = origin[2] = 0;
+	origin[1] = 0;
 	origin[0] = 0; 
+	origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	refcoord.SetCoordinate(origin, euler, BASE_COORD);
 	BASE_COORD = &refcoord;
@@ -308,8 +309,8 @@ void Model_BO105::GetModel(void)
 	fuselage.Krho = amb.rho / 1.225;
 	fuselage.si_unit = si_unit;
 	origin[0] = -0.091;
-	origin[1] = origin[2] = 0;
-	//origin[2] = 0.174;
+	origin[1] = 0;
+	origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
 
@@ -355,7 +356,7 @@ void Model_BO105::InitFuselage(void)
 	fuselage.zf0 = -51.1, fuselage.zf1 = -1202.0, fuselage.zf2 = 1515.7, fuselage.zf3 = -604.2;
 	fuselage.mf0 = -1191.8, fuselage.mf1 = 12752.0, fuselage.mf2 = 8201.3, fuselage.mf3 = -5796.7;
 	fuselage.nf0 = fuselage.nf2 = fuselage.nf3 = 0;
-	fuselage.nf1 = -10028.0;
+	fuselage.nf1 = -10028.0*0.5;
 	fuselage.cxtc.allocate(9, 2), fuselage.cytc.allocate(11, 2), fuselage.cztc.allocate(11, 2);
 	fuselage.cmtc.allocate(10, 2), fuselage.cntc.allocate(9, 2);
 	fuselage.cxtc.input("fuselage_cx.txt"), fuselage.cytc.input("fuselage_cy.txt"), fuselage.cztc.input("fuselage_cz.txt");
@@ -385,11 +386,12 @@ void Model_BO105::InitFin(Wing &F)
 	F.a1 = 2.704, F.a3 = F.a5 = 0;
 	F.alpha0 = -0.08116;
 	F.cd0 = F.cd1 = F.cd2 = 0;
+	//F.cd0 = 0.0105, F.cd1 = 0, F.cd2 = 0.01325;
 	F.span = 1, F.chord = 0.805, F.taper = 1;
 	F.KLT = 1.7422;
-	F.KLTail = 0.0;
-	F.Inter0 = 0;
-	F.Inter1 = 0;
+	F.KLTail = 0;
+	F.Inter0 = RAD(0);
+	F.Inter1 = RAD(0);
 }
 
 void Model_BO105::InitMainRotor(Rotor &R)
@@ -416,7 +418,8 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.khub = 113330, R.del = 0, R.pitchroot = RAD(0);
 	R.radius = 4.91, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
 	R.precone = 0;
-	R.omega = 44.4;
+	R.omega0 = 44.4;
+	R.omega = R.omega0;
 	R.vtipa = R.omega*R.radius;
 	R.outboard = 0.3;
 	R.rc0 = 0.004852173913043;
@@ -467,8 +470,8 @@ void Model_BO105::InitMainRotor(Rotor &R)
 
 void Model_BO105::InitTailRotor(Rotor &R, double w)
 {
-	R.FT = 0.787;
-	R.KLT = 0; //1.7741;
+	R.FT = 1;//0.787;
+	R.KLT = 1.7741;
 	R.Inter0 = RAD(77.6);
 	R.Inter1 = RAD(87.7);
 	R.KA = 0;
@@ -494,9 +497,9 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.a0 = 5.7, R.del0 = 0.008, R.del2 = 9.5, R.alpha0 = 0;
 	R.eflap = 0, R.khub = 0, R.del = 45, R.pitchroot = 0;
 	R.radius = 0.95, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
-	R.precone = RAD(0.0), R.omega = 5.25*w, R.vtipa = R.omega*R.radius;
+	R.precone = RAD(0.0), R.omega0 = 5.25*w;
 	R.outboard = 0, R.rc0 = 0;
-	
+	R.omega = R.omega0, R.vtipa = R.omega*R.radius;
 	//R.iflap = -99, R.m1 = -99, R.gama = -99;
 	//R.iflap = 2.9, R.m1 = 1.5*R.iflap / R.radius, R.gama = 0.1764; // ²Â²âÖµ
 	R.iflap = 0.66, R.m1 = 1.1 * R.radius, R.gama = 0.1764; // ²Â²âÖµ
@@ -860,7 +863,7 @@ void Rotor::InitVariables(void)
 		sita[1] = RAD(0.0), sita[2] = RAD(0.0);
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
-		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
+		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 300 * bld.nperiod;
 		bld.sol.allocate(bld.nitermax);
 		bld.azmuth.allocate(bld.nitermax);
 		break;
@@ -1180,7 +1183,7 @@ void Jobs::PostProcess(Copter &C, string pf, const int ic, const int s, const in
 				{
 					LateADerivate(ic, i * 3 + j) = C.AMatrix(i + 4, j + 5);
 					LaLgADerivate(ic, i * 3 + j) = C.AMatrix(i, j + 5);
-					LgLaADerivate(ic, i * 3 + j) = C.ALateM(i + 4, j);
+					LgLaADerivate(ic, i * 3 + j) = C.AMatrix(i + 4, j);
 				}
 				else
 				{
@@ -1855,13 +1858,8 @@ void LinearModel(int nth)
 			solver.CopterSimulation(copter);
 			jobs.PostProcessMP(copter, i, s, e);
 
-			printf("Hor Wing AoA = %f, Lift = %f\n", DEG(copter.WingV[0].monitor.AOA), copter.WingV[0].monitor.af[2]);
-			printf("Hor Wing Cl = %f\n", copter.WingV[0].monitor.CL);
-			printf("Wake KA = %f\n", DEG(copter.RotorV[0].monitor.KA));
-			printf("Fuse AoA = %f, Slid = %f\n", DEG(copter.fuselage.monitor.Alpha), DEG(copter.fuselage.monitor.Beta));
-			printf("Fuse Long Airloading Z = %f, M = %f \n", copter.fuselage.monitor.af[2], copter.fuselage.monitor.mf[1]);
-			printf("Fuse Cl = %f Cm = %f\n", copter.fuselage.monitor.CL, copter.fuselage.monitor.CM);
-			printf("Fuse Mcg = %f\n", copter.fuselage.monitor.mfcg[1]);
+			printf("M Rotor Y = %f, L = %f, Lcg = %f \n", copter.RotorV[0].monitor.af[0], copter.RotorV[0].monitor.mf[0], copter.RotorV[0].monitor.mfcg[0]);
+			printf("M Rotor Slip = %f \n", DEG(copter.RotorV[0].monitor.Beta));
 		}
 
 		jobs.GetContrls(uctrl_temp);
@@ -1885,6 +1883,12 @@ void LinearModel(int nth)
 		solver.CopterSimulation(copter);
 		jobs.PostProcess(copter, "St", i, s, e);
 		
+		printf("M Rotor Y|r+ = %f, Y|r- = %f \n", copter.RotorV[0].monitor.afpB[5][1], copter.RotorV[0].monitor.afnB[5][1]);
+		printf("M Rotor L|r+ = %f, L|r+ = %f \n", copter.RotorV[0].monitor.mfpB[5][0], copter.RotorV[0].monitor.mfnB[5][0]);
+		printf("M Rotor Lcg|r+ = %f, Lcg|r- = %f \n", copter.RotorV[0].monitor.MfcgPB[5][0], copter.RotorV[0].monitor.MfcgNB[5][0]);
+		printf("M Rotor Slip|r+ = %f, Slip|r- = %f \n", DEG(copter.RotorV[0].monitor.Betad[0]), DEG(copter.RotorV[0].monitor.Betad[1]));
+		printf("M Rotor (Pw,Qw,Rw)|r+ = (%f, %f, %f) \n", copter.RotorV[0].monitor.OmgwPB[5][0], copter.RotorV[0].monitor.OmgwPB[5][1], copter.RotorV[0].monitor.OmgwPB[5][2]);
+		printf("M Rotor (Pw,Qw,Rw)|r- = (%f, %f, %f) \n", copter.RotorV[0].monitor.OmgwNB[5][0], copter.RotorV[0].monitor.OmgwNB[5][1], copter.RotorV[0].monitor.OmgwNB[5][2]);
 	}
 }
 
