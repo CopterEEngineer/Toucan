@@ -232,6 +232,9 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 
 	C.RotorV[1].GetAirfm(C.RotorV[1].monitor.af, C.RotorV[1].monitor.mf);
 	C.RotorV[0].GetAirfm(C.RotorV[0].monitor.af, C.RotorV[0].monitor.mf);
+	C.fuselage.GetAirfm(C.fuselage.monitor.af, C.fuselage.monitor.mf);
+	C.WingV[0].GetAirfm(C.WingV[0].monitor.af, C.WingV[0].monitor.mf);
+	C.WingV[1].GetAirfm(C.WingV[1].monitor.af, C.WingV[1].monitor.mf);
 
 	C.RotorV[0].GetAirfm_cg(C.RotorV[0].monitor.afcg, C.RotorV[0].monitor.mfcg);
 	C.RotorV[1].GetAirfm_cg(C.RotorV[1].monitor.afcg, C.RotorV[1].monitor.mfcg);
@@ -618,68 +621,71 @@ void CopterSolver::_Assemble(Copter &C)
 		SigmaM[j] += mtemp[j];
 	}
 #ifdef OUTPUT_MODE
-	printf("MAIN ROTOR: \n");
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-#endif
-
-	C.RotorV[1].SetAirfm_cg(C.refcoord.base);
-	C.RotorV[1].GetAirfm_cg(ftemp, mtemp);
-	for (int j = 0; j < 3; ++j)
-	{
-		SigmaF[j] += ftemp[j];
-		SigmaM[j] += mtemp[j];
-	}
-#ifdef OUTPUT_MODE
 	printf("TAIL ROTOR: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
-	
-	C.fuselage.SetAirfm_cg(C.refcoord.base);
-	C.fuselage.GetAirfm_cg(ftemp, mtemp);
 
-	if (!(simtype == Transient && C.vel_g[0] < 5))
-	{		
+	if (simtype != WindTrim)
+	{
+		C.RotorV[1].SetAirfm_cg(C.refcoord.base);
+		C.RotorV[1].GetAirfm_cg(ftemp, mtemp);
 		for (int j = 0; j < 3; ++j)
 		{
 			SigmaF[j] += ftemp[j];
 			SigmaM[j] += mtemp[j];
-			C.fuselage.monitor.mfcg[j] = mtemp[j];
 		}
-	}
 #ifdef OUTPUT_MODE
-	printf("FUSELAGE: \n");
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-#endif
-	
-	C.WingV[0].SetAirfm_cg(C.refcoord.base);
-	C.WingV[0].GetAirfm_cg(ftemp, mtemp);
-	for (int j = 0; j < 3; ++j)
-	{
-		SigmaF[j] += ftemp[j];
-		SigmaM[j] += mtemp[j];
-	}
-#ifdef OUTPUT_MODE
-	printf("HORIZONTAL WING: \n");
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+		printf("MAIN ROTOR: \n");
+		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
 
-	C.WingV[1].SetAirfm_cg(C.refcoord.base);
-	C.WingV[1].GetAirfm_cg(ftemp, mtemp);
-	for (int j = 0; j < 3; ++j)
-	{
-		SigmaF[j] += ftemp[j];
-		SigmaM[j] += mtemp[j];
+		C.fuselage.SetAirfm_cg(C.refcoord.base);
+		C.fuselage.GetAirfm_cg(ftemp, mtemp);
+
+		if (!(simtype == Transient && C.vel_g[0] < 5))
+		{
+			for (int j = 0; j < 3; ++j)
+			{
+				SigmaF[j] += ftemp[j];
+				SigmaM[j] += mtemp[j];
+				C.fuselage.monitor.mfcg[j] = mtemp[j];
+			}
+		}
+#ifdef OUTPUT_MODE
+		printf("FUSELAGE: \n");
+		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+#endif
+
+		C.WingV[0].SetAirfm_cg(C.refcoord.base);
+		C.WingV[0].GetAirfm_cg(ftemp, mtemp);
+		for (int j = 0; j < 3; ++j)
+		{
+			SigmaF[j] += ftemp[j];
+			SigmaM[j] += mtemp[j];
+		}
+#ifdef OUTPUT_MODE
+		printf("HORIZONTAL WING: \n");
+		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+#endif
+
+		C.WingV[1].SetAirfm_cg(C.refcoord.base);
+		C.WingV[1].GetAirfm_cg(ftemp, mtemp);
+		for (int j = 0; j < 3; ++j)
+		{
+			SigmaF[j] += ftemp[j];
+			SigmaM[j] += mtemp[j];
+		}
+#ifdef OUTPUT_MODE
+		printf("VERTICAL WING: \n");
+		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
+		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
+		printf("################################################################ \n");
+#endif
 	}
-	#ifdef OUTPUT_MODE
-	printf("VERTICAL WING: \n");
-	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
-	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
-	printf("################################################################ \n");
-	#endif
 }
 
 void CopterSolver::_EnableWake(Copter &C)

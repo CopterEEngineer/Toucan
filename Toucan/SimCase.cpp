@@ -351,10 +351,10 @@ void Model_BO105::InitFuselage(void)
 {
 	fuselage.fmdling = Fitting; // Fitting;
 	fuselage.Vtest = 30.48; //m/s
-	fuselage.xf0 = -580.6, fuselage.xf1 = -454.0, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
+	fuselage.xf0 = -580.6, fuselage.xf1 = -454.0*1.7, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
 	fuselage.yf0 = -6.9, fuselage.yf1 = -2399.0, fuselage.yf2 = -1.7, fuselage.yf3 = 12.7;
 	fuselage.zf0 = -51.1, fuselage.zf1 = -1202.0, fuselage.zf2 = 1515.7, fuselage.zf3 = -604.2;
-	fuselage.mf0 = -1191.8, fuselage.mf1 = 12752.0, fuselage.mf2 = 8201.3, fuselage.mf3 = -5796.7;
+	fuselage.mf0 = -1191.8, fuselage.mf1 = 12752.0*0.55, fuselage.mf2 = 8201.3, fuselage.mf3 = -5796.7;
 	fuselage.nf0 = fuselage.nf2 = fuselage.nf3 = 0;
 	fuselage.nf1 = -10028.0*0.5;
 	fuselage.cxtc.allocate(9, 2), fuselage.cytc.allocate(11, 2), fuselage.cztc.allocate(11, 2);
@@ -373,7 +373,7 @@ void Model_BO105::InitWing(Wing &W)
 	W.a1 = 3.762, W.a3 = W.a5 = 0;
 	W.alpha0 = -0.0698;
 	W.cd0 = 0., W.cd1 = 0, W.cd2 = 0.;
-	W.span = 2.76, W.chord = 0.376, W.taper = 1;
+	W.span = 2.76, W.chord = 0.306, W.taper = 1;
 	W.KLT = 1.6887;
 	W.KLTail = 0;
 	W.Inter0 = RAD(-15.3);
@@ -471,7 +471,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 void Model_BO105::InitTailRotor(Rotor &R, double w)
 {
 	R.FT = 1;//0.787;
-	R.KLT = 1.7741;
+	R.KLT = 0;//1.7741;
 	R.Inter0 = RAD(77.6);
 	R.Inter1 = RAD(87.7);
 	R.KA = 0;
@@ -1858,8 +1858,18 @@ void LinearModel(int nth)
 			solver.CopterSimulation(copter);
 			jobs.PostProcessMP(copter, i, s, e);
 
-			printf("M Rotor Y = %f, L = %f, Lcg = %f \n", copter.RotorV[0].monitor.af[0], copter.RotorV[0].monitor.mf[0], copter.RotorV[0].monitor.mfcg[0]);
-			printf("M Rotor Slip = %f \n", DEG(copter.RotorV[0].monitor.Beta));
+			//printf("M Rotor X = %f, L = %f, Lcg = %f \n", copter.RotorV[0].monitor.af[0], copter.RotorV[0].monitor.mf[0], copter.RotorV[0].monitor.mfcg[0]);
+			//printf("T Rotor X = %f \n", copter.RotorV[1].monitor.af[0]);
+			printf("Fuse (X, Y, Z) = (%f, %f, %f) \n", copter.fuselage.monitor.af[0], copter.fuselage.monitor.af[1],copter.fuselage.monitor.af[2]);
+			printf("Fuse (L, M, N) = (%f, %f, %f) \n", copter.fuselage.monitor.mf[0], copter.fuselage.monitor.mf[1], copter.fuselage.monitor.mf[2]);
+			printf("Fuse Mcg = %f \n", copter.fuselage.monitor.mfcg[1]);
+			//printf("HorW X = %f \n", copter.WingV[0].monitor.af[0]);
+			//printf("VerW X = %f \n", copter.WingV[1].monitor.af[0]);
+			//printf("M Rotor Slip = %f \n", DEG(copter.RotorV[0].monitor.Beta));
+			//printf("M Rotor M = %f \n", copter.RotorV[0].monitor.mf[1]);
+
+			printf("Fuse AOA = %f \n", DEG(copter.fuselage.monitor.Alpha));
+
 		}
 
 		jobs.GetContrls(uctrl_temp);

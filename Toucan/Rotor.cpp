@@ -480,9 +480,6 @@ void Rotor::_teeterflap_fx(void)
 	dq0(0) = 0.0;
 	dq0(1) = omega*q0(1);
 
-	//cout << q0(1) << endl;
-	//cout << sol(1, 0) << endl;
-
 	temp_M = d22.matrixmultiplyP2(dq0) + k22.matrixmultiplyP2(q0) - f22;
 	Msolver(m22.v_p, temp_M.v_p, 2);
 	ddq = temp_M*(-1);
@@ -1710,9 +1707,6 @@ void Rotor::_windcoordVel(double v[3], double dv[3])
 
 void Rotor::_windcoordOmg(double w[3], double dw[3])
 {
-	double _E[9];
-	double euler_temp1[3], euler_temp2[3];
-
 	w[0] = w[1] = w[2] = 0;
 	dw[0] = dw[1] = dw[2] = 0;
 
@@ -1723,12 +1717,12 @@ void Rotor::_windcoordOmg(double w[3], double dw[3])
 	w[1] = -omg[0] * sin(windcoord.euler[2]) + omg[1] * cos(windcoord.euler[2]);
 	dw[1] = -domg[0] * sin(windcoord.euler[2]) + domg[1] * cos(windcoord.euler[2]);
 
-	//for (int i = 2; i >= 0; --i) {
-	//	for (int j = 2; j >= 0; --j) {
-	//		w[i] += windcoord.Ttransf[i][j] * omg[j];
-	//		dw[i] += windcoord.Ttransf[i][j] * domg[j];
-	//	}
-	//}
+	/*for (int i = 2; i >= 0; --i) {
+		for (int j = 2; j >= 0; --j) {
+			w[i] += windcoord.Ttransf[i][j] * omg[j];
+			dw[i] += windcoord.Ttransf[i][j] * domg[j];
+		}
+	}*/
 }
 
 void Rotor::_velTransform(double v[3], double dv[3], Coordinate & coord)

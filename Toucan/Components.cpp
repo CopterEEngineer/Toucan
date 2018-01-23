@@ -464,6 +464,18 @@ void Rotor::SetStates(const myTYPE *vc, const myTYPE *wc, const myTYPE *dvc, con
 	euler_temp[0] = euler_temp[1] =0;
 	//euler_temp[2] = -Atan2(vel[1], -vel[0]); // wind coordinate
 	betawind = atan2(vel[1], -vel[0]); // 从直升机右侧来流为正侧滑角
+	/*if (vel[1] > 0)
+		betawind = PI - atan2(vel[1], vel[0]);
+	else if (vel[1] < 0)
+		betawind = -PI - atan2(vel[1], vel[0]);
+	else
+	{
+		if (vel[0] >= 0)
+			betawind = 0;
+		else
+			betawind = PI;
+	}*/
+
 	euler_temp[2] = -betawind;// +hubfxcoord.euler[1]; // 坐标轴转角，与坐标轴方向定义是有关的
 	windcoord.SetCoordinate(euler_temp, "euler");
 
