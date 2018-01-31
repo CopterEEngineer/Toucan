@@ -217,20 +217,52 @@ public:
 	Matrix1<double> Tp, Tf, Tv, Tvl;
 };
 
-class LBDynamicStall
+class LBStall
 {
 public:
-	LBDynamicStall() { ; }
-	~LBDynamicStall() { ; }
+	enum FlowState
+	{
+		Attach = 0, Separate = 1, ReAttach = 2
+	};
+	enum VortexState
+	{
+		NoVortex = 0, Conv = 1, Nearby = 2, Far = 3, Secd = 4
+	};
+	typedef std::pair<FlowState, VortexState> StatePair;
 
-	void LBDSprepare(double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
-	void LBDScomplete(void);
-	void AttachFlow(int, int);
-	void SeparateFlow(void);
+
+	LBStall() { ; }
+	~LBStall() { ; }
+
+	void Prepare(Airfoil af, double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
+	void Complete(void);
+	void AttachFlow(int , int);
 	void DynamicStall(void);
 	bool isExit(int);
 
 	void FuncTest(void);
+
+private:
+	void performLBStall(void);
+	void performAttach(void);
+	void performReAttach(void);
+	void performSeparate(void);
+	void _performKflow(double);
+	void _performdstall(double);
+
+	void performVortex(void);
+	void _performnvortex(void);
+	void _performconv(void);
+	void _performnearby(void);
+	void _performfar(void);
+	void _performsecd(void);
+
+	bool _startReAttach(void);
+	bool _startAttach(void);
+	bool _enableSecd(void);
+
+	StatePair stateChange(StatePair);
+	StatePair stateChange(double);
 
 public:
 	Airfoil airfoil;
@@ -241,35 +273,35 @@ public:
 	Matrix1<double> fpp, fp, Df, Dfp, alphaeff, alphaE;
 	Matrix1<double> CNPrevised, CNfrevised, Dp;
 	Matrix1<double> Cv, CNv;
-	Matrix1<double> CNT, CCf, CD;
+	Matrix2<double> CNvSecd;
+	Matrix1<double> CNT, CCf, CD, CL;
 	Matrix1<double> alphak, qk;
 	double dt, ds, alphaLc, MaLc, CNILc, DFLc, vsound, Cd0Lc;
 	double A1, A2, b1, b2, beta2, CNMa;
-	double Tl, Ta, Tq, Tf, Tp, Tv, Tvl, dalpha1;
+	double Tl, Ta, Tq, Tf, Tp, Tv, Tvl, Ts, dalpha1;
 	double s1, s2, alpha1, alpha0, yita;
-	Matrix2<double> aoa0M2, MaM2, q0M2;
+	Matrix2<double> aoa0M2, MaM2, q0M2, fppM2;
 	Matrix2<double> CNCM2, CNIM2, CNPM2, CNaIM2, CNqIM2;
-	Matrix2<double> CNfM2, CNfCM2, CDM2;
+	Matrix2<double> CNfM2, CNfCM2, CDM2, CLM2;
 	Matrix2<double> CNPrevisedM2, CvM2, CNvM2, CNTM2, CCfM2;
 	int countk, countk1, Nf, Ns;
 	double fpptemp;
 	Matrix1<double> MaIn;
 	Matrix1<double> AoALSSave, AoATSSave, AoAATSave;
 	Matrix2<double> AoALSSaveM2, AoATSSaveM2, AoAATSaveM2;
-	double tv;
-	
-	enum FlowState
-	{
-		Attach = 0, Separate = 1, ReAttach = 2
-	};
-	enum VortexState
-	{
-		Novortex = 0, Conv = 1, Nearby = 2, Far = 3, Second = 4,
-	};
 
-	FlowState flowstate;
-	VortexState vortexstate;
+	Matrix1<int> FlowStateSave, VortexStateSave;
+	Matrix2<int> FlowStateSaveM2, VortexStateSaveM2;
+
+	StatePair  state;
+
+private:
+	double tv, _aeff, _Tf, _Tv;
+	bool _secdcomfd;
+	int secdID;
 };
+
+
 
 class Rotor
 {
@@ -393,8 +425,6 @@ public:
 	Ambience amb;
 	bool si_unit;
 	AirfoilAero airfoil;
-
-	LBDynamicStall dstall;
 
 	myTYPE sita[3];
 	AeroDynType adyna;

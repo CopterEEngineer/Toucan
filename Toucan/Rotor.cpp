@@ -1790,7 +1790,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 		_az.setvalue(ia);
 		_lambdi = lambdi.interplinear_fast(az, ra, _az, ra);
 		_dD = _cd*_factor / mcos(_inflow);
-		power_i += (_dt*_lambdi).sum() +db / omega * ((ra - eflap)*_dfz).sum();
+		power_i += db / omega * ((ra - eflap)*_dfz).sum() - (_dt*_lambdi).sum();
 		power_o += (_dD*sin(ia)*mul + _dD*ra1).sum();
 		
 		if (adyna == Averaged)
