@@ -215,6 +215,8 @@ public:
 	Matrix1<double> Ma, CLa, alpha1, dalpha1, alpha0;
 	Matrix1<double> s1, s2, K0, K1, K2, CD0, Df, CNl;
 	Matrix1<double> Tp, Tf, Tv, Tvl;
+	double r0, alphads0, alphass, alphacr, Talpha;
+	double alphamin0, alphamin, Tr;
 };
 
 class LBStall
@@ -234,6 +236,7 @@ public:
 	LBStall() { ; }
 	~LBStall() { ; }
 
+	void Prepare(Airfoil af, double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0, double r);
 	void Prepare(Airfoil af, double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
 	void Complete(void);
 	void AttachFlow(int , int);
@@ -260,6 +263,8 @@ private:
 	bool _startReAttach(void);
 	bool _startAttach(void);
 	bool _enableSecd(void);
+
+	bool _ShengCriterion(void);
 
 	StatePair stateChange(StatePair);
 	StatePair stateChange(double);
@@ -295,6 +300,10 @@ public:
 
 	StatePair  state;
 
+	double r0, alphads0, alphass, alphacr, Talpha;
+	double req;
+	double alphamin0, alphamin, Tr;
+	Matrix1<double> Da, alphap;
 private:
 	double tv, _aeff, _Tf, _Tv;
 	bool _secdcomfd;
