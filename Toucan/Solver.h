@@ -20,6 +20,7 @@ private:
 	void _CompsSetAirFM(Copter &C);
 	void _Assemble(Copter &C);
 	void _EnableWake(Copter &C);
+	void _EnableLBStall(Copter &C);
 	void _GetSigmaFM(Copter &C, myTYPE f[3], myTYPE m[3]);
 	void _ComputeAMatrix(Matrix2<double> &A, Copter &);
 	void _ComputeBMatrix(Matrix2<double> &B, Copter &);

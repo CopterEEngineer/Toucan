@@ -28,9 +28,9 @@ int main()
 	//RPMSweep(6, 0);
 	//OPT_RPMSweep(); // 560s; 100+ s; 1219s; 2514s; 1531s
 
-	//LinearModel(1);
+	LinearModel(1);
 
-	lbs.FuncTest();
+	//lbs.FuncTest();
 
 	printf("\n Time taken: %fs\n", (double(clock() - tStart)) / CLOCKS_PER_SEC);
 

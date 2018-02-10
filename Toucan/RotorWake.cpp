@@ -7,9 +7,9 @@ void Rotor::_wakeInducedVel(void)
 	switch (adyna)
 	{
 	case PWake:
-		haveStr = _tipVortexStr();
+		haveStr = true;// _tipVortexStr();
 		//_bladePosition();
-		haveGeo = _wakeGeoBd();
+		haveGeo = true;// _wakeGeoBd();
 		//_wakeIndVelCalc();
 		break;
 	case FWake:
@@ -38,12 +38,17 @@ bool Rotor::_tipVortexStr(void)
 			tipstr(i, j) = cirlb(igen, idns).findmax();
 		}
 	}
+	//cirlb.output("DEBUG_cirlb.output", 6);
 	return true;
 }
 
 void Rotor::_bladePosition()
 {
+	//尾迹法速度计算点，目前取四分之三弦长位置
+	//有后掠角时还要调整
 	myTYPE azm, bfp, rst;
+	myTYPE ch = chord(0) / radius;
+	myTYPE twistt = twist(ns - 1) - twist(0) + pitchroot;
 	for (int j = ns - 1; j >= 0; --j)
 	{
 		for (int i = nf - 1; i >= 0; --i)
@@ -51,62 +56,64 @@ void Rotor::_bladePosition()
 			azm = azstation(i, j);
 			bfp = beta[0] + beta[1] * cos(azm) + beta[2] * sin(azm);
 			rst = rastation(i, j);
-			bladedeform(i, j, 0) = ((rst - eflap)*cos(bfp) + eflap) * cos(azm);
-			bladedeform(i, j, 1) = ((rst - eflap)*cos(bfp) + eflap) * sin(azm);
-			bladedeform(i, j, 2) = sin(bfp)*(rst - eflap);
+			bladedeform(i, j, 0) = ((rst - eflap)*cos(bfp) + eflap) * cos(azm) + ch*0.5*sin(azm);
+			bladedeform(i, j, 1) = ((rst - eflap)*cos(bfp) + eflap) * sin(azm) - ch*0.5*cos(azm);
+			bladedeform(i, j, 2) = bfp*(rst - eflap) - 0.5*ch*(sita[0] + sita[1] * cos(azm) + sita[2] * sin(azm) + twistt);
 		}
 	}
 	//if (bladedeform(1, ns - 1, 1) < 0)
-	//	bladedeform.output("bladedeform.output", 6);
+	//bladedeform.output("DEBUG_bladedeform.output", 6);
 }
 
 bool Rotor::_wakeGeoBd()
 {
-	myTYPE r0, z0, x0, xv, yv, zv, xe, df;
+	//有后掠角时还要调整
+	myTYPE r0, z0, x0, xv, yv, zv, xe, df, ch;
 	myTYPE ka, E, kx, ky, ky3, k0;
 	myTYPE veltpp[3] = { 0.0,0.0,0.0 };
+	myTYPE dveltpp[3] = { 0.0,0.0,0.0 };
+	myTYPE temp = 0;
+	myTYPE twistt = twist(ns - 1) - twist(0) + pitchroot;
 
 	// shed point at tpp
 	r0 = rtip * cos(beta[0]);
-	z0 = (rtip - 1.0) * sin(beta[0]);
+	//z0 = rtip * beta[0];
+	ch = chord(0) / radius;
 
 	// Beddoes prescribed wake parameters obtained
 	veltpp[0] = veltpp[1] = veltpp[2] = 0;
-	for (int i = 2; i >= 0; --i) {
-		for (int j = 2; j >= 0; --j) {
-			veltpp[i] += tppcoord.Ttransf[i][j] * vel[j];
-		}
-	}
+	_velTransform(veltpp, dveltpp, tppcoord);
 
-	ka = Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag);
+	ka = atan2(-veltpp[0] / vtipa, -(-veltpp[2] / vtipa + lambdi_ag));
 	E = ka / 2.0;
-	kx = E; ky = -2.0 * veltpp[0] / vtipa; ky3 = -kx; k0 = 1.0 - 8.0 * ky3 / 15.0 / PI;
+	kx = E; ky = 2 * veltpp[0] / vtipa; ky3 = -kx; k0 = 1.0 - 8.0 * ky3 / 15.0 / PI;
 
 	// compute tip vortices geometry in TPP coord
 	df = 2.0 * PI / nf; xe = 0;
 	for (int j = nf - 1; j >= 0; --j) {
 		for (int i = nk - 1; i >= 0; --i) {
-			x0 = r0 * cos(df * (j - i));
-			xv = x0 + veltpp[0] / vtipa * df * i;
-			yv = r0 * sin(df * (j - i));
+			x0 = r0 * cos(df * (j - i)) + ch*0.75*sin(df*(j - i));
+			xv = x0 - veltpp[0] / vtipa * df * i;
+			yv = r0 * sin(df * (j - i)) - ch*0.75*cos(df*(j - i));
 			if (xv * xv + yv * yv < 1.01) {
 				zv = -lambdi_ag * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * i*df - lambdi_ag / 2.0 * kx * (x0 + xv) * i*df;
 			}
 			else {
 				xe = sqrt(1.0 - yv*yv);
 				//zv = -lambdi_ag / veltpp[0] * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx * (x0 + xe) * i*df;
-				zv = -lambdi_ag / veltpp[0] * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx / veltpp[0] * vtipa * (xe*xe - x0*x0);
-				zv -= 2.0 * lambdi_ag * vtipa / veltpp[0] * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
+				zv = -lambdi_ag / (-veltpp[0]) * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx / (-veltpp[0]) * vtipa * (xe*xe - x0*x0);
+				zv -= 2.0 * lambdi_ag * vtipa / (-veltpp[0]) * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
 			}
 			tipgeometry(i, j, 0) = xv;
 			tipgeometry(i, j, 1) = yv;
-			tipgeometry(i, j, 2) = zv + z0;
+			temp = -zv + (rtip - eflap)*(beta[0] + beta[1] * cos(df*(j - i)) + beta[2] * sin(df*(j - i)));
+			temp -= 0.75*ch*(sita[0] + sita[1] * cos(df*(j - i)) + sita[2] * sin(df*(j - i)) + twistt);
+			tipgeometry(i, j, 2) = temp - veltpp[2] / vtipa*df*i;// temp;
 		}
 	}
 
 	//if (outputWake)
-	//	tipgeometry.output("tipgeo.output", 6);
-
+	//tipgeometry.output("DEBUG_tipgeo.output", 6);
 	return true;
 }
 
@@ -149,12 +156,12 @@ void Rotor::_wakeIndVelCalc()
 
 	for (int iz = nf - 1, iz2 = iz + nf / nb; iz >= 0; --iz, iz2 = iz + nf / nb)
 	{
-		if (nb != 2)
+		/*if (nb != 2)
 		{
 			printf("Undefined nb != 2 in _wakeIndVelCalc() Func. \n");
 			system("pause");
 			return;
-		}
+		}*/
 		if (iz2 >= nf) { iz2 -= nf; }
 
 		str0_b0_ptr = tipstr_vpp + (nk - 1 + iz*tipstr_NI); //tipstr(nk - 1, iz);
@@ -268,7 +275,7 @@ void Rotor::_wakeIndVelCalc()
 		}	
 	}
 	lambdh = lambdi - vel[2] / vtipa;
-
+	lambdi.output("DEBUG_lambdi.output", 10);
 }
 
 void Rotor::_wakeInducedVelMP()
@@ -285,12 +292,12 @@ void Rotor::_wakeInducedVelMP()
 	myTYPE rcros[3], _temp;
 
 
-	if (nb != 2)
+	/*if (nb != 2)
 	{
 		printf("Undefined nb != 2 in _wakeIndVelCalc() Func. \n");
 		system("pause");
 		return;
-	}
+	}*/
 
 	rc04 = rc0 * rc0 * rc0 * rc0;
 	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); // 应该要减去在TPP坐标系下TPP原点指向HUB原点的向量
@@ -390,6 +397,7 @@ void Rotor::_wakeInducedVelMP()
 		}
 	}
 	lambdh = lambdi - vel[2] / vtipa;
+	lambdi.output("DEBUG_lambdi.output", 10);
 }
 
 void Rotor::_wakeInducedVelMP(int nb)
@@ -405,7 +413,7 @@ void Rotor::_wakeInducedVelMP(int nb)
 	myTYPE rcros[3], _temp;
 
 	rc04 = rc0 * rc0 * rc0 * rc0;
-	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); // 应该要减去在TPP坐标系下TPP原点指向HUB原点的向量
+	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); 
 	for (int i = 0; i < 3; ++i)
 		for (int j = 0; j < 3; ++j)
 			tempM(i, j) = tppcoord.Ttransf[i][j];
@@ -422,54 +430,59 @@ void Rotor::_wakeInducedVelMP(int nb)
 			temp_lambdx = 0;
 			temp_lambdy = 0;
 
+			xblade = bladedeform(iz, ir, 0);
+			yblade = bladedeform(iz, ir, 1);
+			zblade = bladedeform(iz, ir, 2);
+
 			for (int ib = 0; ib < nb; ib++)
 			{
-				iz += nf / nb*ib;
-				if (iz >= nf)
-					iz -= nf;
-
-				xblade = bladedeform(iz, ir, 0);
-				yblade = bladedeform(iz, ir, 1);
-				zblade = bladedeform(iz, ir, 2);
+				int iz2 = iz + nf / nb*ib;
+				if (iz2 >= nf)
+					iz2 -= nf;
 
 				// balde 1 $ik == nk - 1$ element points to blade 1 
-				ri0 = xblade - tipgeoathub(nk - 1, iz, 0);
-				rj0 = yblade - tipgeoathub(nk - 1, iz, 1);
-				rk0 = zblade - tipgeoathub(nk - 1, iz, 2);
+				ri0 = xblade - tipgeoathub(nk - 1, iz2, 0);
+				rj0 = yblade - tipgeoathub(nk - 1, iz2, 1);
+				rk0 = zblade - tipgeoathub(nk - 1, iz2, 2);
 				r0len = norm(ri0, rj0, rk0);
 				for (int ik = nk - 2; ik >= 0; --ik)
 				{
-					ri1 = xblade - tipgeoathub(ik, iz, 0);
-					rj1 = yblade - tipgeoathub(ik, iz, 1);
-					rk1 = zblade - tipgeoathub(ik, iz, 2);
+					ri1 = xblade - tipgeoathub(ik, iz2, 0);
+					rj1 = yblade - tipgeoathub(ik, iz2, 1);
+					rk1 = zblade - tipgeoathub(ik, iz2, 2);
 					r1len = norm(ri1, rj1, rk1);
 
 					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
 					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
 					rdot = dot(ri0, rj0, rk0, ri1, rj1, rk1);
 					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
-					geofunc *= (1 - 0.5 * rc04 / height2 / height2);
-					geofunc *= 0.5*(tipstr(ik, iz) + tipstr(ik + 1, iz));
+					geofunc *= height2 / rootNewton(rc04 + height2*height2, height2, height2*1e-2);
+					//geofunc *= height2 / sqrt(rc04 + height2*height2);
+					geofunc *= 0.5*(tipstr(ik, iz2) + tipstr(ik + 1, iz2));
 
 					_temp = 0.25 / PI * geofunc;
 
 					temp_lambdx -= rcros[0] * _temp;
-					temp_lambdy -= rcros[1] * _temp;
+					temp_lambdy -= rcros[1] * _temp;					
 					temp_lambdi -= rcros[2] * _temp;
 
 					ri0 = ri1;
 					rj0 = rj1;
 					rk0 = rk1;
 					r0len = r1len;
+					//
+					//if (ib==0 && iz==19)
+					//	DEBUG_height2(ik, ir) = height2;
 				}
-
-				lambdi(iz, ir) = temp_lambdi / radius / vtipa;
-				lambdx(iz, ir) = temp_lambdx / radius / vtipa;
-				lambdy(iz, ir) = temp_lambdy / radius / vtipa;
-
 			}
+			lambdi(iz, ir) = -temp_lambdi / radius / vtipa;
+			lambdx(iz, ir) = -temp_lambdx / radius / vtipa;
+			lambdy(iz, ir) = -temp_lambdy / radius / vtipa;
 		}
 	}
 	lambdh = lambdi - vel[2] / vtipa;
+	//lambdi.output("DEBUG_lambdi.output", 10);
+	//tipgeoathub.output("DEBUG_tipgeo_athub.output", 10);
+	//DEBUG_height2.output("DEBUG_height2.output", 10);
 }
 

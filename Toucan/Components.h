@@ -58,7 +58,7 @@ enum WingModeling {
 };
 
 enum AirfoilAero {
-	Liftslope = 0, C81Table = 1, Padfield = 2
+	Liftslope = 0, C81Table = 1, Padfield = 2, LBStallMethod = 3
 };
 
 class Monitor
@@ -88,6 +88,7 @@ public:
 	double errdb2[2], errdw2[2];
 	double VelPB[9][3], OmgPB[9][3], VelNB[9][3], OmgNB[9][3];
 	double VelwPB[9][3], OmgwPB[9][3], VelwNB[9][3], OmgwNB[9][3];
+	double errw2;
 
 };
 
@@ -236,16 +237,27 @@ public:
 	LBStall() { ; }
 	~LBStall() { ; }
 
+	void Allocate(int, int, int);
+	void SetConstants(void);
 	void Prepare(Airfoil af, double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0, double r);
 	void Prepare(Airfoil af, double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
+	void Prepare(double c, double a, double dt, int nf, int ns, int nk, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &q0);
+	void Starter(double c, double a, double dt);
 	void Complete(void);
+	void Complete(Matrix1<double> &cl, Matrix1<double> &cd, Matrix1<double> &cn, Matrix1<double> &cc);
 	void AttachFlow(int , int);
+	void AttachFlow(int);
 	void DynamicStall(void);
-	bool isExit(int);
+	bool isExit(int &);
+
+	void Save(int);
 
 	void FuncTest(void);
+	bool Solver(int &, int, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &aoad);
 
 private:
+	void _allocate(void);
+	void _allocate1(void);
 	void performLBStall(void);
 	void performAttach(void);
 	void performReAttach(void);
@@ -280,30 +292,33 @@ public:
 	Matrix1<double> Cv, CNv;
 	Matrix2<double> CNvSecd;
 	Matrix1<double> CNT, CCf, CD, CL;
-	Matrix1<double> alphak, qk;
+	Matrix1<double> alphak, qk, Mak;
 	double dt, ds, alphaLc, MaLc, CNILc, DFLc, vsound, Cd0Lc;
 	double A1, A2, b1, b2, beta2, CNMa;
 	double Tl, Ta, Tq, Tf, Tp, Tv, Tvl, Ts, dalpha1;
-	double s1, s2, alpha1, alpha0, yita;
+	double s1, s2, alpha1, alpha0, yita, eps;
 	Matrix2<double> aoa0M2, MaM2, q0M2, fppM2;
+	Matrix1<double> aoa0M1, MaM1, q0M1;
 	Matrix2<double> CNCM2, CNIM2, CNPM2, CNaIM2, CNqIM2;
 	Matrix2<double> CNfM2, CNfCM2, CDM2, CLM2;
 	Matrix2<double> CNPrevisedM2, CvM2, CNvM2, CNTM2, CCfM2;
-	int countk, countk1, Nf, Ns;
+	int countk, countk1, Nf, Ns, Nk;
 	double fpptemp;
 	Matrix1<double> MaIn;
 	Matrix1<double> AoALSSave, AoATSSave, AoAATSave;
 	Matrix2<double> AoALSSaveM2, AoATSSaveM2, AoAATSaveM2;
+	Matrix1<int> Circle;
 
 	Matrix1<int> FlowStateSave, VortexStateSave;
 	Matrix2<int> FlowStateSaveM2, VortexStateSaveM2;
 
 	StatePair  state;
-
+	double _dak, _dqk;
 	double r0, alphads0, alphass, alphacr, Talpha;
 	double req;
 	double alphamin0, alphamin, Tr;
 	Matrix1<double> Da, alphap;
+	bool enable;
 private:
 	double tv, _aeff, _Tf, _Tv;
 	bool _secdcomfd;
@@ -331,6 +346,7 @@ public:
 	void WakeModelPrams(const int k);
 	void WakeInducedVel(void);
 	void OutPutWake(const int ic);
+	void OutPutWake(string s, const int ic);
 	void GetPower(myTYPE p[6], myTYPE t[6]);
 	void DiskOutput(string s);
 	double GetLambdi(void);
@@ -378,12 +394,16 @@ private:
 	void _velTransform(double v[3], double dv[3], Coordinate &);
 
 	void _setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<double> &_dfr, const double &it, const double &b, const double &db, const int ia);
-	void _setairfm(Matrix1<float> &_dfx, Matrix1<float> &_dfz, Matrix1<float> &_dfr, const float &it, const float &b, const float &db);
+	double _setairfm(double &_dfx, double &_dfz, double &_dfr, const double &cl, const double &cd, const int, const int);
+	void _setbladeaeros(double &_ma, double &_aoa, double &_infl, const double &az, const double &ra, const double &lamh, const int iz, const int ir);
 	void _setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia, const double &it, const double &b, const double &db);
 	void _setbladevelc(Matrix1<float> &_ut, Matrix1<float> &_up, float &ia, const float &it, const float &b, const float &db);
-	void _setairfm_sp(double f[3], double m[3]);
-	void _setairfm_sp(float f[3], double m[3]);
+	void _setbladevelc(double & _ut, double &_up, const double &b, const double &db, const double &lamh, const double &ia, const double &ir);
 
+	void _setairfm_sp(double f[3], double m[3]);
+
+	double _limitaz(double);
+	double _limitaoa(double);
 
 	template <class _Ty>
 	void _aerodynacoef(Matrix1<_Ty> &_cl, Matrix1<_Ty> &_cd, Matrix1<_Ty> &incidn, Matrix1<_Ty> &ma_n);
@@ -434,6 +454,7 @@ public:
 	Ambience amb;
 	bool si_unit;
 	AirfoilAero airfoil;
+	LBStall lbstall;
 
 	myTYPE sita[3];
 	AeroDynType adyna;
@@ -444,6 +465,7 @@ public:
 	myTYPE rtip, rc0, outboard;
 	bool outputWake;
 	bool haveGeo, haveStr;
+	bool dstall;
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;
 	myTYPE power_iid, torque_iid;
 	int niter_w, niter_a;

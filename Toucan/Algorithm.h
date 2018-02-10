@@ -618,6 +618,67 @@ void Msolver(float *A, float *b, const int n, const int nrhs = 1);
 void SolveSpEig(SpMtrx<double> &K, SpMtrx<double> &M, Matrix1<double> &lam, Matrix2<double> &Vn, int Nwmax, double emin, double emax, int &Nw);
 
 
+template<class _Ty>
+_Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法  
+{
+	_Ty x0 = a + 0.25, x1, xx = x0;
+	for (;;)
+	{
+		x1 = (x0*x0 + a) / (2.0 * x0);
+		if (fabs(x1 - x0) <= eps) break;
+		if (xx == x1) break;  //to break two value cycle.  
+		xx = x0;
+		x0 = x1;
+	}
+	if (fabs(x1*x1 - a) > 10 * eps)
+	{
+		printf("Wrong in rootNewton. \n");
+		system("pause");
+	}
+	return x1;
+}
+
+
+template<class _Ty>
+_Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法  
+{
+	_Ty x0 = a0, x1, xx = x0;
+	for (;;)
+	{
+		x1 = (x0*x0 + a) / (2.0 * x0);
+		if (fabs(x1 - x0) <= eps) break;
+		if (xx == x1) break;  //to break two value cycle.  
+		xx = x0;
+		x0 = x1;
+	}
+	if (fabs(x1*x1 - a) > 10 * eps)
+	{
+		printf("Wrong in rootNewton. \n");
+		system("pause");
+	}
+	return x1;
+}
+
+
+template<class _Ty>
+_Ty rootMagic(_Ty number)
+{
+	long i;
+	_Ty x, y;
+	const _Ty f = 1.5F;
+	x = number * 0.5F;
+	y = number;
+	i = *(long *)&y;
+	i = 0x5f3759df - (i >> 1); //魔术数        
+	y = *(_Ty *)&i;
+	y = y * (f - (x * y * y));        //迭代1    1/sqrt(number)    
+	y = y * (f - (x * y * y));        //迭代2    1/sqrt(number)   
+	//y    = y * ( f - ( x * y * y ) );        //迭代3    1/sqrt(number)，如需要更高的精度请迭代多次   
+	
+	return number * y;
+}
+
+
 class GenArf {
 public:
 	double pho;

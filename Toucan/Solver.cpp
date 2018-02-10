@@ -14,7 +14,7 @@ void CopterSolver::CopterSimulation(Copter &C)
 
 	if (C.RotorV[0].adyna>100 || C.RotorV[1].adyna>100)
 	{
-		C.RotorV[0].adyna = Averaged;
+		C.RotorV[0].adyna = LinearInflow;
 		C.RotorV[1].adyna = Min(Averaged, ad[1]);
 		switch (simtype)
 		{
@@ -204,6 +204,7 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 		//	_EnableWake(C);
 
 		_EnableWake(C);
+		_EnableLBStall(C);
 		_CompsSetAirFM(C);
 		_Assemble(C);
 		_SetDerivs(dv, dw, SigmaF, SigmaM, C);
@@ -621,7 +622,7 @@ void CopterSolver::_Assemble(Copter &C)
 		SigmaM[j] += mtemp[j];
 	}
 #ifdef OUTPUT_MODE
-	printf("TAIL ROTOR: \n");
+	printf("MAIN ROTOR: \n");
 	printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 	printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
@@ -636,7 +637,7 @@ void CopterSolver::_Assemble(Copter &C)
 			SigmaM[j] += mtemp[j];
 		}
 #ifdef OUTPUT_MODE
-		printf("MAIN ROTOR: \n");
+		printf("TAIL ROTOR: \n");
 		printf("F: %f, %f, %f \n", ftemp[0], ftemp[1], ftemp[2]);
 		printf("M: %f, %f, %f \n\n", mtemp[0], mtemp[1], mtemp[2]);
 #endif
@@ -693,6 +694,13 @@ void CopterSolver::_EnableWake(Copter &C)
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
 		if (C.RotorV[i].adyna > 100)
 			C.RotorV[i].WakeInducedVel();
+}
+
+void CopterSolver::_EnableLBStall(Copter &C)
+{
+	for (int i = C.RotorV.size() - 1; i >= 0; --i)
+		if (C.RotorV[i].lbstall.enable)
+			C.RotorV[i].airfoil = LBStallMethod;
 }
 
 void CopterSolver::_GetSigmaFM(Copter & C, myTYPE f[3], myTYPE m[3])

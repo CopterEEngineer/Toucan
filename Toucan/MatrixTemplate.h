@@ -1347,6 +1347,12 @@ public:
 			system("pause");
 		}
 
+		// deal with boundary
+		if (index_c == NJ - 1) { --index_c; }
+		if (index_c == -1) { ++index_c; }
+		if (index_r == NI - 1) { --index_r; }
+		if (index_r == -1) { ++index_r; }
+
 		f00 = (*this)(index_r, index_c);
 		f01 = (*this)(index_r, index_c + 1);
 		f10 = (*this)(index_r + 1, index_c);
@@ -1532,6 +1538,12 @@ public:
 				system("pause");
 			}
 
+			// deal with boundary
+			if (index_c == nj - 1) { --index_c; }
+			if (index_c == -1) { ++index_c; }
+			if (index_r == ni - 1) { --index_r; }
+			if (index_r == -1) { ++index_r; }
+
 			f00 = (*this)(index_r, index_c);
 			f01 = (*this)(index_r, index_c + 1);
 			f10 = (*this)(index_r + 1, index_c);
@@ -1587,8 +1599,6 @@ public:
 			ys = YN.v_p[k];
 
 			li = 0;
-			//ri = X.Nv - 1;
-			//index_r = X.Nv;
 			ri = ni - 1;
 			index_r = ni;
 			for (int i = ni - 1; i >= 0; --i) {
@@ -1598,12 +1608,6 @@ public:
 				}
 				else {
 					m = (li + ri) / 2;
-					//if (*(X.v_p + m) < xs) li = m + 1;
-					//else if (*(X.v_p + m) > xs) ri = m - 1;
-					//else {
-					//	index_r = m;
-					//	break;
-					//}
 					if (*(x_ptr + m) < xs) { li = m + 1; }
 					else if (*(x_ptr + m) > xs) { ri = m - 1; }
 					else {
@@ -1613,8 +1617,6 @@ public:
 				}
 			}
 			li = 0;
-			/*ri = Y.Nv - 1;
-			index_c = Y.Nv;*/
 			ri = nj - 1;
 			index_c = nj;
 			for (int j = nj - 1; j >= 0; --j) {
@@ -1624,12 +1626,6 @@ public:
 				}
 				else {
 					m = (li + ri) / 2;
-					/*if (*(Y.v_p + m) < ys) li = m + 1;
-					else if (*(Y.v_p + m) > ys) ri = m - 1;
-					else {
-						index_c = m;
-						break;
-					}*/
 					if (*(y_ptr + m) < ys) { li = m + 1; }
 					else if (*(y_ptr + m) > ys) { ri = m - 1; }
 					else {

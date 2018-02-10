@@ -739,9 +739,25 @@ void Airfoil::SetAirfoil(string fn)
 		Tv(i) = AirfoilParas(_ir++, i);
 		Tvl(i) = AirfoilParas(_ir++, i);
 	}
+	if (fn == "naca23012.txt")
+	{
+		alphads0 = RAD(17.91);
+		alphass = RAD(14.85);
+		r0 = 0.01;
+		Talpha = 3.97;
+		alphamin0 = RAD(21.15);
+		Tr = 3.5;
+	}
+	else if (fn == "naca0012.txt")
+	{
+		alphads0 = RAD(18.73);
+		alphass = RAD(14.95);
+		r0 = 0.01;
+		Talpha = 3.9;
+		alphamin0 = RAD(16.57);
+		Tr = 5.82;
+	}
 }
-
-
 
 void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns, int _nk, Matrix2<double>& aoa, Matrix2<double>& Ma, Matrix2<double>& q0, double r)
 {
@@ -758,28 +774,9 @@ void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns
 
 	yita = 0.95;
 	countk = 0;
-	Nf = nf, Ns = ns;
-	CNCM2.allocate(Nf, Ns), CNIM2.allocate(Nf, Ns), CNPM2.allocate(Nf, Ns), CNaIM2.allocate(Nf, Ns), CNqIM2.allocate(Nf, Ns);
-	CNfM2.allocate(Nf, Ns), CNfCM2.allocate(Nf, Ns), CDM2.allocate(Nf, Ns), CLM2.allocate(Nf, Ns);
-	CNPrevisedM2.allocate(Nf, Ns), CvM2.allocate(Nf, Ns), CNvM2.allocate(Nf, Ns), CNTM2.allocate(Nf, Ns), CCfM2.allocate(Nf, Ns);
-	AoALSSaveM2.allocate(Nf, Ns), AoATSSaveM2.allocate(Nf, Ns), AoAATSaveM2.allocate(Nf, Ns);
-	FlowStateSaveM2.allocate(Nf, Ns), VortexStateSaveM2.allocate(Nf, Ns);
-	fppM2.allocate(Nf, Ns);
-
-	alphaIn.allocate(_nk*Nf);
-	x1.allocate(_nk*Nf), y1.allocate(_nk*Nf), D1.allocate(_nk*Nf), D2.allocate(_nk*Nf);
-	CNC.allocate(_nk*Nf), CNI.allocate(_nk*Nf), CNP.allocate(_nk*Nf), CNaI.allocate(_nk*Nf), CNqI.allocate(_nk*Nf);
-	CNf.allocate(_nk*Nf), CNfC.allocate(_nk*Nf);
-	fpp.allocate(_nk*Nf), fp.allocate(_nk*Nf), Df.allocate(_nk*Nf), Dfp.allocate(_nk*Nf), alphaeff.allocate(_nk*Nf), alphaE.allocate(_nk*Nf);
-	CNPrevised.allocate(_nk*Nf), CNfrevised.allocate(_nk*Nf), Dp.allocate(_nk*Nf);
-	Cv.allocate(_nk*Nf), CNv.allocate(_nk*Nf);
-	CNvSecd.allocate(100, _nk*Nf);
-	CNT.allocate(_nk*Nf), CCf.allocate(_nk*Nf), CD.allocate(_nk*Nf), CL.allocate(_nk*Nf);
-	alphak.allocate(_nk*Nf), qk.allocate(_nk*Nf);
-	AoALSSave.allocate(_nk*Nf), AoATSSave.allocate(_nk*Nf), AoAATSave.allocate(_nk*Nf);
-	FlowStateSave.allocate(_nk*Nf), VortexStateSave.allocate(_nk*Nf);
-	Da.allocate(_nk*Nf), alphap.allocate(_nk*Nf);
-
+	Nf = nf, Ns = ns, Nk = _nk;
+	_allocate();
+	
 	tv = 0;
 	_aeff = 0;
 	_Tf = _Tv = 1;
@@ -793,9 +790,72 @@ void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns
 
 }
 
-void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns, int _nk, Matrix2<double>& aoa, Matrix2<double>& Ma, Matrix2<double>& q0)
+void LBStall::Allocate(int nf, int ns, int _nk)
 {
-	airfoil = af;
+	Nf = nf, Ns = ns, Nk = _nk;
+	_allocate();
+}
+
+void LBStall::_allocate(void)
+{
+	int _nk = Nk;
+	CNCM2.allocate(Nf, Ns), CNIM2.allocate(Nf, Ns), CNPM2.allocate(Nf, Ns), CNaIM2.allocate(Nf, Ns), CNqIM2.allocate(Nf, Ns);
+	CNfM2.allocate(Nf, Ns), CNfCM2.allocate(Nf, Ns), CDM2.allocate(Nf, Ns), CLM2.allocate(Nf, Ns);
+	CNPrevisedM2.allocate(Nf, Ns), CvM2.allocate(Nf, Ns), CNvM2.allocate(Nf, Ns), CNTM2.allocate(Nf, Ns), CCfM2.allocate(Nf, Ns);
+	AoALSSaveM2.allocate(Nf, Ns), AoATSSaveM2.allocate(Nf, Ns), AoAATSaveM2.allocate(Nf, Ns);
+	FlowStateSaveM2.allocate(Nf, Ns), VortexStateSaveM2.allocate(Nf, Ns);
+	fppM2.allocate(Nf, Ns);
+	aoa0M1.allocate(Nf), MaM1.allocate(Nf), q0M1.allocate(Nf);
+
+	alphaIn.allocate(_nk*Nf);
+	x1.allocate(_nk*Nf), y1.allocate(_nk*Nf), D1.allocate(_nk*Nf), D2.allocate(_nk*Nf);
+	CNC.allocate(_nk*Nf), CNI.allocate(_nk*Nf), CNP.allocate(_nk*Nf), CNaI.allocate(_nk*Nf), CNqI.allocate(_nk*Nf);
+	CNf.allocate(_nk*Nf), CNfC.allocate(_nk*Nf);
+	fpp.allocate(_nk*Nf), fp.allocate(_nk*Nf), Df.allocate(_nk*Nf), Dfp.allocate(_nk*Nf), alphaeff.allocate(_nk*Nf), alphaE.allocate(_nk*Nf);
+	CNPrevised.allocate(_nk*Nf), CNfrevised.allocate(_nk*Nf), Dp.allocate(_nk*Nf);
+	Cv.allocate(_nk*Nf), CNv.allocate(_nk*Nf);
+	CNvSecd.allocate(100, _nk*Nf);
+	CNT.allocate(_nk*Nf), CCf.allocate(_nk*Nf), CD.allocate(_nk*Nf), CL.allocate(_nk*Nf);
+	alphak.allocate(_nk*Nf), qk.allocate(_nk*Nf), Mak.allocate(_nk*Nf);
+	AoALSSave.allocate(_nk*Nf), AoATSSave.allocate(_nk*Nf), AoAATSave.allocate(_nk*Nf);
+	FlowStateSave.allocate(_nk*Nf), VortexStateSave.allocate(_nk*Nf);
+	Da.allocate(_nk*Nf), alphap.allocate(_nk*Nf);
+
+	Circle.allocate(Ns);
+}
+
+void LBStall::_allocate1(void)
+{
+	int _nk = Nk;
+
+	aoa0M1.allocate(Nf), MaM1.allocate(Nf), q0M1.allocate(Nf);
+
+	alphaIn.allocate(_nk*Nf);
+	x1.allocate(_nk*Nf), y1.allocate(_nk*Nf), D1.allocate(_nk*Nf), D2.allocate(_nk*Nf);
+	CNC.allocate(_nk*Nf), CNI.allocate(_nk*Nf), CNP.allocate(_nk*Nf), CNaI.allocate(_nk*Nf), CNqI.allocate(_nk*Nf);
+	CNf.allocate(_nk*Nf), CNfC.allocate(_nk*Nf);
+	fpp.allocate(_nk*Nf), fp.allocate(_nk*Nf), Df.allocate(_nk*Nf), Dfp.allocate(_nk*Nf), alphaeff.allocate(_nk*Nf), alphaE.allocate(_nk*Nf);
+	CNPrevised.allocate(_nk*Nf), CNfrevised.allocate(_nk*Nf), Dp.allocate(_nk*Nf);
+	Cv.allocate(_nk*Nf), CNv.allocate(_nk*Nf);
+	CNvSecd.allocate(100, _nk*Nf);
+	CNT.allocate(_nk*Nf), CCf.allocate(_nk*Nf), CD.allocate(_nk*Nf), CL.allocate(_nk*Nf);
+	alphak.allocate(_nk*Nf), qk.allocate(_nk*Nf), Mak.allocate(_nk*Nf);
+	AoALSSave.allocate(_nk*Nf), AoATSSave.allocate(_nk*Nf), AoAATSave.allocate(_nk*Nf);
+	FlowStateSave.allocate(_nk*Nf), VortexStateSave.allocate(_nk*Nf);
+	Da.allocate(_nk*Nf), alphap.allocate(_nk*Nf);
+}
+
+void LBStall::SetConstants(void)
+{
+	A1 = 0.3, b1 = 0.14, A2 = 0.7, b2 = 0.53;
+	yita = 0.95;
+	eps = 1e-6;
+	MaIn = airfoil.Ma;
+}
+
+
+void LBStall::Prepare(double c, double a, double _dt, int nf, int ns, int _nk, Matrix2<double>& aoa, Matrix2<double>& Ma, Matrix2<double>& q0)
+{
 	MaIn = airfoil.Ma;
 	Tl = c / a;
 	vsound = a;
@@ -824,7 +884,7 @@ void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns
 	Cv.allocate(_nk*Nf), CNv.allocate(_nk*Nf);
 	CNvSecd.allocate(100, _nk*Nf);
 	CNT.allocate(_nk*Nf), CCf.allocate(_nk*Nf), CD.allocate(_nk*Nf), CL.allocate(_nk*Nf);
-	alphak.allocate(_nk*Nf), qk.allocate(_nk*Nf);
+	alphak.allocate(_nk*Nf), qk.allocate(_nk*Nf), Mak.allocate(_nk*Nf);
 	AoALSSave.allocate(_nk*Nf), AoATSSave.allocate(_nk*Nf), AoAATSave.allocate(_nk*Nf);
 	FlowStateSave.allocate(_nk*Nf), VortexStateSave.allocate(_nk*Nf);
 	Da.allocate(_nk*Nf), alphap.allocate(_nk*Nf);
@@ -842,17 +902,72 @@ void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns
 }
 
 
+void LBStall::Prepare(Airfoil af, double c, double a, double _dt, int nf, int ns, int _nk, Matrix2<double>& aoa, Matrix2<double>& Ma, Matrix2<double>& q0)
+{
+	airfoil = af;
+	Prepare(c, a, _dt, nf, ns, _nk, aoa, Ma, q0);
+}
+
+
+void LBStall::Starter(double c, double a, double _dt)
+{
+	Tl = c / a;
+	dt = _dt; 
+	//aoa0M2 = aoa;
+	//MaM2 = ma;
+	//q0M2 = aoad / MaM2*Tl;
+
+	countk = 0;
+	tv = 0;
+	_aeff = 0;
+	_Tf = _Tv = 1;
+	state = std::make_pair(Attach, NoVortex);
+	secdID = 0;
+
+	_allocate1();
+
+	alphads0 = airfoil.alphads0;
+	alphass = airfoil.alphass;
+	Talpha = airfoil.Talpha;
+	r0 = airfoil.r0;
+}
+
+
 void LBStall::Complete(void)
 {
 	countk++;
 	CNT(countk1) = CNf(countk1) + CNv(countk1);
-	CCf(countk1) = yita*CNMa*alphaE(countk1)*alphaE(countk1)*(fpptemp - 1);
+	//CCf(countk1) = 0.9*yita*CNMa*(alphaE(countk1) - alpha0)*sin(alphaE(countk1) - alpha0)*(fpptemp - 1);
+	CCf(countk1) = 0.9*yita*CNC(countk1)*tan(alphaE(countk1) - alpha0)*(fpptemp - 1);
 
 	if (CNPrevised(countk1) >= CNILc)
 		CCf(countk1) *= pow(fpp(countk1), 0.25*DFLc*(CNPrevised(countk1) - CNILc));
 
 	CD(countk1) = Cd0Lc + CNT(countk1)*sin(alphaLc) - CCf(countk1)*cos(alphaLc);
 	CL(countk1) = CNT(countk1)*cos(alphaLc) + CCf(countk1)*sin(alphaLc);
+}
+
+void LBStall::Complete(Matrix1<double>& cl, Matrix1<double>& cd, Matrix1<double>& cn, Matrix1<double>& cc)
+{
+	int iz0 = countk / Nf;
+	int ic = countk;
+	iz0 = countk - iz0*Nf - 1;
+	if (iz0 < 0)
+		iz0 += Nf;
+	for (int iz = iz0; iz >= 0; iz--, ic--)
+	{
+		cn(iz) = CNT(ic);
+		cc(iz) = CCf(ic);
+		cl(iz) = CL(ic);
+		cd(iz) = CD(ic);
+	}
+	for (int iz = Nf - 1; iz >= iz0 + 1; iz--, ic--)
+	{
+		cn(iz) = CNT(ic);
+		cc(iz) = CCf(ic);
+		cl(iz) = CL(ic);
+		cd(iz) = CD(ic);
+	}
 }
 
 void LBStall::AttachFlow(int iz, int ir)
@@ -899,7 +1014,7 @@ void LBStall::AttachFlow(int iz, int ir)
 	_dak = aoa0M2(iz, ir) - aoa0M2(iz1, ir);
 	x1(countk1) = x1(countk) * exp(-b1*beta2*ds) + A1 * _dak * exp(-b1*beta2*ds*0.5);
 	y1(countk1) = y1(countk) * exp(-b2*beta2*ds) + A2 * _dak * exp(-b2*beta2*ds*0.5);
-	alphaE(countk1) = alphaLc - x1(countk1) - y1(countk1) - RAD(alpha0);
+	alphaE(countk1) = alphaLc - x1(countk1) - y1(countk1);// -RAD(alpha0);
 	CNC(countk1) = CNMa * alphaE(countk1);
 
 	Ta = 0.75*Tl / (1 - MaLc + PI*beta2*MaLc*MaLc*(A1*b1 + A2*b2));
@@ -925,13 +1040,93 @@ void LBStall::AttachFlow(int iz, int ir)
 	alphamin = alphamin0 + req*Tr;
 }
 
+void LBStall::AttachFlow(int iz)
+{
+	double _dak2, _dqk2;
+	int iz1, iz2;
+
+	iz1 = iz - 1;
+	if (iz1 < 0)
+		iz1 = Nf - 1;
+	iz2 = iz1 - 1;
+	if (iz2 < 0)
+		iz2 = Nf - 1;
+
+	alphaLc = aoa0M1(iz); // 0.5*(aoa0M2(iz, ir) + aoa0M2(iz1, ir));
+	MaLc = 0.5*(MaM1(iz) + MaM1(iz1));
+	ds = MaLc*dt * 2 / Tl;
+	beta2 = 1 - MaLc * MaLc;
+
+	CNMa = airfoil.CLa.interplinear_fast(MaIn, MaLc);
+	CNILc = airfoil.CNl.interplinear_fast(MaIn, MaLc);
+
+	// constant
+	Tp = airfoil.Tp.interplinear_fast(MaIn, MaLc);
+	Tf = airfoil.Tf.interplinear_fast(MaIn, MaLc);
+	alpha0 = airfoil.alpha0.interplinear_fast(MaIn, MaLc);
+	alpha1 = airfoil.alpha1.interplinear_fast(MaIn, MaLc);
+	dalpha1 = 0;// airfoil.dalpha1.interplinear_fast(MaIn, MaLc);
+	s1 = airfoil.s1.interplinear_fast(MaIn, MaLc);
+	s2 = airfoil.s2.interplinear_fast(MaIn, MaLc);
+	Tv = airfoil.Tv.interplinear_fast(MaIn, MaLc);
+	Tvl = airfoil.Tvl.interplinear_fast(MaIn, MaLc);
+	DFLc = airfoil.Df.interplinear_fast(MaIn, MaLc);
+	Cd0Lc = airfoil.CD0.interplinear_fast(MaIn, MaLc);
+	alphamin0 = airfoil.alphamin0;
+	Tr = airfoil.Tr;
+
+	_Tv = Tv;
+	_Tf = Tf;
+
+	countk1 = countk + 1;
+	alphaIn(countk1) = DEG(alphaLc);
+	Mak(countk1) = MaLc;
+
+	_dak = aoa0M1(iz) - aoa0M1(iz1);
+	x1(countk1) = x1(countk) * exp(-b1*beta2*ds) + A1 * _dak * exp(-b1*beta2*ds*0.5);
+	y1(countk1) = y1(countk) * exp(-b2*beta2*ds) + A2 * _dak * exp(-b2*beta2*ds*0.5);
+	alphaE(countk1) = alphaLc-x1(countk1) - y1(countk1);
+	CNC(countk1) = CNMa * (alphaE(countk1) - alpha0);
+
+	Ta = 0.75*Tl / (1 - MaLc + PI*beta2*MaLc*MaLc*(A1*b1 + A2*b2));
+	Tq = 0.75*Tl / (1 - MaLc + 2 * PI*beta2*MaLc*MaLc*(A1*b1 + A2*b2));
+
+	_dak2 = aoa0M1(iz1) - aoa0M1(iz2);
+	_dqk = q0M1(iz) - q0M1(iz1);
+	_dqk2 = q0M1(iz1) - q0M1(iz2);
+	D1(countk1) = D1(countk)*exp(-dt / Ta) + (_dak - _dak2) / dt *exp(-dt / Ta*0.5);
+	D2(countk1) = D2(countk)*exp(-dt / Tq) + (_dqk - _dqk2) / dt *exp(-dt / Tq*0.5);
+	CNaI(countk1) = 4 * Ta / MaLc*(_dak / dt - D1(countk1));
+	CNqI(countk1) = Tq / MaLc*(_dqk / dt - D2(countk1));
+	CNI(countk1) = CNaI(countk1) + CNqI(countk1);
+
+	CNP(countk1) = CNC(countk1) + CNI(countk1);
+
+	req = q0M1(iz)*0.5;
+	// rad
+	if (Abs(req) >= r0)
+		alphacr = alphads0;
+	else
+		alphacr = alphass + (alphads0 - alphass)*Abs(req) / r0;
+	alphamin = PI;// alphamin0 + req*Tr;
+}
+
 void LBStall::DynamicStall(void)
 {
+	double _dak = alphaIn(countk1) - alphaIn(countk); // deg
 	Dp(countk1) = Dp(countk)*exp(-ds / Tp) + (CNP(countk1) - CNP(countk))*exp(-ds / Tp*0.5);
+	Da(countk1) = Da(countk)*exp(-ds / Talpha) + _dak;// *exp(-ds / Talpha*0.5);
 	CNPrevised(countk1) = CNP(countk1) - Dp(countk1);
-	alphaeff(countk1) = CNPrevised(countk1) / CNMa;
-	_aeff = alphaeff(countk1);
-	
+	if (MaLc >= 0.3)
+	{		
+		alphaeff(countk1) = CNPrevised(countk1) / CNMa;
+		_aeff = alphaeff(countk1);
+	}
+	else
+	{		
+		alphap(countk1) = RAD(alphaIn(countk1) - Da(countk1));//
+		_aeff = alphaeff(countk1) = alphap(countk1);
+	}
 	state = stateChange(state);
 	//state = stateChange(alphaLc);
 
@@ -954,24 +1149,62 @@ void LBStall::DynamicStall(void)
 	}
 }
 
-bool LBStall::isExit(int ir)
+
+void LBStall::Save(int ir)
 {
-	//if收敛
-	for (int iz = Nf - 1; iz >= 0; iz--, countk1--)
+	int iz0 = countk / Nf;
+	int ic = countk;
+
+	Circle(ir) = iz0;
+
+	iz0 = countk - iz0*Nf - 1;
+	if (iz0 < 0)
+		iz0 += Nf;
+	for (int iz = iz0; iz >= 0; iz--, ic--)
 	{
-		CNTM2(iz, ir) = CNT(countk1);
-		CCfM2(iz, ir) = CCf(countk1);
-		CDM2(iz, ir) = CD(countk1);
-		CLM2(iz, ir) = CL(countk1);
-		AoALSSaveM2(iz, ir) = AoALSSave(countk1);
-		AoATSSaveM2(iz, ir) = AoATSSave(countk1);
-		AoAATSaveM2(iz, ir) = AoAATSave(countk1);
-		FlowStateSaveM2(iz, ir) = FlowStateSave(countk1);
-		VortexStateSaveM2(iz, ir) = VortexStateSave(countk1);
-		fppM2(iz, ir) = fpp(countk1);
+		CNTM2(iz, ir) = CNT(ic);
+		CCfM2(iz, ir) = CCf(ic);
+		CDM2(iz, ir) = CD(ic);
+		CLM2(iz, ir) = CL(ic);
+		FlowStateSaveM2(iz, ir) = FlowStateSave(ic);
+		VortexStateSaveM2(iz, ir) = VortexStateSave(ic);
+		fppM2(iz, ir) = fpp(ic);
 	}
-	return true;
+	for (int iz = Nf - 1; iz >= iz0 + 1; iz--, ic--)
+	{
+		CNTM2(iz, ir) = CNT(ic);
+		CCfM2(iz, ir) = CCf(ic);
+		CDM2(iz, ir) = CD(ic);
+		CLM2(iz, ir) = CL(ic);
+		FlowStateSaveM2(iz, ir) = FlowStateSave(ic);
+		VortexStateSaveM2(iz, ir) = VortexStateSave(ic);
+		fppM2(iz, ir) = fpp(ic);
+	}
+	/*if (ir == 1)
+	{
+		CNT.output("CNT.output", 10);
+		CCf.output("CCf.output", 10);
+		CD.output("CD.output", 10);
+		CL.output("CL.output", 10);
+		FlowStateSave.output("FlowState.output", 2);
+		VortexStateSave.output("VortexState.output", 2);
+		alphaIn.output("alphaIn.output", 2);
+		fpp.output("fpp.output", 10);
+	}*/
 }
+
+bool LBStall::isExit(int &ck)
+{
+	double _sum = 0;
+	for (int i = 0; i < Nf; i++)
+		_sum += pow(CNT(countk - i) - CNT(countk - Nf - i), 2);
+	ck = countk;
+	if (_sum < eps)
+		return true;
+	else
+		return false;
+}
+
 
 void LBStall::performAttach(void)
 {
@@ -990,6 +1223,7 @@ void LBStall::performAttach(void)
 		CNfC(countk1) = CNC(countk1);
 		CNf(countk1) = CNfC(countk1) + CNI(countk1);
 	}
+	//_performKflow(Tf);
 }
 
 void LBStall::performSeparate(void)
@@ -1028,7 +1262,7 @@ void LBStall::performReAttach(void)
 	switch (state.second)
 	{
 	case NoVortex://临界值降低至以下
-		_performKflow(4 * Tf);
+		_performKflow(4*Tf);
 		_performdstall(Tv);
 		break;
 	case Conv:
@@ -1036,11 +1270,11 @@ void LBStall::performReAttach(void)
 		_performdstall(Tv);
 		break;
 	case Nearby:
-		_performKflow(3 * Tf);
+		_performKflow(3*Tf);
 		_performdstall(0.5*Tv);
 		break;
 	case Far://涡消失以后
-		_performKflow(3 * Tf);
+		_performKflow(3*Tf);
 		_performdstall(0.5*Tv);
 		break;
 	case Secd:
@@ -1168,23 +1402,16 @@ void LBStall::_performsecd(void)
 bool LBStall::_startReAttach(void)
 {
 	//if (_aeff * (_aeff - alphaeff(countk)) < 0 && Abs(_aeff) < alpha1 - RAD(0))
-	if (_aeff*(_aeff - alphaeff(countk)) < 0 && Abs(alphaLc) < alphamin)
-	{
-		//有效迎角大于0，变化率小于0的时候唤醒；
-		//有效迎角小于0，变化率大于0的时候唤醒
+	if (Abs(_aeff) < Abs(alphaeff(countk)) && Abs(alphaLc) < Min(alpha1,alphamin) && (MaLc - 0.3)*(Mak(countk) - 0.3) >= 0)
 		return true;
-	}
-	else if (_aeff * (_aeff - alphaeff(countk)) < 0)
-	{
-		return false;
-	}
 	else
 		return false;
 }
 
 bool LBStall::_startAttach(void)
 {
-	if (_aeff*(_aeff - alphaeff(countk)) >= 0)
+	//if (countk > 0 && (_aeff - alphaeff(countk)) * (alphaeff(countk) - alphaeff(countk-1)) < 0)
+	if (Abs(_aeff) >= Abs(alphaeff(countk)) && (MaLc - 0.3)*(Mak(countk) - 0.3) >= 0)
 		return true;
 	else
 		return false;
@@ -1218,20 +1445,24 @@ LBStall::StatePair LBStall::stateChange(StatePair curState)
 		{
 			if (_ShengCriterion())
 				return StatePair(Separate, Conv);
+			else if (_startReAttach())
+				return StatePair(ReAttach, NoVortex);
 			else
 				return StatePair(Attach, NoVortex);
 		}
 		else
 		{
-			if (CNPrevised(countk1) > CNILc)
+			if (Abs(CNPrevised(countk1)) > CNILc)
 				return StatePair(Separate, Conv);
+			else if (_startReAttach())
+				return StatePair(ReAttach, NoVortex);
 			else
 				return StatePair(Attach, NoVortex);
 		}
 	case Separate:
 		if(!_startReAttach())
 		{ 
-			if (CNPrevised(countk1) < CNILc)
+			if (Abs(CNPrevised(countk1)) < CNILc)
 			{
 				tv = 0;
 				return StatePair(Separate, NoVortex);
@@ -1252,7 +1483,7 @@ LBStall::StatePair LBStall::stateChange(StatePair curState)
 		}
 		else
 		{
-			if (CNPrevised(countk1) < CNILc)
+			if (Abs(CNPrevised(countk1)) < CNILc)
 			{
 				tv = 0;
 				return StatePair(ReAttach, NoVortex);
@@ -1274,7 +1505,7 @@ LBStall::StatePair LBStall::stateChange(StatePair curState)
 	case ReAttach:
 		if (!_startAttach())
 		{
-			if (CNPrevised(countk1) < CNILc)
+			if (Abs(CNPrevised(countk1)) < CNILc)
 			{
 				tv = 0;
 				return StatePair(ReAttach, NoVortex);
@@ -1295,7 +1526,7 @@ LBStall::StatePair LBStall::stateChange(StatePair curState)
 		}
 		else
 		{
-			if (CNPrevised(countk1) > CNILc)
+			if (Abs(CNPrevised(countk1)) > CNILc)
 				return StatePair(Separate, Conv);
 			else
 				return StatePair(Attach, NoVortex); 		
@@ -1332,12 +1563,7 @@ LBStall::StatePair LBStall::stateChange(double aoa)
 
 bool LBStall::_ShengCriterion(void)
 {
-	double _dak = alphaIn(countk1) - alphaIn(countk); // deg
-
-	Da(countk1) = Da(countk)*exp(-ds / Talpha) + _dak;// *exp(-ds / Talpha*0.5);
-	alphap(countk1) = RAD(alphaIn(countk1) - Da(countk1))-Abs(req)*Talpha;
-
-	if (alphap(countk1) > alphacr)
+	if (Abs(alphap(countk1)) > alphacr)// + Abs(req)*Talpha)
 	{
 		if (Abs(req) >= r0)
 			dalpha1 = (alphads0 - alphass); // rad
@@ -1357,17 +1583,17 @@ void LBStall::FuncTest(void)
 	Airfoil airfoil;
 	double c = 0.1;
 	double a = 340;
-	double k = 0.074;
-	double Ma = 0.381;
+	double k = 0.102;
+	double Ma = 0.12;
 	double V = Ma*a;
 	double omega = 2 * V*k / c;
-	double df = 5;
+	double df = 2;
 	double dt = RAD(df) / omega;
 	int nf = 360 / df;
 	int ns = 1;
 	int nk = 4;
-	double aAmp = RAD(8.6);
-	double a0 = RAD(5.1);
+	double aAmp = RAD(10);
+	double a0 = RAD(10);
 	double q0 = 0;
 	Matrix2<double> _Ma(nf, ns), _aoa(nf, ns), _aoaDG(nf, ns), _q0(nf, ns);
 
@@ -1379,20 +1605,20 @@ void LBStall::FuncTest(void)
 		_q0(i, 0) = aAmp*omega*cos(omega*dt*i)*c / V;
 		_aoaDG(i, 0) = DEG(_aoa(i, 0));
 	}
-	/*airfoil.SetAirfoil("naca23012.txt");
+	airfoil.SetAirfoil("naca23012.txt");
 	airfoil.alphads0 = RAD(17.91); 
 	airfoil.alphass = RAD(14.85); 
 	airfoil.r0 = 0.01;
 	airfoil.Talpha = 3.97; 
 	airfoil.alphamin0 = RAD(21.15);
-	airfoil.Tr = 3.5;*/
-	airfoil.SetAirfoil("naca0012.txt");
+	airfoil.Tr = 3.5;
+	/*airfoil.SetAirfoil("naca0012.txt");
 	airfoil.alphads0 = RAD(18.73);
 	airfoil.alphass = RAD(14.95);
 	airfoil.r0 = 0.01;
 	airfoil.Talpha = 3.9;
 	airfoil.alphamin0 = RAD(16.57);
-	airfoil.Tr = 5.82;
+	airfoil.Tr = 5.82;*/
 	
 	
 	Prepare(airfoil, c, a, dt, nf, ns, nk, _aoa, _Ma, _q0);
@@ -1440,7 +1666,7 @@ void LBStall::FuncTest(void)
 		}
 	}
 
-	isExit(0);
+	isExit(countk);
 	_aoaDG.output("AOAIn_LBD_NACA0012.output", 10);
 	CNTM2.output("CNT_LBD_NACA0012.output", 10);
 	CCfM2.output("CCf_LBD_NACA0012.output", 10);
@@ -1454,5 +1680,67 @@ void LBStall::FuncTest(void)
 	alphaIn.output("AlphaIn.output", 10);
 	//CNT.output("CNT.output", 10);
 	fppM2.output("fpp.output", 10);
+}
+
+bool LBStall::Solver(int &ck, int ir, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &aoad)
+{
+	for (int iz = 0; iz < Nf; iz++)
+	{
+		aoa0M1(iz) = aoa(iz, ir);
+		MaM1(iz) = Ma(iz, ir);
+		q0M1(iz) = aoad(iz, ir)*Tl / MaM1(iz);
+	}
+
+	for (int ik = 0; ik < Nk; ik++)
+	{
+		for (int iz = 0; iz < Nf; iz++)
+		{
+			if (!(iz == 0 && ik == 0))
+			{
+				AttachFlow(iz);
+				DynamicStall();
+				Complete();
+				
+			/*	if (ir == 1)
+				{
+					printf("Circle No: %d \n", ik);
+					printf("AOA = %f alphaE = %f\n", DEG(alphaLc), DEG(alphaE(countk1)));
+					printf("Ma = %f \n", MaLc);
+					printf("Cur State: (%d, %d) \n", state.first, state.second);
+					printf("Prv State: (%d, %d) \n", FlowStateSave(countk - 1), VortexStateSave(countk - 1));
+					printf("Tf = %f, Tv = %f \n", _Tf, _Tv);
+					printf("tv = %f, Tvl = %f, Ts = %f, Tl = %f \n", tv, Tvl, Ts, Tl);
+
+					printf("\n");
+					printf("CNP = %f, CHC = %f, CNI = %f \n", CNP(countk1), CNC(countk1), CNI(countk1));
+					printf("_dak = %f, _dqk = %f \n", DEG(_dak), DEG(_dqk));
+					printf("CNaI = %f, CNqI = %f \n", CNaI(countk1), CNqI(countk1));
+
+					printf("\n");
+					printf("CNPr = %f, CNILc = %f \n", CNPrevised(countk1), CNILc);
+
+					printf("\n");
+					printf("r = %f \n", req);
+					printf("Alpha' = %f, Alpha_cr = %f \n", DEG(alphap(countk1)), DEG(alphacr));
+
+					printf("\n");
+					printf("CNf = %f, CNfC = %f \n", CNf(countk1), CNfC(countk1));
+
+					printf("fp = %f, fpp = %f \n", fp(countk1), fpp(countk1));
+					printf("alpha_eff = %f, alpha_1 = %f \n", DEG(_aeff), DEG(alpha1));
+
+					printf("\n");
+					printf("CNv = %f, Cv = %f \n", CNv(countk1), Cv(countk1));
+
+					printf("\n");
+					printf("CNT = %f, CCf = %f \n", CNT(countk1), CCf(countk1));
+					printf("***********************************************************\n");
+				}	*/
+			}
+		}
+		if (ik > 0 && isExit(ck))
+			return true;
+	}
+	return false;
 }
 
