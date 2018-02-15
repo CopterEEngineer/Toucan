@@ -948,26 +948,49 @@ void Rotor::_hingelessdynamics_rt(void)
 	lambdh.setvalue(lambdh_ag);
 	lambdi.setvalue(lambdi_ag);
 
-	for (int i = 1; i < itermax; i++)
+	if (airfoil != LBStallMethod)
 	{
-		_hingelessflap_rt();
+		for (int i = 1; i < itermax; i++)
+		{
+			_hingelessflap_rt();
 
-		_velTransform(veltpp, dveltpp, tppcoord); 
+			_velTransform(veltpp, dveltpp, tppcoord);
 
-		euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
-		veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
-		veltpp[1] = 0;
+			euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
+			veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
+			veltpp[1] = 0;
 
-		lambdiold = lambdi;
-		lambdt_ag = _aerodynamics(lambtpp[i-1], veltpp);
-		lambtpp[i] = lambdt_ag;
+			lambdiold = lambdi;
+			lambdt_ag = _aerodynamics(lambtpp[i - 1], veltpp);
+			lambtpp[i] = lambdt_ag;
 
-		iter = i;
-		if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w)
-			break;
+			iter = i;
+			if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w)
+				break;
+		}
 	}
-	//lambdh.output("_lambdh_hingeless.output", 10);
-	//lambdi.output("_lambdi_hingeless.output", 10);
+	else
+	{
+		double af[3] = { 0,0,0 };
+		double mf[3] = { 0,0,0 };
+		for (int i = 1; i < itermax; i++)
+		{
+			_hingelessflap_rt(af, mf);
+
+			_velTransform(veltpp, dveltpp, tppcoord);
+			euler_temp[2] = atan2(veltpp[1], -veltpp[0]); // wind coordinate
+			veltpp[0] = veltpp[0] * cos(euler_temp[2]) - veltpp[1] * sin(euler_temp[2]);
+			veltpp[1] = 0;
+
+			lambdiold = lambdi;
+			lambdt_ag = _aerodynamics(lambtpp[i - 1], veltpp, af, mf);
+			lambtpp[i] = lambdt_ag;
+
+			iter = i;
+			if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w)
+				break;
+		}
+	}
 	niter_w = iter;
 	Errw2 = (lambdt_ag / lambtpp[niter_w - 1] - 1)*(lambdt_ag / lambtpp[niter_w - 1] - 1);
 	
@@ -1131,7 +1154,223 @@ void Rotor::_hingelessflap_rt(void)
 	euler_temp[2] = 0;
 
 	tppcoord.SetCoordinate(euler_temp, "euler");
-	
+}
+
+void Rotor::_hingelessflap_rt(double f[3], double m[3])
+{
+	int niter, nitermax, backstep, ck;
+	myTYPE dt, af;
+	myTYPE qt, t;
+	myTYPE ia, ir, _up, _ut, _infl, _lamh, _lami;
+	myTYPE _dfx, _dfz, _dfr, _factor, _dd;
+	myTYPE _dak, _df;
+	Matrix1<myTYPE> q(nitermax), dq(nitermax);
+
+	Matrix1<myTYPE> dfx(ns), dfr(ns), dfz(ns), ra(ns), az(nf);
+	myTYPE euler_temp[3];
+	Matrix1<myTYPE> azmuth(bld.nitermax);
+	Matrix1<int> id_ns = step(0, ns - 1);
+	Matrix1<int> id_nf = step(0, nf - 1);
+	Matrix2<myTYPE> aoad(nf, ns);
+
+	f[0] = f[1] = f[2] = 0;
+	m[0] = m[1] = m[2] = 0;
+	power = power_c = power_i = power_f = power_o;
+	torque = torque_c = torque_i = torque_f = torque_o;
+
+	if (adyna == Averaged)
+	{
+		power_iid = 0;
+		torque_iid = 0;
+	}
+
+	ra = rastation(0, id_ns);
+	az = azstation(id_nf, 0);
+
+	niter = 0, nitermax = bld.nitermax, af = bld.GAf.af;
+	backstep = 5;
+	dt = RAD(bld.dff) / omega;
+	_df = RAD(bld.dff);
+
+	q(0) = beta[0] - sita[2];
+	dq(0) = omega*sita[1];
+
+	_setairfm(dfx, dfz, dfr, 0.0, q(0), dq(0), 0);
+	qt = 2 * iflap* omega*(-omg[0] * cos(0) - omg[1] * sin(0)) + iflap*(domg[0] * sin(0) + domg[1] * cos(0));
+	if (si_unit)
+		qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
+	else
+		qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8*0.3048*0.3048);
+	qt += (dfz*ra).sum()*radius;
+
+	if (bld._GenArfStarter(qt, q(0), dq(0)))
+	{
+		for (int i = 0; i < nitermax - 1; ++i)
+		{
+			int iz0, iz1, iz2;
+			t = i*dt + (1 - af)*dt;
+			azmuth(i) = omega*t;
+			niter = i + 1;
+
+			iz0 = i;
+			while (iz0 > nf - 1)
+				iz0 -= nf;
+			iz1 = iz0 + 1;
+			iz2 = iz0 - 1;
+			if (iz1 > nf - 1)
+				iz1 = 0;
+			if (iz2 < 0)
+				iz2 = nf - 1;
+
+			qt = 0;
+			for (int j = 0; j < ns; ++j)
+			{
+				ir = rastation(0, j);
+				ia = _limitaz(omega*t);
+				_lamh = lambdh.interplinear_fast(az, ra, ia, ir);
+				_setbladeaeros(ua(iz0, j), incidn(iz0, j), inflow(iz0, j), q, dq);
+
+				_dak = incidn(iz1, j) - incidn(iz2, j);
+				if (_dak < -1.7*PI)
+					_dak += 2 * PI;
+				else if (_dak > 1.7*PI)
+					_dak = _dak - 2 * PI;
+				aoad(iz0, j) = _dak / (_df / omega);
+			
+				if (niter > backstep)
+				{
+					lbstall.Starter(chord(j), amb.vsound, _df / omega); 
+					lbstall.AttachFlow(iz0, j);
+					lbstall.DynamicStall();
+					lbstall.Complete();
+
+					cl(iz0, j) = lbstall.CL(1);
+					cd(iz0, j) = lbstall.CD(1);
+					_factor = _setairfm(_dfx, _dfz, _dfr, cl(iz0, j), cd(iz0, j), iz0, j);
+
+					qt += _dfz*(ir - eflap)*radius;	
+					qt += 2 * iflap * omega*(-omg[0] * cos(omega*t) - omg[1] * sin(omega*t)) + iflap*(domg[0] * sin(omega*t) + domg[1] * cos(omega*t));
+					if (si_unit)
+						qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8);
+					else
+						qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8 * 0.3048 * 0.3048);
+
+					bld._GenArfTimeMarch(qt, dt, niter);
+					q(niter) = bld.q;
+					dq(niter) = bld.dq;
+				}
+				else
+				{
+					lbstall.aoa0M2(iz0, j) = incidn(iz0, j);
+					lbstall.MaM2(iz0, j) = ua(iz0, j);
+					lbstall.q0M2(iz0, j) = aoad(iz0, j)*lbstall.Tl / ua(iz0, j);
+				}				
+			}
+
+			if (bld.isGenArfExit(niter))
+			{			
+				lbstall.isExit(ck);
+				printf("LB err = %f \n", lbstall.err);
+				int ic = niter;
+				for (int i = iz0; i >= 0; i--, ic--)
+				{
+					ia = _limitaz(i * 2 * PI / nf);
+					for (int j = 0; j < ns; j++)
+					{
+						ir = rastation(0, j);
+						_factor = _setairfm(_dfx, _dfz, _dfr, cl(i,j), cd(i,j), i, j);
+						f[0] += (_dfx*sin(ia) + _dfr*cos(ia)) * nb / nf;
+						f[1] -= (_dfx*cos(ia) - _dfr*sin(ia)) * nb / nf;
+						f[2] += _dfz*cos(q(ic)) * nb / nf;
+
+						m[2] -= (_dfx*(ir - eflap)*cos(q(ic)) + eflap) * radius * nb / nf;
+
+						// power computation
+						_lami = lambdi.interplinear_fast(az, ra, ia, ir);
+						_dd = cd(i, j)*_factor / cos(inflow(i, j));
+
+						power_i += dq(ic) / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(q(ic));
+						power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(q(ic)) + eflap);
+						if (adyna == Averaged)
+							power_iid += dq(ic) / omega*(ir - eflap)*_dfz;
+					}
+				}
+
+				for (int i = nf - 1; i >= iz0 + 1; i--, ic--)
+				{
+					ia = _limitaz(i * 2 * PI / nf);
+					for (int j = 0; j < ns; j++)
+					{
+						ir = rastation(0, j);
+						_factor = _setairfm(_dfx, _dfz, _dfr, cl(i, j), cd(i, j), i, j);
+						f[0] += (_dfx*sin(ia) + _dfr*cos(ia)) * nb / nf;
+						f[1] -= (_dfx*cos(ia) - _dfr*sin(ia)) * nb / nf;
+						f[2] += _dfz*cos(q(ic)) * nb / nf;
+
+						m[2] -= (_dfx*(ir - eflap)*cos(q(ic)) + eflap) * radius * nb / nf;
+
+						// power computation
+						_lami = lambdi.interplinear_fast(az, ra, ia, ir);
+						_dd = cd(i, j)*_factor / cos(inflow(i, j));
+
+						power_i += dq(ic) / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(q(ic));
+						power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(q(ic)) + eflap);
+						if (adyna == Averaged)
+							power_iid += dq(ic) / omega*(ir - eflap)*_dfz;
+					}
+				}
+				
+				
+				break;
+			}
+		}
+	}
+
+	beta[0] = beta[1] = beta[2] = 0;
+	int val1 = niter%bld.nperiod;
+	int val2 = bld.nperiod / 4;
+	for (int i = niter - bld.nperiod + 1; i <= niter; ++i)
+	{
+		switch (nb)
+		{
+		case 4:
+			beta[1] += (bld.sol(i)*cos(azmuth(i)) + bld.sol(i - bld.nperiod / 4)*sin(azmuth(i)) - bld.sol(i - bld.nperiod / 2)*cos(azmuth(i)) - bld.sol(i - bld.nperiod / 4 * 3)*sin(azmuth(i))) / 2;
+			beta[2] += (bld.sol(i)*sin(azmuth(i)) - bld.sol(i - bld.nperiod / 4)*cos(azmuth(i)) - bld.sol(i - bld.nperiod / 2)*sin(azmuth(i)) + bld.sol(i - bld.nperiod / 4 * 3)*cos(azmuth(i))) / 2;
+			beta[0] += (bld.sol(i) + bld.sol(i - bld.nperiod / 4) + bld.sol(i - bld.nperiod / 2) + bld.sol(i - bld.nperiod / 4 * 3)) / 4;
+			break;
+		case 2:
+			beta[0] += precone;
+			beta[1] += bld.sol(niter - val1);
+			if (val1 < val2) beta[2] += -bld.sol(niter - val1 - val2);
+			else beta[2] += bld.sol(niter - val1 + val2);
+			break;
+
+		default:
+			printf("Undefine nb = %d in _hingelessflap_rt() \n", nb);
+			system("pause");
+			break;
+		}
+	}
+	beta[0] /= bld.nperiod;
+	beta[1] /= bld.nperiod;
+	beta[2] /= bld.nperiod;
+
+	if (niter == nitermax - 1)
+		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
+	//bld.sol.output("bld_mr.output", 10);
+	euler_temp[0] = beta[2];
+	euler_temp[1] = beta[1];
+	euler_temp[2] = 0;
+
+	tppcoord.SetCoordinate(euler_temp, "euler");
+
+	for (int i = iz0; i >= 0; i--)
+	{
+		for (int j = 0; j < ns; j++)
+		{
+
+		}
+	}
 }
 
 void Rotor::_flapWang(void)
@@ -1824,9 +2063,16 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 				cl.v_p[j*cl.NI + i] = _cl(j);
 				cd.v_p[j*cd.NI + i] = _cd(j);
 				inflow.v_p[j*inflow.NI + i] = _inflow(j);
-				incidn.v_p[j*incidn.NI + i] = _incidn(j);
 				ua.v_p[j*ua.NI + i] = _ua(j);
 				dt.v_p[j*dt.NI + i] = _dt(j);
+				incidn.v_p[j*incidn.NI + i] = _incidn(j);
+				
+				//if (_incidn(j) > PI / 2 && _incidn(j) <= PI)
+				//	incidn.v_p[j*incidn.NI + i] = PI - _incidn(j);
+				//else if (_incidn(j) < -PI / 2 && _incidn(j) >= -PI)
+				//	incidn.v_p[j*incidn.NI + i] = -PI - _incidn(j);
+				//else
+				incidn.v_p[j*incidn.NI + i] = _incidn(j);
 			}
 		}
 	}
@@ -1834,6 +2080,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	{
 		double ir, _up, _ut, _infl, _lamh, _lami;
 		int ck = 0;
+		double _dak;
 		Matrix2<double> aoad(nf, ns);
 		//Matrix1<double> _cllbs(nf), _cdlbs(nf), _cnlbs(nf), _cclbs(nf);
 		double _cl, _cd;
@@ -1851,14 +2098,26 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 				_setbladeaeros(ua(i, j), incidn(i, j), inflow(i, j), ia, ir, _lamh, i, j);
 			}
 			for (int i = 1; i < nf - 1; ++i)
-				aoad(i, j) = (incidn(i + 1, j) - incidn(i - 1, j)) / (_df / omega);
-			aoad(0, j) = (incidn(1, j) - incidn(nf - 1, j)) / (_df / omega);
-			aoad(nf - 1, j) = (incidn(0, j) - incidn(nf - 2, j)) / (_df / omega);
+			{
+				_dak = incidn(i + 1, j) - incidn(i - 1, j);
+				if (_dak < -1.7*PI)
+					_dak += 2 * PI;
+				else if (_dak > 1.7*PI)
+					_dak = _dak - 2 * PI;
+				aoad(i, j) = _dak / (_df / omega);
+			}
+			_dak = (incidn(1, j) - incidn(nf - 1, j));
+			if (_dak < -1.7*PI)
+				_dak += 2 * PI;
+			else if (_dak > 1.7*PI)
+				_dak = _dak - 2 * PI;
+			aoad(0, j) = _dak / (_df / omega);
+			_dak = (incidn(0, j) - incidn(nf - 2, j));
+			aoad(nf - 1, j) = _dak / (_df / omega);
 
 			lbstall.Starter(chord(j), amb.vsound, _df / omega);
 			if (lbstall.Solver(ck, j, incidn, ua, aoad))
-			{
-				//lbstall.Complete(_cllbs, _cdlbs, _cnlbs, _cclbs);				
+			{			
 				int iz0 = ck / nf;
 				int ic = ck;
 				iz0 = ck - iz0*nf - 1;
@@ -2027,7 +2286,6 @@ void Rotor::_setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<doub
 			else if (_incidn.v_p[i] < -PI) { _incidn.v_p[i] += 2 * PI; }
 			else { break; }
 		}
-
 	}
 
 	// air coefficients
@@ -2186,7 +2444,7 @@ double Rotor::GetLambdi(void)
 
 void Rotor::DiskOutput(string s)
 {
-	if (airfoil == LBStallMethod)
+	if (lbstall.enable)
 	{
 		lbstall.CNTM2.output(s + "_CNT.output", 10);
 		lbstall.CCfM2.output(s + "_CCf.output", 10);
@@ -2199,8 +2457,8 @@ void Rotor::DiskOutput(string s)
 	}
 	else
 	{
-		cl.output(s + "_cl.output", 10);
-		cd.output(s + "_cd.output", 10);
+		cl.output(s + "_CL.output", 10);
+		cd.output(s + "_CD.output", 10);
 	}
 	inflow.output(s + "_inflow.output", 10);
 	incidn.output(s + "_AOA.output", 10);

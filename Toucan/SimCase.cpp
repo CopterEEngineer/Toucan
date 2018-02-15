@@ -403,13 +403,13 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.teeter = false;
 	R.hingetype = Hingeless;
 	R.nb = 4;
-	R.nf = 72, R.ns = 40, R.ni = 10;
+	R.nf = 180, R.ns = 40, R.ni = 10;
 	R.amb = amb;
 	R.si_unit = true;
 	R.airfoil = C81Table;
 	R.lbstall.enable = true;
-	R.lbstall.Allocate(R.nf, R.ns, 10);
-	R.lbstall.airfoil.SetAirfoil("naca23012.txt");
+	R.lbstall.Allocate(R.nf, R.ns, 3);
+	R.lbstall.airfoil.SetAirfoil("naca23012.txt", 17, 11);
 	R.lbstall.SetConstants();
 	// C81Table;
 	R.bld.soltype = HubFixed, R.adyna = LinearInflow;	

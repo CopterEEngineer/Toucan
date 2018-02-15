@@ -12,8 +12,8 @@
 #define SLUG_CONST 32.174
 #define UNIT_CONST (32.1522/32.174)
 #define HORSEPOWER (0.0018182)
-#define RAD(x) (PI*x)/180.0
-#define DEG(x) (x*180.0)/PI
+#define RAD(x) (PI*(x))/180.0
+#define DEG(x) ((x)*180.0)/PI
 
 #ifdef _DEBUG
 #define OUTPUT_MODE
@@ -209,7 +209,7 @@ public:
 	Airfoil() { ; }
 	~Airfoil() { ; }
 
-	void SetAirfoil(string s);
+	void SetAirfoil(string, int, int);
 
 public:
 	string nid;
@@ -251,6 +251,7 @@ public:
 	bool isExit(int &);
 
 	void Save(int);
+	void Save(int, int);
 
 	void FuncTest(void);
 	bool Solver(int &, int, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &aoad);
@@ -317,12 +318,14 @@ public:
 	double r0, alphads0, alphass, alphacr, Talpha;
 	double req;
 	double alphamin0, alphamin, Tr;
-	Matrix1<double> Da, alphap;
-	bool enable;
+	Matrix1<double> Da;
+	bool enable, isShengCur, isShengPrv;
+	double err;
 private:
 	double tv, _aeff, _Tf, _Tv;
 	bool _secdcomfd;
 	int secdID;
+	bool isReverse;
 };
 
 
@@ -387,8 +390,12 @@ private:
 	void _hingelessflap_fx(void);
 	void _flapMBC(double, double);
 	void _flapWang(void);
+	void _hingelessflap_rt(double f[3], double m[3]);
+
+	double _aeromoment()
 
 	double _aerodynamics(double, double *);
+	double _aerodynamics(double, double *, double f[3], double m[3]);
 	void _windcoordVel(double v[3], double dv[3]);
 	void _windcoordOmg(double w[3], double dw[3]);
 	void _velTransform(double v[3], double dv[3], Coordinate &);
@@ -663,21 +670,11 @@ void Rotor::_aerodynacoef(Matrix1<_Ty> &_cl, Matrix1<_Ty> &_cd, Matrix1<_Ty> &in
 	double _a = 0;
 	double ct = 0;
 
-	//if (Abs(airforce[2]) > 0.01*t0)
-	//{
-	//	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
-	//}
-	//else
-	//{
-	//	if (si_unit)
-	//		ct = t0 * 9.8 / amb.rho / disk_A / vtipa / vtipa;
-	//	else
-	//		ct = t0 * UNIT_CONST * SLUG_CONST / amb.rho / disk_A / vtipa / vtipa;
-	//}
 	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
 	switch (airfoil)
 	{
 	case C81Table:
+	case LBStallMethod:
 		_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
 		_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
 		break;
@@ -698,7 +695,6 @@ void Rotor::_aerodynacoef(Matrix1<_Ty> &_cl, Matrix1<_Ty> &_cd, Matrix1<_Ty> &in
 		}
 		break;
 	}
-
 }
 
 template <class _Ty>
@@ -707,23 +703,12 @@ void Rotor::_aerodynacoef(Matrix2<_Ty> &_cl, Matrix2<_Ty> &_cd, Matrix2<_Ty> &in
 	double _a = 0;
 	double ct = 0;
 
-	//if (Abs(airforce[2]) > 0.01*t0)
-	//{
-	//	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
-	//}
-	//else
-	//{
-	//	if (si_unit)
-	//		ct = t0 * 9.8 / amb.rho / disk_A / vtipa / vtipa;
-	//	else
-	//		ct = t0 * UNIT_CONST * SLUG_CONST / amb.rho / disk_A / vtipa / vtipa;
-	//}
-
 	ct = -airforce[2] / amb.rho / disk_A / vtipa / vtipa;
 
 	switch (airfoil)
 	{
 	case C81Table:
+	case LBStallMethod:
 		_cl = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn / PI*180.0, ma_n);
 		_cd = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn / PI*180.0, ma_n);
 		break;

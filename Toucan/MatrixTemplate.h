@@ -4,7 +4,7 @@
 
 //define matrix template and simple operator
 #ifndef PI
-#define PI 3.141592653589793238462643383279502884197169
+#define PI (3.141592653589793238462643383279502884197169)
 #endif // !PI
 #ifndef Sign
 #define Sign(a) ((a) >= 0 ? 1 : -1)
