@@ -88,8 +88,8 @@ public:
 	double errdb2[2], errdw2[2];
 	double VelPB[9][3], OmgPB[9][3], VelNB[9][3], OmgNB[9][3];
 	double VelwPB[9][3], OmgwPB[9][3], VelwNB[9][3], OmgwNB[9][3];
-	double errw2;
-
+	double errw2, errb2;
+	double LBerrSum;
 };
 
 
@@ -185,13 +185,14 @@ public:
 
 	template<class _Ty> void _GenArfPrepare(_Ty dt);
 	template<class _Ty> bool _GenArfStarter(_Ty Qt, _Ty q, _Ty dq);
+	template<class _Ty> bool _GenArfStarter(_Ty Qt, _Ty q, _Ty dq, int n);
 	template<class _Ty> void _GenArfTimeMarch(_Ty Qt, _Ty dt, int niter);
 
 	bool isGenArfExit(int niter);
 	void InitBladeSolver(bool teeter);
 
 public:
-	myTYPE Marf, Carf, Karf, Ka, err_b;
+	myTYPE Marf, Carf, Karf, Ka, epsb, err_b;
 	//Matrix2<myTYPE> Marf22, Carf22, Karf22, Ka22;
 	myTYPE Qt, q0, dq0, ddq0, q1, q, dq, ddq;
 	//Matrix1<myTYPE> Qt22, q02, dq02, ddq02, q12, dq2, ddq2;
@@ -249,12 +250,14 @@ public:
 	void AttachFlow(int);
 	void DynamicStall(void);
 	bool isExit(int &);
+	bool isExit(int &, int &);
 
 	void Save(int);
 	void Save(int, int);
 
 	void FuncTest(void);
 	bool Solver(int &, int, Matrix2<double> &aoa, Matrix2<double> &Ma, Matrix2<double> &aoad);
+	void Display(int);
 
 private:
 	void _allocate(void);
@@ -281,6 +284,7 @@ private:
 
 	StatePair stateChange(StatePair);
 	StatePair stateChange(double);
+
 
 public:
 	Airfoil airfoil;
@@ -319,8 +323,9 @@ public:
 	double req;
 	double alphamin0, alphamin, Tr;
 	Matrix1<double> Da;
-	bool enable, isShengCur, isShengPrv;
+	bool enable, isShengCur, isShengPrv, secEnable;
 	double err;
+	double cl, cd;
 private:
 	double tv, _aeff, _Tf, _Tv;
 	bool _secdcomfd;
@@ -390,12 +395,10 @@ private:
 	void _hingelessflap_fx(void);
 	void _flapMBC(double, double);
 	void _flapWang(void);
-	void _hingelessflap_rt(double f[3], double m[3]);
+	bool _hingelessflap_rt(double f[3], double m[3]);
 
-	double _aeromoment()
-
-	double _aerodynamics(double, double *);
-	double _aerodynamics(double, double *, double f[3], double m[3]);
+	double _aerodynamics(double, double*);
+	
 	void _windcoordVel(double v[3], double dv[3]);
 	void _windcoordOmg(double w[3], double dw[3]);
 	void _velTransform(double v[3], double dv[3], Coordinate &);
@@ -461,7 +464,9 @@ public:
 	Ambience amb;
 	bool si_unit;
 	AirfoilAero airfoil;
-	LBStall lbstall;
+	//LBStall lbstall;
+	std::vector<LBStall> lbstall;
+	bool secLB;
 
 	myTYPE sita[3];
 	AeroDynType adyna;
@@ -648,6 +653,18 @@ bool BladeSolver::_GenArfStarter(_Ty _Qt, _Ty _q, _Ty _dq)
 	q = _q;
 	sol.allocate(nitermax);
 	sol(0) = q;
+	return true;
+}
+
+template<class _Ty>
+bool BladeSolver::_GenArfStarter(_Ty _Qt, _Ty _q, _Ty _dq, int n)
+{
+	ddq = Marf / (_Qt - Carf*_dq - Karf*_q);
+	dq = _dq;
+	q = _q;
+	sol.allocate(nitermax);
+	for (int i = 0; i < n; i++)
+		sol(i) = q;
 	return true;
 }
 

@@ -396,6 +396,7 @@ void Model_BO105::InitFin(Wing &F)
 
 void Model_BO105::InitMainRotor(Rotor &R)
 {
+	LBStall _lbstall;
 	R.type = Mrotor;
 	R.FT = R.KLT = 0;
 	R.Inter0 = R.Inter1 = 0;
@@ -406,13 +407,33 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.nf = 180, R.ns = 40, R.ni = 10;
 	R.amb = amb;
 	R.si_unit = true;
-	R.airfoil = C81Table;
-	R.lbstall.enable = true;
-	R.lbstall.Allocate(R.nf, R.ns, 3);
-	R.lbstall.airfoil.SetAirfoil("naca23012.txt", 17, 11);
-	R.lbstall.SetConstants();
-	// C81Table;
-	R.bld.soltype = HubFixed, R.adyna = LinearInflow;	
+
+	R.secLB = true;
+	_lbstall.enable = true;
+	_lbstall.secEnable = true;
+	_lbstall.Allocate(R.nf, R.ns, 30);
+	_lbstall.airfoil.SetAirfoil("naca23012.txt", 17, 11);
+	_lbstall.SetConstants();
+	R.bld.soltype = Rotation, R.adyna = LinearInflow;
+	if (R.bld.soltype == HubFixed)
+		R.lbstall.emplace_back(_lbstall);
+	else
+	{
+		for (int i = 0; i < R.ns; i++)
+			R.lbstall.emplace_back(_lbstall);
+	}
+	
+	if (_lbstall.enable)
+	{
+		if (R.secLB)
+			R.airfoil = C81Table;
+		else
+			R.airfoil = LBStallMethod;
+	}
+	else
+		R.airfoil = C81Table;
+
+	
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
 	R.haveGeo = false, R.haveStr = false, R.outputWake = true;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
@@ -475,6 +496,8 @@ void Model_BO105::InitMainRotor(Rotor &R)
 
 void Model_BO105::InitTailRotor(Rotor &R, double w)
 {
+	LBStall _lbstall;
+
 	R.FT = 1;//0.787;
 	R.KLT = 0;//1.7741;
 	R.Inter0 = RAD(77.6);
@@ -483,7 +506,9 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.type = Trotor;
 	R.amb = amb;
 	R.si_unit = si_unit;
-	R.lbstall.enable = false;
+	R.secLB = false;
+	_lbstall.enable = false;
+	R.lbstall.emplace_back(_lbstall);
 	R.airfoil = Padfield;
 	R.hingetype = Teeter; 
 	R.teeter = true;
@@ -591,7 +616,8 @@ void Rotor::InitVariables(void)
 		//sita[0] = RAD(16.1), sita[1] = RAD(1.18), sita[2] = RAD(3.12);
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
-		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 30 * bld.nperiod;
+		bld.epsb = 1e-3, bld.dff = 360/nf, bld.nperiod = nf, bld.nitermax = 30 * bld.nperiod;
+		bld.err_b = 0;
 		bld.sol.allocate(bld.nitermax);
 		bld.azmuth.allocate(bld.nitermax);
 		break;
@@ -605,7 +631,8 @@ void Rotor::InitVariables(void)
 		sita[1] = RAD(0.0), sita[2] = RAD(0.0);
 		beta[0] = precone, beta[1] = RAD(0.0), beta[2] = RAD(0.0);
 		bld.GAf.pho = 1.0;
-		bld.err_b = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 300 * bld.nperiod;
+		bld.epsb = 1e-3, bld.dff = 15, bld.nperiod = 360 / 15, bld.nitermax = 300 * bld.nperiod;
+		bld.err_b = 0;
 		bld.sol.allocate(bld.nitermax);
 		bld.azmuth.allocate(bld.nitermax);
 		break;
@@ -1625,10 +1652,14 @@ void LinearModel(int nth)
 			//printf("HorW X = %f \n", copter.WingV[0].monitor.af[0]);
 			//printf("VerW X = %f \n", copter.WingV[1].monitor.af[0]);
 			//printf("M Rotor Slip = %f \n", DEG(copter.RotorV[0].monitor.Beta));
+			printf("Copter Niter = %d\n", copter.Niter);
+			printf("Copter Err = (%e, %e, %e) \n", copter.sum_a1_del, copter.sum_a2_del, copter.max_c_del);
 			printf("M Rotor (X, Y, Z) = (%f, %f, %f) \n", copter.RotorV[0].monitor.af[0], copter.RotorV[0].monitor.af[1], copter.RotorV[0].monitor.af[2]);
 			printf("M Rotor (L, M, N) = (%f, %f, %f) \n", copter.RotorV[0].monitor.mf[0], copter.RotorV[0].monitor.mf[1], copter.RotorV[0].monitor.mf[2]);
-			printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(copter.RotorV[0].monitor.flapc[0]), DEG(copter.RotorV[0].monitor.flapc[1]), DEG(copter.RotorV[0].monitor.flapc[1]));
+			printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(copter.RotorV[0].monitor.flapc[0]), DEG(copter.RotorV[0].monitor.flapc[1]), DEG(copter.RotorV[0].monitor.flapc[2]));
+			printf("M Rotor Errb2 = %e\n", copter.RotorV[0].monitor.errb2);
 			printf("M Rotor Errw2 = %e\n", copter.RotorV[0].monitor.errw2);
+			printf("LB model Err = %e\n", copter.RotorV[0].monitor.LBerrSum);
 			//printf("Fuse AOA = %f \n", DEG(copter.fuselage.monitor.Alpha));
 
 		}

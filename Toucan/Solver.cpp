@@ -699,7 +699,7 @@ void CopterSolver::_EnableWake(Copter &C)
 void CopterSolver::_EnableLBStall(Copter &C)
 {
 	for (int i = C.RotorV.size() - 1; i >= 0; --i)
-		if (C.RotorV[i].lbstall.enable)
+		if (C.RotorV[i].lbstall[0].enable && C.RotorV[0].secLB)
 			C.RotorV[i].airfoil = LBStallMethod;
 }
 

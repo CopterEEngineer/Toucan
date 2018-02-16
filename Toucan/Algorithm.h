@@ -642,7 +642,9 @@ _Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法
 template<class _Ty>
 _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法  
 {
+	a0 = Abs(a0);
 	_Ty x0 = a0, x1, xx = x0;
+
 	for (;;)
 	{
 		x1 = (x0*x0 + a) / (2.0 * x0);

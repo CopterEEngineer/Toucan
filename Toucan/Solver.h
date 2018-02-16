@@ -276,13 +276,7 @@ void CopterSolver::_UpdateRotorCtrls(_Ty xctrl[6], Copter &C)
 template <class _Ty>
 bool CopterSolver::isExit(_Ty *xctrl, _Ty *deltt, const int iter)
 {
-	//static Matrix1<double> sum_a1_del(nitermax), sum_a2_del(nitermax), max_c_del(nitermax);
-	//static double xctrl_temp[6] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
-	//if (iter == 0)
-	//{
-	//	//sum_a1_del.allocate(nitermax), sum_a2_del.allocate(nitermax), max_c_del.allocate(nitermax);
-	//	xctrl_temp[0] = xctrl_temp[1] = xctrl_temp[2] = xctrl_temp[3] = xctrl_temp[4] = xctrl_temp[5] = 1.0;
-	//}
+
 	if (iter == 0)
 	{
 		xctrl_temp[0] = xctrl_temp[1] = xctrl_temp[2] = xctrl_temp[3] = xctrl_temp[4] = xctrl_temp[5] = 1.0;

@@ -846,7 +846,7 @@ void LBStall::SetConstants(void)
 {
 	A1 = 0.3, b1 = 0.14, A2 = 0.7, b2 = 0.53;
 	yita = 0.95;
-	eps = 1e-3;
+	eps = 1e-4;
 	MaIn = airfoil.Ma;
 }
 
@@ -924,6 +924,8 @@ void LBStall::Complete(void)
 
 	CD(countk1) = Cd0Lc + CNT(countk1)*sin(alphaLc) - CCf(countk1)*cos(alphaLc);
 	CL(countk1) = CNT(countk1)*cos(alphaLc) + CCf(countk1)*sin(alphaLc);
+	cl = CL(countk1);
+	cd = CD(countk1);
 }
 
 void LBStall::Complete(Matrix1<double>& cl, Matrix1<double>& cd, Matrix1<double>& cn, Matrix1<double>& cc)
@@ -1204,26 +1206,49 @@ void LBStall::Save(int ir)
 	}
 }
 
-void LBStall::Save(int iz, int ir)
-{
-	CNTM2(iz, ir) = CNT(ic);
-	CCfM2(iz, ir) = CCf(ic);
-	CDM2(iz, ir) = CD(ic);
-	CLM2(iz, ir) = CL(ic);
-	FlowStateSaveM2(iz, ir) = FlowStateSave(ic);
-	VortexStateSaveM2(iz, ir) = VortexStateSave(ic);
-	fppM2(iz, ir) = fpp(ic);
-}
-
 bool LBStall::isExit(int &ck)
 {
 	err = 0;
 	for (int i = 0; i < Nf; i++)
 		err += pow(CNT(countk - i) - CNT(countk - Nf - i), 2);
 	ck = countk;
-	//cout << _sum << endl;
+
 	if (err < eps)
 		return true;
+	else
+		return false;
+}
+
+bool LBStall::isExit(int &ck, int &np)
+{
+	err = 0;
+	for (int i = 0; i < Nf; i++)
+		err += pow(CNT(countk - i) - CNT(countk - Nf - i), 2);
+	ck = countk;
+	np = 1;
+	if (err < eps)
+		return true;
+	else if (err > 10 && countk > 4 * Nf)
+	{
+		err = 0;
+		for (int i = 0; i < Nf; i++)
+			err += pow(CNT(countk - i) - CNT(countk - 2 * Nf - i), 2);
+		if (err < eps)
+		{
+			err = 0; 
+			for (int i = 0; i < Nf; i++)
+				err += pow(CNT(countk - Nf - i) - CNT(countk - 3 * Nf - i), 2);
+			if (err < eps)
+			{
+				np = 2;
+				return true;
+			}
+			else
+				return false;
+		}
+		else
+			return false;
+	}
 	else
 		return false;
 }
@@ -1318,7 +1343,10 @@ void LBStall::_performKflow(double _tf)
 	else
 		fp(countk1) = 0.7*exp((alpha1 - Abs(_aeff - dalpha1)) / s2);// +0.04;
 
-	Ts = 2 * (1 - fpp(countk1)) / 0.19;
+	if (secEnable)
+		Ts = 2 * (1 - fpp(countk1)) / 0.19;
+	else
+		Ts = 1e12;
 
 	Df(countk1) = Df(countk)*exp(-ds / _Tf) + (fp(countk1) - fp(countk))*exp(-ds / _Tf*0.5);
 	//动态时相当于对K流分离点引入延迟
@@ -1570,6 +1598,41 @@ LBStall::StatePair LBStall::stateChange(double aoa)
 			_state = std::make_pair(ReAttach, NoVortex);
 	}
 	return _state;
+}
+
+void LBStall::Display(int nj)
+{
+	printf("NS = %d \n",nj);
+	printf("AOA = %f alphaE = %f\n", DEG(alphaLc), DEG(alphaE(countk1)));
+	printf("Ma = %f \n", MaLc);
+	printf("Cur State: (%d, %d) \n", state.first, state.second);
+	printf("Prv State: (%d, %d) \n", FlowStateSave(countk - 1), VortexStateSave(countk - 1));
+	printf("Tf = %f, Tv = %f \n", _Tf, _Tv);
+	printf("tv = %f, Tvl = %f, Ts = %f, Tl = %f \n", tv, Tvl, Ts, Tl);
+
+	printf("\n");
+	printf("CNP = %f, CNC = %f, CNI = %f \n", CNP(countk1), CNC(countk1), CNI(countk1));
+	printf("_dak = %f, _dqk = %f \n", DEG(_dak), DEG(_dqk));
+	printf("CNaI = %f, CNqI = %f \n", CNaI(countk1), CNqI(countk1));
+
+	printf("\n");
+	printf("CNPr = %f, CNILc = %f \n", CNPrevised(countk1), CNILc);
+
+	printf("\n");
+	printf("r = %f \n", req);
+	printf("alpha_eff = %f, Alpha_cr = %f, alpha_1 = %f \n", DEG(_aeff), DEG(alphacr), DEG(alpha1));
+
+	printf("\n");
+	printf("CNf = %f, CNfC = %f \n", CNf(countk1), CNfC(countk1));
+
+	printf("fp = %f, fpp = %f \n", fp(countk1), fpp(countk1));
+
+	printf("\n");
+	printf("CNv = %f, Cv = %f \n", CNv(countk1), Cv(countk1));
+
+	printf("\n");
+	printf("CNT = %f, CCf = %f \n", CNT(countk1), CCf(countk1));
+	printf("***********************************************************\n");
 }
 
 bool LBStall::_ShengCriterion(void)
