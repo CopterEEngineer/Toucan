@@ -69,15 +69,6 @@ void Rotor::SetAirfm(void)
 	{
 	case Mrotor:
 		AvrgInducedVel();
-		/*cout << endl;
-		printf("%d rotor induced velocity iter count: %d \n", type, niter_w);
-		printf("%d rotor flaps (degs): %f, %f, %f\n", type, DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
-		printf("lambdi_ag: %f, lambdt_ag: %f, lambdh_ag: %f \n", lambdi_ag, lambdt_ag, lambdh_ag);
-		cout << endl;
-		printf("%d rotor airdynamics: \n", type);
-		printf("F: %f, %f, %f \n", airforce[0], airforce[1], airforce[2]);
-		printf("M: %f, %f, %f \n", airmoment[0], airmoment[1], airmoment[2]);
-		cout << endl;*/
 		break;
 	case Trotor:
 		airforce[0] = airforce[1] = airmoment[0] = airmoment[1] = 0;
@@ -1021,10 +1012,13 @@ void Rotor::_hingelessdynamics_rt(void)
 			for (int j = 0; j < ns; j++)
 				Errw2 += pow(lambdi(i, j) - lambdiold(i, j), 2);		
 	}
+	
 	monitor.errw2 = Errw2;
-	monitor.errb2 = bld.err_b;
+	
 #ifdef OUTPUT_MODE_1
 	printf("Flap in _hingelessdynamics_rt() counts: %d \n", niter_w);
+	printf("M Rotor Errb2 = %e\n", monitor.errb2);
+	printf("M Rotor Errw2 = %e\n", monitor.errw2);
 #endif // OUTPUT_MODE_1
 }
 
@@ -1166,12 +1160,18 @@ void Rotor::_hingelessflap_rt(void)
 
 	if (niter == nitermax - 1)
 		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
-	//bld.sol.output("bld_mr.output", 10);
+	//bld.sol.output("sol.output", 10);
 	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
 	euler_temp[2] = 0;
 
 	tppcoord.SetCoordinate(euler_temp, "euler");
+
+	monitor.errb2 = bld.err_b;
+
+	//printf("M Rotor Niter = %d, Errb2 = %e\n", niter, monitor.errb2);
+	//printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
+
 }
 
 bool Rotor::_hingelessflap_rt(double f[3], double m[3])
@@ -1180,7 +1180,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	myTYPE dt, af;
 	myTYPE qt, t;
 	myTYPE ia, ir, _up, _ut, _ma, _sfth, _infl, _lamh, _lami;
-	myTYPE _dfx, _dfz, _dfr, _factor, _dd;
+	myTYPE _dfx, _dfz, _factor, _dd;
 	myTYPE _dak, _df, err;
 	Matrix1<myTYPE> q, dq;
 
@@ -1190,16 +1190,19 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	Matrix1<int> id_ns = step(0, ns - 1);
 	Matrix1<int> id_nf = step(0, nf - 1);
 	Matrix2<myTYPE> aoad(nf, ns);
-
+	myTYPE powerTemp, poweriTemp, poweroTemp, powercTemp, powerfTemp;
 	bool _flg = false;
 	Matrix1<int> np(ns);
 	np.setvalue(1);
 
 	f[0] = f[1] = f[2] = 0;
 	m[0] = m[1] = m[2] = 0;
-	power = power_c = power_i = power_f = power_o = 0;
-	torque = torque_c = torque_i = torque_f = torque_o = 0;
-
+	powerTemp = power;
+	poweriTemp = power_i;
+	poweroTemp = power_o;
+	powercTemp = power_c;
+	powerfTemp = power_f;
+	
 	if (adyna == Averaged)
 	{
 		power_iid = 0;
@@ -1262,8 +1265,8 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 				_ut *= cos(sweep(j));
 				_ma = rootNewton(_ut*_ut + _up*_up, _ut, 1e-6);
 				_ma *= (vtipa / amb.vsound);
-				_ma = Max(_ma, 0);
-				ua(iz0, j) = Min(_ma, 1);
+				_ma = Max(_ma, 1e-3);
+				ua(iz0, j) = Min(_ma, 0.999);
 
 				inflow(iz0, j) = atan2(_up, _ut);
 				incidn(iz0, j) = _limitaoa(inflow(iz0, j) + _sfth);
@@ -1273,7 +1276,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 					_dak += 2 * PI;
 				else if (_dak > 1.7*PI)
 					_dak = _dak - 2 * PI;
-				aoad(iz0, j) = _dak / (_df / omega);
+				aoad(iz0, j) = _dak / (2 * _df / omega);
 			
 				lbstall[j].aoa0M1(iz0) = incidn(iz0, j);
 				lbstall[j].MaM1(iz0) = ua(iz0, j);
@@ -1289,7 +1292,8 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 
 					cl(iz0, j) = lbstall[j].cl;
 					cd(iz0, j) = lbstall[j].cd;
-					_factor = _setairfm(_dfx, _dfz, _dfr, cl(iz0, j), cd(iz0, j), iz0, j);
+					_factor = _setairfm(_dfx, _dfz, cl(iz0, j), cd(iz0, j), iz0, j); 
+					// _setairfm(_dfx, _dfz, _dfr, cl(iz0, j), cd(iz0, j), iz0, j);
 
 					qt += _dfz*(ir - eflap)*radius;	
 					
@@ -1310,6 +1314,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 			}
 
 			// 计算桨盘平均气动力			
+		
 			if (bld.isGenArfExit(niter))
 			{			
 				err = 0;
@@ -1320,9 +1325,16 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 				}
 				if (err < ns*lbstall[0].eps)
 				{
+					double b, db;
+					//double dqi, dqo, dm;
+					//dqi = dqo = dm = 0;
+
+					power = power_c = power_i = power_f = power_o = 0;
+					torque = torque_c = torque_i = torque_f = torque_o = 0;
+					
 					for (int j = 0; j < ns; j++)
 					{
-						int ic = niter;
+						int ic = niter - 1;
 						ir = rastation(0, j);
 
 						for (int ip = 0; ip < np(j); ip++)
@@ -1330,44 +1342,68 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 							for (int i = iz0; i >= 0; i--, ic--)
 							{
 								ia = _limitaz(i * 2 * PI / nf);
-								_factor = _setairfm(_dfx, _dfz, _dfr, cl(i, j), cd(i, j), i, j);
-								f[0] += (_dfx*sin(ia) + _dfr*cos(ia)) / np(j);
-								f[1] -= (_dfx*cos(ia) - _dfr*sin(ia)) / np(j);
-								f[2] += _dfz*cos(q(ic)) / np(j);
+								b = q(ic);// beta[0] + beta[1] * cos(ia) + beta[2] * sin(ia);
+								db = dq(ic);// (-beta[1] * sin(ia) + beta[2] * cos(ia))*omega;
+								_factor = _setairfm(_dfx, _dfz, cl(i, j), cd(i, j), i, j);
+								//_setairfm(_dfx, _dfz, _dfr, cl(i, j), cd(i, j), i, j);
+								f[0] += (_dfx*sin(ia) - _dfz*sin(b)*cos(ia)) / np(j);
+								f[1] -= (_dfx*cos(ia) + _dfz*sin(b)*sin(ia)) / np(j);
+								f[2] += _dfz*cos(b) / np(j);
 
-								m[2] -= (_dfx*(ir - eflap)*cos(q(ic)) + eflap) / np(j);
-
+								m[2] -= (_dfx*((ir - eflap)*cos(b) + eflap)) / np(j);
+								
 								// power computation
 								_lami = lambdi.interplinear_fast(az, ra, ia, ir);
-								_dd = cd(i, j)*_factor / cos(inflow(i, j));
+								_dd = cd(i, j)*_factor / (cos(inflow(i, j)) +1e-6);
 
-								power_i += dq(ic) / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(q(ic));
-								power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(q(ic)) + eflap);
+								power_i += (db / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(b)) / np(j);
+								//if(cd(i,j)>0)
+								power_o += (_dd*sin(ia)*mul + _dd*((ir - eflap)*cos(b) + eflap)) / np(j);
+
+								//double rcap = ((ir - eflap)*cos(b) + eflap);
+								//dm += _dfx*rcap;
+								//dqi += tan(inflow(i, j))*_dfz*rcap;
+								//dqo += _dd*rcap;
+								//printf("dQ = %f, dQi = %f, dQo = %f, dQ+dQi-dQo = %e \n", dm, dqi, dqo, dm+dqi-dqo);
+
 								if (adyna == Averaged)
-									power_iid += dq(ic) / omega*(ir - eflap)*_dfz;
+									power_iid += db / omega*(ir - eflap)*_dfz / np(j);
 							}
 
 							for (int i = nf - 1; i >= iz0 + 1; i--, ic--)
 							{
 								ia = _limitaz(i * 2 * PI / nf);
-								_factor = _setairfm(_dfx, _dfz, _dfr, cl(i, j), cd(i, j), i, j);
-								f[0] += (_dfx*sin(ia) + _dfr*cos(ia)) / np(j);
-								f[1] -= (_dfx*cos(ia) - _dfr*sin(ia)) / np(j);
-								f[2] += _dfz*cos(q(ic)) / np(j);
+								b = q(ic); // beta[0] + beta[1] * cos(ia) + beta[2] * sin(ia);
+								db = dq(ic);// (-beta[1] * sin(ia) + beta[2] * cos(ia))*omega;
+								_factor = _setairfm(_dfx, _dfz, cl(i, j), cd(i, j), i, j);
+								//_setairfm(_dfx, _dfz, _dfr, cl(i, j), cd(i, j), i, j);
+								f[0] += (_dfx*sin(ia) - _dfz*sin(b)*cos(ia)) / np(j);
+								f[1] -= (_dfx*cos(ia) + _dfz*sin(b)*sin(ia)) / np(j);
+								f[2] += _dfz*cos(b) / np(j);
 
-								m[2] -= (_dfx*(ir - eflap)*cos(q(ic)) + eflap) / np(j);
+								m[2] -= (_dfx*((ir - eflap)*cos(b) + eflap)) / np(j);
 
 								// power computation
 								_lami = lambdi.interplinear_fast(az, ra, ia, ir);
-								_dd = cd(i, j)*_factor / cos(inflow(i, j));
+								_dd = cd(i, j)*_factor / (cos(inflow(i, j)) +1e-6);
 
-								power_i += dq(ic) / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(q(ic));
-								power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(q(ic)) + eflap);
+								power_i += (db / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(b)) / np(j);
+								//if(cd(i,j)>0)
+								power_o += (_dd*sin(ia)*mul + _dd*((ir - eflap)*cos(b) + eflap)) / np(j);
+
+								//double rcap = ((ir - eflap)*cos(b) + eflap);
+								//dm += _dfx*rcap;
+								//dqi += tan(inflow(i, j))*_dfz*rcap;
+								//dqo += _dd*rcap;
+								//printf("dQ = %f, dQi = %f, dQo = %f, dQ+dQi-dQo = %e \n", dm, dqi, dqo, dm+dqi-dqo);
+
 								if (adyna == Averaged)
-									power_iid += dq(ic) / omega*(ir - eflap)*_dfz;
+									power_iid += db / omega*(ir - eflap)*_dfz / np(j);
 							}
 						}
 					}
+
+					//q.output("q.output", 10);
 
 					_flg = true;
 					break;
@@ -1381,21 +1417,6 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 		m[2] *= (radius*nb / nf);
 	}
 	//bld.sol.output("sol.output", 10);
-
-	//lbstall[0].alphaIn.output("AOA0.output", 10);
-	//lbstall[0].CNT.output("CNT0.output", 10);
-	//lbstall[0].CL.output("CL0.output", 10);
-	//lbstall[0].CD.output("CD0.output", 10);
-
-	//lbstall[20].alphaIn.output("AOA20.output", 10);
-	//lbstall[20].CNT.output("CNT20.output", 10);
-	//lbstall[20].CL.output("CL20.output", 10);
-	//lbstall[20].CD.output("CD20.output", 10);
-
-	//lbstall[38].alphaIn.output("AOA38.output", 10);
-	//lbstall[38].CNT.output("CNT38.output", 10);
-	//lbstall[38].CL.output("CL38.output", 10);
-	//lbstall[38].CD.output("CD38.output", 10);
 
 	beta[0] = beta[1] = beta[2] = 0;
 	int val1 = niter%bld.nperiod;
@@ -1462,6 +1483,14 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	default:
 		break;
 	}
+	/*cout << power_o << endl;
+	printf("(%f, %f, %f) \n", beta[0], beta[1], beta[2]);
+	cl.output("LF_MR_4_CL.output", 10);
+	cd.output("LF_MR_4_CD.output", 10);
+	inflow.output("LF_MR_4_inflow.output", 10);
+	incidn.output("LF_MR_4_AOA.output", 10);
+	ua.output("LF_MR_4_Ma.output", 10);
+	lambdi.output("LF_MR_4_lambdi.output", 10);*/
 
 	power_i *= vtipa*nb / nf;
 	power_o *= vtipa*nb / nf;
@@ -1511,6 +1540,19 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 			power_iid /= 1000.0;
 	}
 	
+	monitor.errb2 = bld.err_b;
+
+	//printf("M Rotor Niter = %d, Errb2 = %e\n", niter, monitor.errb2);
+	//printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
+	//printf("Power Comp: (%f, %f, %f, %f, %f) \n", power, power_i, power_o, power_f, power_c);
+	if(!_flg)
+	{
+		power = powerTemp;
+		power_i = poweriTemp;
+		power_o = poweroTemp;
+		power_c = powercTemp;
+		power_f = powerfTemp;
+	}
 	return _flg;
 }
 
@@ -2007,47 +2049,31 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 	switch (adyna)
 	{
 	case PWake:
-		//_setairfm_sp(_af_temp, _am_temp);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	airforce[i] = _af_temp[i];
-		//	airmoment[i] = _am_temp[i];
-		//}
 		// airforce at hub coord approx to tpp coord
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
+		//lambdi_ag = -airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 
 		if (haveGeo && haveStr)
 		{
 			_tipVortexStr();
-			_wakeGeoBd();
+			//_wakeGeoBd();
 			_bladePosition();
-			//_wakeIndVelCalc();
-			//_wakeInducedVelMP();
 			_wakeInducedVelMP(nb);
 		}
 		else
 		{
-			lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+			lambdh_ag = lambdi_ag - vel[2] / vtipa;
 			lambdh.setvalue(lambdh_ag);
 			lambdi.setvalue(lambdi_ag);
 		}
 		break;
 	case LinearInflow:
-		//_setairfm_sp(_af_temp, _am_temp);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	airforce[i] = _af_temp[i];
-		//	airmoment[i] = _am_temp[i];
-		//}
 		// airforce at hub coord approx to tpp coord
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
-
-		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
 		lambdh_ag = lambdi_ag - vel[2] / vtipa;
-		
-		//ka = Atan2(veltpp[0] / vtipa, -veltpp[2] / vtipa + lambdi_ag);
+
 		ka = atan2(-veltpp[0] / vtipa, -(-veltpp[2] / vtipa + lambdi_ag));
 		ky = 0* 2 * veltpp[0] / vtipa;
 		if (ka <= PI / 2 && ka >= -PI / 2)
@@ -2056,8 +2082,7 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 			kx = 1 / tan(ka * 0.5);
 		else
 			kx = 0.0;
-		//cout << kx << endl;
-		//kx = 1.2;
+
 		// non-uniform inflow model is doing in TPP wind coordinate
 		Iid_betaw = betawind / (2 * PI / nf);
 		for (int j = lambdi.NJ - 1; j >= 0; j--)
@@ -2074,20 +2099,11 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 				lambdh(i, j) = lambdi_temp - vel[2] / vtipa; 
 			}
 		}
-		//lambdh.output("_lambdh.output", 10);
 		break;
 	case Averaged:
-		//_setairfm_sp(_af_temp, _am_temp);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	airforce[i] = _af_temp[i];
-		//	airmoment[i] = _am_temp[i];
-		//}
 		// airforce at hub coord approx to tpp coord
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
-
-		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
 		lambdh_ag = lambdi_ag - vel[2] / vtipa;
 
 		lambdh.setvalue(lambdh_ag);
@@ -2095,36 +2111,26 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 		break;
 	case Simple:
 		// simple ct
-		//ct = sigma*a0*0.5*(sita[0] / 3.0*(1 + 1.5*mul*mul) + 0.25*twistt*(1 + mul*mul) + 0.5*mul*beta[1] + 0.5*lambtpp);
-		//airforce[2] = ct*amb.rho*PI*radius*radius*vtipa*vtipa;
 		lambdi_ag -= ct / 2.0 / sqrt(mul*mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
-		
-		//lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
 		lambdh_ag = lambdi_ag - vel[2] / vtipa;
 
 		lambdh.setvalue(lambdh_ag);
 		lambdi.setvalue(lambdi_ag);
 		break;
 	default:
-		//_setairfm_sp(_af_temp, _am_temp);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	airforce[i] = _af_temp[i];
-		//	airmoment[i] = _am_temp[i];
-		//}
 		// airforce at hub coord approx to tpp coord
 		lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp * lambtpp);
 		lambdi_ag /= 2.0;
 
-		lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
+		lambdh_ag = lambdi_ag - vel[2] / vtipa;
 		lambdh.setvalue(lambdh_ag);
 		lambdi.setvalue(lambdi_ag);
 		break;
 	}
 	KA = atan2(-veltpp[0] / vtipa, -(-veltpp[2] / vtipa + lambdi_ag));
 	monitor.KA = KA;
-	// veltpp: tpp plane velocity with copter
+
 	return lambdi_ag - veltpp[2] / vtipa;
 }
 
@@ -2254,6 +2260,9 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 				incidn.v_p[j*incidn.NI + i] = _incidn(j);
 			}
 		}
+
+		//cout << power_o << endl;
+
 	}
 	else
 	{
@@ -2283,16 +2292,16 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 					_dak += 2 * PI;
 				else if (_dak > 1.7*PI)
 					_dak = _dak - 2 * PI;
-				aoad(i, j) = _dak / (_df / omega);
+				aoad(i, j) = _dak / (2 * _df / omega);
 			}
 			_dak = (incidn(1, j) - incidn(nf - 1, j));
 			if (_dak < -1.7*PI)
 				_dak += 2 * PI;
 			else if (_dak > 1.7*PI)
 				_dak = _dak - 2 * PI;
-			aoad(0, j) = _dak / (_df / omega);
+			aoad(0, j) = _dak / (2 * _df / omega);
 			_dak = (incidn(0, j) - incidn(nf - 2, j));
-			aoad(nf - 1, j) = _dak / (_df / omega);
+			aoad(nf - 1, j) = _dak / (2 * _df / omega);
 
 			lbstall[0].Starter(chord(j), amb.vsound, _df / omega);
 			if (lbstall[0].Solver(ck, j, incidn, ua, aoad))
@@ -2316,11 +2325,11 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 					f[1] -= (_dfx*cos(ia) - _dfr*sin(ia)) * nb / nf;
 					f[2] += _dfz*cos(b) * nb / nf;
 
-					m[2] -= (_dfx*(ir - eflap)*cos(b) + eflap) * radius * nb / nf;
+					m[2] -= (_dfx*((ir - eflap)*cos(b) + eflap)) * radius * nb / nf;
 
 					// power computation
 					_lami = lambdi.interplinear_fast(az, ra, ia, ir);
-					_dd = _cd*_factor / cos(inflow(i, j));
+					_dd = _cd*_factor / (cos(inflow(i, j)) + 1e-6);
 
 					power_i += db / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(b);
 					power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(b) + eflap);
@@ -2345,7 +2354,7 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 
 					// power computation
 					_lami = lambdi.interplinear_fast(az, ra, ia, ir);
-					_dd = _cd*_factor / cos(inflow(i, j));
+					_dd = _cd*_factor / (cos(inflow(i, j)) + 1e-6);
 
 					power_i += db / omega*(ir - eflap)*_dfz - _lami*_dfz*cos(b);
 					power_o += _dd*sin(ia)*mul + _dd*((ir - eflap)*cos(b) + eflap);
@@ -2375,7 +2384,6 @@ void Rotor::_setairfm_sp(double f[3], double m[3])
 	default:
 		break;
 	}
-
 	//lambdi.output("temp_lambdi.output", 10);
 	power_i *= vtipa*nb / nf;
 	power_o *= vtipa*nb / nf;
@@ -2488,7 +2496,7 @@ double Rotor::_setairfm(double &_dfx, double &_dfz, double &_dfr, const double &
 {
 	double _ua = ua(iz, ir);
 	double _ua2 = _ua*_ua;
-	double _infl = inflow(ir, ir);
+	double _infl = inflow(iz, ir);
 	double _c = chord(ir);
 	double _az = _limitaz(iz * 2 * PI / nf);
 	double b = beta[0] + beta[1] * cos(_az) + beta[2] * sin(_az);
@@ -2508,6 +2516,31 @@ double Rotor::_setairfm(double &_dfx, double &_dfz, double &_dfr, const double &
 	_dfr = -_dfz*sin(b);
 	return _factor;
 }
+
+double Rotor::_setairfm(double &_dfx, double &_dfz, const double &cl, const double &cd, const int iz, const int ir)
+{
+	double _ua = ua(iz, ir);
+	double _ua2 = _ua*_ua;
+	double _infl = inflow(iz, ir);
+	double _c = chord(ir);
+	double _az = _limitaz(iz * 2 * PI / nf);
+	double _dr, _factor;
+
+	cirlb(iz, ir) = 0.5*ua(iz, ir)*cl*_c*amb.vsound;
+	if (ir > 0 && ir < ns - 1)
+		_dr = rastation(0, ir) - rastation(0, ir - 1);
+	else if (ir == 0)
+		_dr = 0.5*(rastation(0, 1) - rastation(0, 0));
+	else
+		_dr = 0.5*(rastation(0, ns - 1) - rastation(0, ns - 2));
+
+	_factor = _ua2*_c*_dr*amb.vsound*amb.vsound*0.5*amb.rho*radius;
+	_dfx = (cd*cos(_infl) - cl*sin(_infl))*_factor;
+	_dfz = (cl*cos(_infl) + cd*sin(_infl))*_factor;
+
+	return _factor;
+}
+
 
 void Rotor::_setbladeaeros(double &_ma, double &_aoa, double &_infl, const double &_az, const double &ra, const double &lamh, const int iz, const int ir)
 {

@@ -414,7 +414,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	_lbstall.Allocate(R.nf, R.ns, 30);
 	_lbstall.airfoil.SetAirfoil("naca23012.txt", 17, 11);
 	_lbstall.SetConstants();
-	R.bld.soltype = Rotation, R.adyna = LinearInflow;
+	R.bld.soltype = Rotation, R.adyna = PWake;
 	if (R.bld.soltype == HubFixed)
 		R.lbstall.emplace_back(_lbstall);
 	else
@@ -601,6 +601,12 @@ void Rotor::WakeModelPrams(const int _k)
 	tipstr.allocate(nk, nf);
 	tipgeometry.deallocate();
 	tipgeometry.allocate(nk, nf, 3);
+
+	Matrix1<int> id_ns = step(0, ns - 1);
+	Matrix1<double> ra(ns);
+	ra = rastation(0, id_ns);
+	twistv = twist.interplinear_fast(ra, rtip);
+	chv = chord.interplinear_fast(ra, rtip);
 }
 
 void Rotor::InitVariables(void)
@@ -1227,10 +1233,6 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		err(ic, 2) = C.max_c_del;		
 
 		niter(ic, 0) = C.Niter;
-		//cout << niter(ic, 0) << endl;
-
-		//C.RotorV[0].GetAirfm(_beta, _beta_tr);
-		//cout << _beta[1] << endl;
 	}
 
 	string prefix = "LF";
@@ -1563,7 +1565,7 @@ void LevelFlight(void)
 	copter.InitRotorCraft(ul496);
 	jobs.InitProject(SimTrim);
 
-	s = 0, e = 1;// jobs.nCase;  //
+	s = 0, e = jobs.nCase;  //
 
 	for (int i = s; i < e; ++i)
 	{
@@ -1627,7 +1629,7 @@ void LinearModel(int nth)
 		break;
 	case 1:
 		jobs.InitProject(SimTrim);
-		i = s = 0, e = jobs.nCase;
+		i = s = 1, e = 2;// jobs.nCase;
 
 		bo105.GetProb(6, 0, FreeTrim1);
 		bo105.GetModel();
@@ -1661,7 +1663,7 @@ void LinearModel(int nth)
 			printf("M Rotor Errw2 = %e\n", copter.RotorV[0].monitor.errw2);
 			printf("LB model Err = %e\n", copter.RotorV[0].monitor.LBerrSum);
 			//printf("Fuse AOA = %f \n", DEG(copter.fuselage.monitor.Alpha));
-
+			printf("Power Comp: (%f, %f, %f, %f, %f) \n", copter.RotorV[0].power, copter.RotorV[0].power_i, copter.RotorV[0].power_o, copter.RotorV[0].power_f, copter.RotorV[0].power_c);
 		}
 
 		jobs.GetContrls(uctrl_temp);

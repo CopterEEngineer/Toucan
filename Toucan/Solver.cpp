@@ -47,9 +47,6 @@ void CopterSolver::CopterSimulation(Copter &C)
 		_WindTrimSolver(C);
 		break;
 	case Transient:
-		//C.simtype = FreeTrim1;
-		//_FreeTrimSolver(C);
-		//C.simtype = Transient;
 		_TransientSolver(C);
 		break;
 	default:
@@ -185,9 +182,11 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 #endif // !OUTPUT_MODE_1
 
 		Msolver(jacobM.v_p, deltt, 6);
-		if (_UpdateCtrls(uctrl, deltt) == 6)
+
+		printf("Trim Count: %d \n", iter);
+		if (_UpdateCtrls(uctrl, deltt, C.RotorV[0].adyna>100 || C.RotorV[1].adyna>100) == 6)
 		{
-			printf("Controls reach boundary.");
+			printf("Controls reach boundary. \n");
 			break;
 		}
 
@@ -198,10 +197,6 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 		C.GetStates(_vc, _wc, _dvc, _dwc);
 
 		_CompsSetStates(C, _vc, _wc, _dvc, _dwc);
-		//if (iter > 0 && Max(sum_a1_del(iter - 1), sum_a2_del(iter - 1)) < err_a*err_a * 4)
-		//	doWake = true;
-		//if (doWake)
-		//	_EnableWake(C);
 
 		_EnableWake(C);
 		_EnableLBStall(C);

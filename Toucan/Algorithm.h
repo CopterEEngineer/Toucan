@@ -622,7 +622,9 @@ template<class _Ty>
 _Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法  
 {
 	_Ty x0 = a + 0.25, x1, xx = x0;
-	for (;;)
+	int n = 1e10;
+	int i = 0;
+	for (i=0;i<n;i++)
 	{
 		x1 = (x0*x0 + a) / (2.0 * x0);
 		if (fabs(x1 - x0) <= eps) break;
@@ -635,6 +637,11 @@ _Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法
 		printf("Wrong in rootNewton. \n");
 		system("pause");
 	}
+	if (i == n)
+	{
+		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
+		system("pause");
+	}
 	return x1;
 }
 
@@ -644,8 +651,9 @@ _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法
 {
 	a0 = Abs(a0);
 	_Ty x0 = a0, x1, xx = x0;
-
-	for (;;)
+	int n = 1e10;
+	int i = 0;
+	for (i=0;i<n;i++)
 	{
 		x1 = (x0*x0 + a) / (2.0 * x0);
 		if (fabs(x1 - x0) <= eps) break;
@@ -656,6 +664,11 @@ _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法
 	if (fabs(x1*x1 - a) > 10 * eps)
 	{
 		printf("Wrong in rootNewton. \n");
+		system("pause");
+	}
+	if (i == n)
+	{
+		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
 		system("pause");
 	}
 	return x1;

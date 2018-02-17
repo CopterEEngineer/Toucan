@@ -44,6 +44,9 @@ private:
 	int _UpdateCtrls(_Ty xctrl[6], _Ty *deltt);
 
 	template <class _Ty>
+	int _UpdateCtrls(_Ty xctrl[6], _Ty *deltt, bool);
+
+	template <class _Ty>
 	void _UpdateRotorCtrls(_Ty xctrl[6], Copter &C);
 
 	template <class _Ty>
@@ -188,8 +191,45 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt)
 {
 	int ic_flg = 0;
 	int nfree = 0;
-	for (int i = 0; i < 6; ++i)
-		xctrl[i] -= deltt[i];
+	double xctrlPrv[6], xctrlCrt[6];
+
+	double _dispx = 0;
+	double _xnorm = 0;
+	for (int i = 0; i < 6; i++)
+	{
+		xctrlPrv[i] = xctrl[i];
+		xctrlCrt[i] = xctrl[i] - deltt[i];
+
+		while (Abs(xctrlPrv[i]) > PI || Abs(xctrlCrt[i]) > PI)
+		{
+			if (xctrlPrv[i] > PI)
+				xctrlPrv[i] -= 2 * PI;
+			if (xctrlPrv[i] < -PI)
+				xctrlPrv[i] += 2 * PI;
+			if (xctrlCrt[i] > PI)
+				xctrlCrt[i] -= 2 * PI;
+			if (xctrlCrt[i] < -PI)
+				xctrlCrt[i] += 2 * PI;
+		}		
+		_dispx += pow(xctrlPrv[i] - xctrlCrt[i], 2);
+		_xnorm += pow(xctrlCrt[i], 2);
+
+		//xctrl[i] = xctrlCrt[i] *0.5 + xctrlPrv[i] * 0.5;
+
+	}
+	
+	if (_dispx > 0.09*_xnorm)
+	{
+		for (int i = 0; i < 6; i++)
+			xctrl[i] = xctrlCrt[i] * 0.5 + xctrlPrv[i] * 0.5;
+	}
+	else
+		for (int i = 0; i < 6; i++)
+			xctrl[i] = xctrlCrt[i];
+
+	/*for (int i = 0; i < 6; i++)
+		xctrl[i] = xctrlCrt[i] * 0.5 + xctrlPrv[i] * 0.5;*/
+
 	if (Abs(xctrl[0]) > sita_coll_max)
 	{
 		xctrl[0] = 0.5 * sita_coll_max*Sign(xctrl[0]) + 0.5 * (xctrl[0] + deltt[0]);
@@ -234,8 +274,8 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt)
 		break;
 	}
 
-#ifdef OUTPUT_MODE
-	cout << endl;
+//#ifdef OUTPUT_MODE
+	//cout << endl;
 	printf("Delta controls (degs).\n");
 	for (int iq = 0; iq < nfree; ++iq) {
 		cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
@@ -249,7 +289,111 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt)
 		cout << DEG(xctrl[iq]) << "\t";
 	}
 	cout << endl << endl;
-#endif // !OUTPUT_MODE_1
+//#endif // !OUTPUT_MODE_1
+
+	return ic_flg;
+}
+
+template <class _Ty>
+int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt, bool flg)
+{
+	int ic_flg = 0;
+	int nfree = 0;
+	double xctrlPrv[6], xctrlCrt[6];
+
+	for (int i = 0; i < 6; i++)
+	{
+		xctrlPrv[i] = xctrl[i];
+		xctrlCrt[i] = xctrl[i] - deltt[i];
+
+		while (Abs(xctrlPrv[i]) > PI || Abs(xctrlCrt[i]) > PI)
+		{
+			if (xctrlPrv[i] > PI)
+				xctrlPrv[i] -= 2 * PI;
+			if (xctrlPrv[i] < -PI)
+				xctrlPrv[i] += 2 * PI;
+			if (xctrlCrt[i] > PI)
+				xctrlCrt[i] -= 2 * PI;
+			if (xctrlCrt[i] < -PI)
+				xctrlCrt[i] += 2 * PI;
+		}
+
+	}
+
+	if (flg)
+	{
+		for (int i = 0; i < 6; i++)
+			xctrl[i] = xctrlCrt[i] * 0.5 + xctrlPrv[i] * 0.5;
+	}
+	else
+	{
+		for (int i = 0; i < 6; i++)
+			xctrl[i] = xctrlCrt[i];
+	}
+
+	/*for (int i = 0; i < 6; i++)
+	xctrl[i] = xctrlCrt[i] * 0.5 + xctrlPrv[i] * 0.5;*/
+
+	if (Abs(xctrl[0]) > sita_coll_max)
+	{
+		xctrl[0] = 0.5 * sita_coll_max*Sign(xctrl[0]) + 0.5 * (xctrl[0] + deltt[0]);
+		++ic_flg;
+	}
+	switch (simtype)
+	{
+	case FreeTrim0:
+	case FreeTrim1:
+	case FreeTrim2:
+	case GeneralTrim:
+		nfree = 6;
+		if (Abs(xctrl[3]) > sita_coll_max)
+		{
+			xctrl[3] = 0.5 * sita_coll_max*Sign(xctrl[3]) + 0.5 * (xctrl[3] + deltt[3]);
+			++ic_flg;
+		}
+		if (Abs(xctrl[1]) > sita_cycl_max)
+		{
+			xctrl[1] = 0.5 * sita_cycl_max*Sign(xctrl[1]) + 0.5*(xctrl[1] + deltt[1]);
+			++ic_flg;
+		}
+		if (Abs(xctrl[2]) > sita_cycl_max)
+		{
+			xctrl[2] = 0.5 * sita_cycl_max*Sign(xctrl[2]) + 0.5*(xctrl[2] + deltt[2]);
+			++ic_flg;
+		}
+		if (Abs(xctrl[4]) > euler_max)
+		{
+			xctrl[4] = 0.5 * euler_max*Sign(xctrl[4]) + 0.5*(xctrl[4] + deltt[4]);
+			++ic_flg;
+		}
+		if (Abs(xctrl[5]) > euler_max)
+		{
+			xctrl[5] = 0.5 * euler_max*Sign(xctrl[5]) + 0.5*(xctrl[5] + deltt[5]);
+			++ic_flg;
+		}
+		break;
+	case WindTrim:
+		break;
+	default:
+		break;
+	}
+
+	//#ifdef OUTPUT_MODE
+	//cout << endl;
+	printf("Delta controls (degs).\n");
+	for (int iq = 0; iq < nfree; ++iq) {
+		cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+		cout << DEG(deltt[iq]) << "\t";
+	}
+	cout << endl << endl;
+
+	printf("New controls (degs).\n");
+	for (int iq = 0; iq < nfree; ++iq) {
+		cout << std::right << std::setw(8) << std::setprecision(4) << std::fixed << std::showpoint;
+		cout << DEG(xctrl[iq]) << "\t";
+	}
+	cout << endl << endl;
+	//#endif // !OUTPUT_MODE_1
 
 	return ic_flg;
 }

@@ -8,9 +8,7 @@ void Rotor::_wakeInducedVel(void)
 	{
 	case PWake:
 		haveStr = true;// _tipVortexStr();
-		//_bladePosition();
-		haveGeo = true;// _wakeGeoBd();
-		//_wakeIndVelCalc();
+		haveGeo = _wakeGeoBd();
 		break;
 	case FWake:
 		break;
@@ -98,17 +96,20 @@ bool Rotor::_wakeGeoBd()
 			if (xv * xv + yv * yv < 1.01) {
 				zv = -lambdi_ag * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * i*df - lambdi_ag / 2.0 * kx * (x0 + xv) * i*df;
 			}
-			else {
-				xe = sqrt(1.0 - yv*yv);
+			else {			
+				if (yv > 1)
+					xe = 0;
+				else
+					xe = sqrt(1.0 - yv*yv);
 				//zv = -lambdi_ag / veltpp[0] * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx * (x0 + xe) * i*df;
 				zv = -lambdi_ag / (-veltpp[0]) * vtipa * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - lambdi_ag / 2.0 * kx / (-veltpp[0]) * vtipa * (xe*xe - x0*x0);
 				zv -= 2.0 * lambdi_ag * vtipa / (-veltpp[0]) * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
 			}
 			tipgeometry(i, j, 0) = xv;
 			tipgeometry(i, j, 1) = yv;
-			temp = -zv + (rtip - eflap)*(beta[0] + beta[1] * cos(df*(j - i)) + beta[2] * sin(df*(j - i)));
-			temp -= 0.75*ch*(sita[0] + sita[1] * cos(df*(j - i)) + sita[2] * sin(df*(j - i)) + twistt);
-			tipgeometry(i, j, 2) = temp - veltpp[2] / vtipa*df*i;// temp;
+			temp = -zv;// +(rtip - eflap)*(beta[0] + beta[1] * cos(df*(j - i)) + beta[2] * sin(df*(j - i)));
+			//temp -= 0.75*ch*(sita[0] + sita[1] * cos(df*(j - i)) + sita[2] * sin(df*(j - i)) + twistt);
+			tipgeometry(i, j, 2) = temp -veltpp[2] / vtipa*df*i;// temp;
 		}
 	}
 
@@ -418,9 +419,26 @@ void Rotor::_wakeInducedVelMP(int nb)
 		for (int j = 0; j < 3; ++j)
 			tempM(i, j) = tppcoord.Ttransf[i][j];
 	tipgeoexpand = tempM.transpose().matrixmultiplyTP(tipgeoexpand);
+	
+	int iz, ik;
+	double _dfi, df;
+	df = 2 * PI / nf;
+
 	for (int k = 0; k < 3; ++k)
+	{
 		for (int j = 0; j < nk*nf; ++j)
-			tipgeoathub(j%nk, j / nk, k) = tipgeoexpand(k, j);
+		{
+			iz = j%nk;
+			ik = j / nk;
+			_dfi = df*(iz - ik);
+			tipgeoathub(iz, ik, k) = tipgeoexpand(k, j);
+			if (k == 2)
+			{
+				tipgeoathub(iz, ik, 2) += (rtip - eflap)*(beta[0] + beta[1] * cos(_dfi) + beta[2] * sin(_dfi));
+				tipgeoathub(iz, ik, 2) -= 0.75*chv*(sita[0] + sita[1] * cos(_dfi) + sita[2] * sin(_dfi) + twistv - twist(0) + pitchroot);
+			}
+		}
+	}
 
 	for (int iz = nf - 1; iz >= 0; iz--)
 	{	

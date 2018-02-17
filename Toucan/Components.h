@@ -405,6 +405,7 @@ private:
 
 	void _setairfm(Matrix1<double> &_dfx, Matrix1<double> &_dfz, Matrix1<double> &_dfr, const double &it, const double &b, const double &db, const int ia);
 	double _setairfm(double &_dfx, double &_dfz, double &_dfr, const double &cl, const double &cd, const int, const int);
+	double _setairfm(double &_dfx, double &_dfz, const double &cl, const double &cd, const int iz, const int ir);
 	void _setbladeaeros(double &_ma, double &_aoa, double &_infl, const double &az, const double &ra, const double &lamh, const int iz, const int ir);
 	void _setbladevelc(Matrix1<double> &_ut, Matrix1<double> &_up, double &ia, const double &it, const double &b, const double &db);
 	void _setbladevelc(Matrix1<float> &_ut, Matrix1<float> &_up, float &ia, const float &it, const float &b, const float &db);
@@ -438,6 +439,7 @@ private:
 	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
 	Matrix3<myTYPE> bladedeform, tipgeometry;
 
+	myTYPE twistv, chv;
 
 	//Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
 	//myTYPE beta[3];
