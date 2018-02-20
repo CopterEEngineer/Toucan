@@ -183,7 +183,7 @@ void CopterSolver::_FreeTrimSolver(Copter &C)
 
 		Msolver(jacobM.v_p, deltt, 6);
 
-		printf("Trim Count: %d \n", iter);
+		//printf("Trim Count: %d \n", iter);
 		if (_UpdateCtrls(uctrl, deltt, C.RotorV[0].adyna>100 || C.RotorV[1].adyna>100) == 6)
 		{
 			printf("Controls reach boundary. \n");
@@ -551,7 +551,8 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 		}
 	}
 
-	if (C.vel_g[0] < 5 && _ka >= C.fuselage.Inter0 && _ka <= C.fuselage.Inter1 && _vi < 0)
+	//if (C.vel_g[0] < 5 && _ka >= C.fuselage.Inter0 && _ka <= C.fuselage.Inter1 && _vi < 0)
+	if (_ka >= C.fuselage.Inter0 && _ka <= C.fuselage.Inter1 && _vi < 0)
 		//C.fuselage.SetAirfm(C.fuselage.KLT*_vi);
 		C.fuselage.SetAirfm(C.fuselage.KLT*_vix, C.fuselage.KLT*_viy, C.fuselage.KLT*_viz);
 	else
@@ -590,10 +591,10 @@ void CopterSolver::_CompsSetAirFM(Copter &C)
 
 #endif // OUTPUT_MODE
 
-	if (niter_r(0) >= 20)
-		printf("Warning: M Rotor Vi Iteration May NOT be CONVERGENT. \n");
-	if (niter_r(1) >= 20)
-		printf("Warning: T Rotor Vi Iteration May NOT be CONVERGENT. \n");
+	//if (niter_r(0) >= 20)
+	//	printf("Warning: M Rotor Vi Iteration May NOT be CONVERGENT. \n");
+	//if (niter_r(1) >= 20)
+	//	printf("Warning: T Rotor Vi Iteration May NOT be CONVERGENT. \n");
 	}
 
 void CopterSolver::_Assemble(Copter &C)

@@ -278,15 +278,10 @@ void Cross(Type A[3], const Type x[3], const Type y[3]) {
 }
 
 
-template<class Type> 
-Type Norm(const Type &x, const Type &y, const Type &z) {
-	return sqrt(x*x + y*y + z*z);
-}
-
 
 template<class Type> 
 Type Dot(const Type &x1, const Type &y1, const Type &z1, const Type &x2, const Type &y2, const Type &z2) {
-	return x1*x2 + y1*y2 + z1*z2;
+	return (x1*x2 + y1*y2 + z1*z2);
 }
 
 
@@ -619,37 +614,15 @@ void SolveSpEig(SpMtrx<double> &K, SpMtrx<double> &M, Matrix1<double> &lam, Matr
 
 
 template<class _Ty>
-_Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法  
-{
-	_Ty x0 = a + 0.25, x1, xx = x0;
-	int n = 1e10;
-	int i = 0;
-	for (i=0;i<n;i++)
-	{
-		x1 = (x0*x0 + a) / (2.0 * x0);
-		if (fabs(x1 - x0) <= eps) break;
-		if (xx == x1) break;  //to break two value cycle.  
-		xx = x0;
-		x0 = x1;
-	}
-	if (fabs(x1*x1 - a) > 10 * eps)
-	{
-		printf("Wrong in rootNewton. \n");
-		system("pause");
-	}
-	if (i == n)
-	{
-		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
-		system("pause");
-	}
-	return x1;
-}
-
-
-template<class _Ty>
 _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法  
 {
+	if (fabs(a - 1) <= DBL_EPSILON)
+		return 1.0;
+	if (fabs(a) <= DBL_EPSILON)
+		return 0.0;
+	
 	a0 = Abs(a0);
+	eps = Abs(eps);
 	_Ty x0 = a0, x1, xx = x0;
 	int n = 1e10;
 	int i = 0;
@@ -663,26 +636,115 @@ _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //牛顿迭代法
 	}
 	if (fabs(x1*x1 - a) > 10 * eps)
 	{
-		printf("Wrong in rootNewton. \n");
-		system("pause");
+#ifndef _DEBUG
+		printf("Wrong in rootNewton, err = %e, eps = %e \n", fabs(x1*x1 - a), 10*eps);
+#endif //_DEBUG
+
+		//return sqrt(a);
+		//system("pause");
 	}
 	if (i == n)
 	{
+#ifdef _DEBUG
 		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
-		system("pause");
+#endif //_DEBUG
+		//system("pause");
 	}
 	return x1;
 }
 
 
 template<class _Ty>
-_Ty rootMagic(_Ty number)
+_Ty rootNewton(_Ty a, _Ty eps)  //牛顿迭代法  
 {
+	if (fabs(a - 1) <= DBL_EPSILON)
+		return 1.0;
+	if (fabs(a) <= DBL_EPSILON)
+		return 0.0;
+
+	_Ty x0 = a + 0.25, x1, xx = x0;
+	eps = Abs(eps);
+	int n = 1e10;
+	int i = 0;
+	for (i = 0; i<n; i++)
+	{
+		x1 = (x0*x0 + a) / (2.0 * x0);
+		if (fabs(x1 - x0) <= eps) break;
+		if (xx == x1) break;  //to break two value cycle.  
+		xx = x0;
+		x0 = x1;
+	}
+	if (fabs(x1*x1 - a) > 10 * eps)
+	{
+#ifndef _DEBUG
+		printf("Wrong in rootNewton, err = %e, eps = %e \n", fabs(x1*x1 - a), 10 * eps);
+#endif //_DEBUG
+		return sqrt(a);
+		//system("pause");
+	}
+	if (i == n)
+	{
+#ifdef _DEBUG
+		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
+#endif //_DEBUG
+	
+	}
+	return x1;
+}
+
+
+template<class _Ty>
+_Ty rootNewton(_Ty a)
+{
+	if (fabs(a - 1) <= DBL_EPSILON)
+		return 1.0;
+	if (fabs(a) <= DBL_EPSILON)
+		return 0.0;
+
+	_Ty x0 = a + 0.25, x1, xx = x0;
+
+	int n = 1e10;
+	int i = 0;
+	for (i = 0; i<n; i++)
+	{
+		x1 = (x0*x0 + a) / (2.0 * x0);
+		if (fabs(x1 - x0) <= DBL_EPSILON) break;
+		if (xx == x1) break;  //to break two value cycle.  
+		xx = x0;
+		x0 = x1;
+	}
+	if (fabs(x1*x1 - a) > 10 * DBL_EPSILON)
+	{
+#ifndef _DEBUG
+		printf("Wrong in rootNewton. \n");
+#endif //_DEBUG
+		return sqrt(a);
+		//system("pause");
+	}
+	if (i == n)
+	{
+#ifdef _DEBUG
+		printf("Wrong in rootNewton: Cannot be convegent in %d counts. \n", i);
+#endif //_DEBUG
+		//system("pause");
+	}
+
+	return x1;
+}
+
+template<class _Ty>
+_Ty rootMagic(_Ty a)
+{
+	if (fabs(a - 1) <= DBL_EPSILON)
+		return 1.0;
+	if (fabs(a) <= DBL_EPSILON)
+		return 0.0;
+
 	long i;
 	_Ty x, y;
 	const _Ty f = 1.5F;
-	x = number * 0.5F;
-	y = number;
+	x = a * 0.5F;
+	y = a;
 	i = *(long *)&y;
 	i = 0x5f3759df - (i >> 1); //魔术数        
 	y = *(_Ty *)&i;
@@ -690,8 +752,19 @@ _Ty rootMagic(_Ty number)
 	y = y * (f - (x * y * y));        //迭代2    1/sqrt(number)   
 	//y    = y * ( f - ( x * y * y ) );        //迭代3    1/sqrt(number)，如需要更高的精度请迭代多次   
 	
-	return number * y;
+	return a * y;
 }
+
+
+
+template<class Type>
+Type Norm(const Type &x, const Type &y, const Type &z) {
+	if (fabs(Max(Abs(x), Max(Abs(y), Abs(z))) <= DBL_EPSILON))
+		return 0;
+	else
+		return rootNewton(x*x + y*y + z*z, 0.001*Max(Abs(x),Max(Abs(y),Abs(z))));
+}
+
 
 
 class GenArf {

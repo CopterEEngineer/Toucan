@@ -378,7 +378,7 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt, bool flg)
 		break;
 	}
 
-	//#ifdef OUTPUT_MODE
+#ifdef OUTPUT_MODE
 	//cout << endl;
 	printf("Delta controls (degs).\n");
 	for (int iq = 0; iq < nfree; ++iq) {
@@ -393,7 +393,7 @@ int CopterSolver::_UpdateCtrls(_Ty xctrl[6], _Ty *deltt, bool flg)
 		cout << DEG(xctrl[iq]) << "\t";
 	}
 	cout << endl << endl;
-	//#endif // !OUTPUT_MODE_1
+#endif // !OUTPUT_MODE_1
 
 	return ic_flg;
 }

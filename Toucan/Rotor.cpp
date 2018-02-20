@@ -1014,7 +1014,7 @@ void Rotor::_hingelessdynamics_rt(void)
 	}
 	
 	monitor.errw2 = Errw2;
-	
+	monitor.Countsw = iter;
 #ifdef OUTPUT_MODE_1
 	printf("Flap in _hingelessdynamics_rt() counts: %d \n", niter_w);
 	printf("M Rotor Errb2 = %e\n", monitor.errb2);
@@ -1158,8 +1158,8 @@ void Rotor::_hingelessflap_rt(void)
 	beta[1] /= bld.nperiod;
 	beta[2] /= bld.nperiod;
 
-	if (niter == nitermax - 1)
-		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
+	/*if (niter == nitermax - 1)
+		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);*/
 	//bld.sol.output("sol.output", 10);
 	euler_temp[0] = beta[2];
 	euler_temp[1] = beta[1];
@@ -1179,7 +1179,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	int niter, nitermax, backstep, ck;
 	myTYPE dt, af;
 	myTYPE qt, t;
-	myTYPE ia, ir, _up, _ut, _ma, _sfth, _infl, _lamh, _lami;
+	myTYPE ia, ir, _up, _ut, _ma, _sfth, _infl, _lamh, _lami, _lamx, _lamy;
 	myTYPE _dfx, _dfz, _factor, _dd;
 	myTYPE _dak, _df, err;
 	Matrix1<myTYPE> q, dq;
@@ -1259,9 +1259,17 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 				ir = rastation(0, j);
 				ia = _limitaz(omega*t);
 				_lamh = lambdh.interplinear_fast(az, ra, ia, ir);
+				_lamx = lambdx.interplinear_fast(az, ra, ia, ir);
+				_lamy = lambdy.interplinear_fast(az, ra, ia, ir);
 
 				_sfth = sita[0] + sita[1] * cos(ia) + sita[2] * sin(ia) + pitchroot - tan(RAD(del))*q(niter - 1) + twist(j);
+
+				vel[0] -= _lamx*vtipa;
+				vel[1] -= _lamy*vtipa;
 				_setbladevelc(_ut, _up, q(niter-1), dq(niter-1), _lamh, ia, ir);
+				vel[0] += _lamx*vtipa;
+				vel[1] += _lamy*vtipa;
+
 				_ut *= cos(sweep(j));
 				_ma = rootNewton(_ut*_ut + _up*_up, _ut, 1e-6);
 				_ma *= (vtipa / amb.vsound);
@@ -1292,6 +1300,11 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 
 					cl(iz0, j) = lbstall[j].cl;
 					cd(iz0, j) = lbstall[j].cd;
+					//if (cd(iz0, j) < 0
+					//cl(iz0, j) = cltc.interplinear_fast(cltc(step(0, cltc.NI - 1), 0), cltc(0, step(0, cltc.NJ - 1)), incidn(iz0, j) / PI*180.0, ua(iz0, j));
+					//cd(iz0, j) = cdtc.interplinear_fast(cdtc(step(0, cdtc.NI - 1), 0), cdtc(0, step(0, cdtc.NJ - 1)), incidn(iz0, j) / PI*180.0, ua(iz0, j));
+					//cd(iz0, j) = 0.0106;
+
 					_factor = _setairfm(_dfx, _dfz, cl(iz0, j), cd(iz0, j), iz0, j); 
 					// _setairfm(_dfx, _dfz, _dfr, cl(iz0, j), cd(iz0, j), iz0, j);
 
@@ -1449,7 +1462,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 
 	if (niter == nitermax - 1)
 	{
-		printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
+		;// printf("Warning: Flap solving may not be convergent in Func _hingelessflap_rt(). Count: %d \n", niter);
 		
 		//for (int i = 3; i < 6; i++)
 		//{
@@ -1541,6 +1554,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	}
 	
 	monitor.errb2 = bld.err_b;
+	monitor.Countsb = niter;
 
 	//printf("M Rotor Niter = %d, Errb2 = %e\n", niter, monitor.errb2);
 	//printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
@@ -1979,8 +1993,8 @@ void Rotor::_flapMBC(double lamb_1s, double lamb_1c)
 				break;
 		}
 	}
-	if (niter == nitermax - 1)
-		printf("Warning: Flap solving may not be convergent in Func _flapMBC(). \n");
+	/*if (niter == nitermax - 1)
+		printf("Warning: Flap solving may not be convergent in Func _flapMBC(). \n");*/
 
 	beta[0] = betaw[0];
 	beta[1] = betaw[2]*sin(betawind) + betaw[1] * cos(betawind);
@@ -2533,7 +2547,7 @@ double Rotor::_setairfm(double &_dfx, double &_dfz, const double &cl, const doub
 		_dr = 0.5*(rastation(0, 1) - rastation(0, 0));
 	else
 		_dr = 0.5*(rastation(0, ns - 1) - rastation(0, ns - 2));
-
+	
 	_factor = _ua2*_c*_dr*amb.vsound*amb.vsound*0.5*amb.rho*radius;
 	_dfx = (cd*cos(_infl) - cl*sin(_infl))*_factor;
 	_dfz = (cl*cos(_infl) + cd*sin(_infl))*_factor;

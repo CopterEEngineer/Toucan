@@ -90,6 +90,7 @@ public:
 	double VelwPB[9][3], OmgwPB[9][3], VelwNB[9][3], OmgwNB[9][3];
 	double errw2, errb2;
 	double LBerrSum;
+	int Countsb, Countsw;
 };
 
 
@@ -333,6 +334,20 @@ private:
 	bool isReverse;
 };
 
+class LSCorr
+{
+public:
+	LSCorr() { ; }
+	~LSCorr() { ; }
+
+	void Initvariable(void);
+	double LSCorrection(double az, double c, double rc, double ri0, double rj0, double rk0, double ri1, double rj1, double rk1);
+
+public:
+	Matrix1<double> angls, b0ls, b1ls, b2ls, aopls, a1ls, a2ls, copls, c0ls, c1ls, c2ls;
+	Matrix1<double> angll, b1ll, aopll, a1ll, a2ll, c0ll;
+	Matrix2<double> LScoeff, LLcoeff;
+};
 
 
 class Rotor
@@ -351,7 +366,7 @@ public:
 	void GetBeta(myTYPE b[3]);
 	void AvrgInducedVel(void);
 	void BladeDynamics(void);
-	void WakeModelPrams(const int k);
+	void WakeModelPrams(const double k);
 	void WakeInducedVel(void);
 	void OutPutWake(const int ic);
 	void OutPutWake(string s, const int ic);
@@ -416,6 +431,8 @@ private:
 	double _limitaz(double);
 	double _limitaoa(double);
 
+	double _liftsurfacecorr(double az, double c, double rc, double ri0, double rj0, double rk0, double ri1, double rj1, double rk1);
+
 	template <class _Ty>
 	void _aerodynacoef(Matrix1<_Ty> &_cl, Matrix1<_Ty> &_cd, Matrix1<_Ty> &incidn, Matrix1<_Ty> &ma_n);
 
@@ -473,8 +490,11 @@ public:
 	myTYPE sita[3];
 	AeroDynType adyna;
 	//RotorWake wake;
+	LSCorr lscorr;
 
-	int kwtip, kwrot, nk, nbn, naf, nnr;
+
+	int kwrot, nk, nbn, naf, nnr;
+	double kwtip;
 	//int nf, ns, ni;
 	myTYPE rtip, rc0, outboard;
 	bool outputWake;

@@ -90,7 +90,7 @@ public:
 private:
 	Matrix1<double> Mus, Pits, Vfs;
 	Matrix2<double> Consini;
-	Matrix1<int> Kwtips;
+	Matrix1<double> Kwtips;
 	Matrix2<double> RPMs, Chds, Rads;
 	Matrix1<double> param0;
 	Matrix2<double> uctrl, beta, err;

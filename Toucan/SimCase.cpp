@@ -294,8 +294,8 @@ void Model_BO105::GetModel(void)
 	inmatx_M(0, 2) = inmatx_M(2, 0) = inmatx[0][2];
 
 	// reference coordinate, mass center
-	origin[1] = 0;
-	origin[0] = 0; 
+	origin[0] = 0;
+	origin[1] = 0;// 0.18;
 	origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	refcoord.SetCoordinate(origin, euler, BASE_COORD);
@@ -309,7 +309,7 @@ void Model_BO105::GetModel(void)
 	fuselage.Krho = amb.rho / 1.225;
 	fuselage.si_unit = si_unit;
 	origin[0] = -0.091;
-	origin[1] = 0;
+	origin[1] = 0.3;
 	origin[2] = 0;
 	euler[0] = euler[1] = euler[2] = 0;
 	fuselage.refcoord.SetCoordinate(origin, euler, BASE_COORD);
@@ -349,11 +349,14 @@ void Model_BO105::GetModel(void)
 
 void Model_BO105::InitFuselage(void)
 {
-	fuselage.fmdling = Fitting; // Fitting;
+	fuselage.fmdling = Fitting; // 
 	fuselage.Vtest = 30.48; //m/s
-	fuselage.xf0 = -580.6, fuselage.xf1 = -454.0*1.7, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
+	//fuselage.xf0 = -580.6*2., fuselage.xf1 = -454.0*1.7, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
+	fuselage.xf0 = -580.6, fuselage.xf1 = -454.0, fuselage.xf2 = 6.2, fuselage.xf3 = 4648.9;
+
 	fuselage.yf0 = -6.9, fuselage.yf1 = -2399.0, fuselage.yf2 = -1.7, fuselage.yf3 = 12.7;
 	fuselage.zf0 = -51.1, fuselage.zf1 = -1202.0, fuselage.zf2 = 1515.7, fuselage.zf3 = -604.2;
+
 	fuselage.mf0 = -1191.8, fuselage.mf1 = 12752.0*0.55, fuselage.mf2 = 8201.3, fuselage.mf3 = -5796.7;
 	fuselage.nf0 = fuselage.nf2 = fuselage.nf3 = 0;
 	fuselage.nf1 = -10028.0*0.5;
@@ -362,7 +365,7 @@ void Model_BO105::InitFuselage(void)
 	fuselage.cxtc.input("fuselage_cx.txt"), fuselage.cytc.input("fuselage_cy.txt"), fuselage.cztc.input("fuselage_cz.txt");
 	fuselage.cmtc.input("fuselage_cm.txt"), fuselage.cntc.input("fuselage_cn.txt");
 	fuselage.Sp = 14, fuselage.Lf = 20, fuselage.Ss = 80;
-	fuselage.KLT = 1.5;//1.2886;
+	fuselage.KLT = 1.5;// 1.5;//1.2886;
 	fuselage.Inter0 = -PI, fuselage.Inter1 = PI;
 	//fuselage.Inter0 = fuselage.Inter1 = 0;
 }
@@ -373,7 +376,7 @@ void Model_BO105::InitWing(Wing &W)
 	W.a1 = 3.762, W.a3 = W.a5 = 0;
 	W.alpha0 = -0.0698;
 	W.cd0 = 0., W.cd1 = 0, W.cd2 = 0.;
-	W.span = 2.76, W.chord = 0.306, W.taper = 1;
+	W.span = 2.76, W.chord = 0.206, W.taper = 1;
 	W.KLT = 1.6887;
 	W.KLTail = 0;
 	W.Inter0 = RAD(-15.3);
@@ -404,13 +407,13 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.teeter = false;
 	R.hingetype = Hingeless;
 	R.nb = 4;
-	R.nf = 180, R.ns = 40, R.ni = 10;
+	R.nf = 72, R.ns = 30, R.ni = 10;
 	R.amb = amb;
 	R.si_unit = true;
 
-	R.secLB = true;
-	_lbstall.enable = true;
-	_lbstall.secEnable = true;
+	R.secLB = true; //外部使用标志
+	_lbstall.enable = true; //开启动态失速模型标志
+	_lbstall.secEnable = true; //允许次级涡标志
 	_lbstall.Allocate(R.nf, R.ns, 30);
 	_lbstall.airfoil.SetAirfoil("naca23012.txt", 17, 11);
 	_lbstall.SetConstants();
@@ -433,6 +436,8 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	else
 		R.airfoil = C81Table;
 
+	if (R.adyna > 100)
+		R.lscorr.Initvariable();
 	
 	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
 	R.haveGeo = false, R.haveStr = false, R.outputWake = true;
@@ -441,8 +446,8 @@ void Model_BO105::InitMainRotor(Rotor &R)
 
 	R.a0 = 6.113, R.del0 = 0.0074, R.del2 = 38.66, R.alpha0 = 0.0;
 	R.eflap = 0;
-	R.khub = 113330, R.del = 0, R.pitchroot = RAD(-2);
-	R.radius = 4.91, R.bt = 0.98, R.rroot = 0.15, R.disk_A = R.radius*R.radius*PI;
+	R.khub = 113330, R.del = 0, R.pitchroot = RAD(0);
+	R.radius = 4.91, R.bt = 0.98, R.rroot = 0.10, R.disk_A = R.radius*R.radius*PI;
 	R.precone = 0;
 	R.omega0 = 44.4;
 	R.omega = R.omega0;
@@ -499,7 +504,7 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	LBStall _lbstall;
 
 	R.FT = 1;//0.787;
-	R.KLT = 0;//1.7741;
+	R.KLT = 0;// 1.7741;
 	R.Inter0 = RAD(77.6);
 	R.Inter1 = RAD(87.7);
 	R.KA = 0;
@@ -515,8 +520,11 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	R.nb = 2;
 	R.bld.soltype = HubFixed, R.adyna = Simple; // Simple; // Averaged;//LinearInflow
 
+	if (R.adyna > 100)
+		R.lscorr.Initvariable();
+
 	if (R.adyna > -1)
-		R.nf = 72, R.ns = 40, R.ni = 40;
+		R.nf = 36, R.ns = 30, R.ni = 20;
 	else
 		R.nf = 1, R.ns = 1, R.ni = 1;
 
@@ -589,12 +597,12 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 		printf("Undefined tail wake func. \n");
 }
 
-void Rotor::WakeModelPrams(const int _k)
+void Rotor::WakeModelPrams(const double _k)
 {
-	kwtip = _k, kwrot = 5, nk = nf*kwtip;
+	kwtip = _k, kwrot = 5, nk = int(nf*kwtip);
 	//nf = naz, ns = nrs,
-	outboard = 0.3, rtip = 0.97;
-	rc0 = 0.5*chord(0) / radius;
+	outboard = 0.6, rtip = 0.95;
+	rc0 = 0.05*chord(0) / radius;
 	haveGeo = false, haveStr = false;// outputWake = false;
 	// update allocate
 	tipstr.deallocate();
@@ -606,7 +614,7 @@ void Rotor::WakeModelPrams(const int _k)
 	Matrix1<double> ra(ns);
 	ra = rastation(0, id_ns);
 	twistv = twist.interplinear_fast(ra, rtip);
-	chv = chord.interplinear_fast(ra, rtip);
+	chv = chord.interplinear_fast(ra, rtip) / radius;
 }
 
 void Rotor::InitVariables(void)
@@ -668,6 +676,77 @@ void Wing::InitVariables(void)
 		airforce[i] = airforce_cg[i] = airmoment[i] = airmoment_cg[i] = 0;
 		vel[i] = omg[i] = dvel[i] = domg[i] = 0;
 	}
+}
+
+void LSCorr::Initvariable(void)
+{
+	LScoeff.allocate(46, 10);
+	LLcoeff.allocate(46, 5);
+
+	angls.allocate(46);
+	b0ls.allocate(46);
+	b1ls.allocate(46);
+	b2ls.allocate(46);
+	aopls.allocate(46);
+	a1ls.allocate(46);
+	a2ls.allocate(46);
+	c0ls.allocate(46);
+	c1ls.allocate(46);
+	c2ls.allocate(46);
+
+	angll.allocate(46);
+	b1ll.allocate(46);
+	aopll.allocate(46);
+	a1ll.allocate(46);
+	a2ll.allocate(46);
+
+	LScoeff.input("LScoef.txt");
+	LLcoeff.input("LLcoef.txt");
+
+	for (int i = 0; i < 46; i++)
+		angls(i) = LScoeff(i, 0);
+
+	for (int i = 0; i < 46; i++)
+		b0ls(i) = LScoeff(i, 1);
+
+	for (int i = 0; i < 46; i++)
+		b1ls(i) = LScoeff(i, 2);
+
+	for (int i = 0; i < 46; i++)
+		b2ls(i) = LScoeff(i, 3);
+
+	for (int i = 0; i < 46; i++)
+		aopls(i) = LScoeff(i, 4);
+
+	for (int i = 0; i < 46; i++)
+		a1ls(i) = LScoeff(i, 5);
+
+	for (int i = 0; i < 46; i++)
+		a2ls(i) = LScoeff(i, 6);
+
+	for (int i = 0; i < 46; i++)
+		c0ls(i) = LScoeff(i, 7);
+
+	for (int i = 0; i < 46; i++)
+		c1ls(i) = LScoeff(i, 8);
+
+	for (int i = 0; i < 46; i++)
+		c2ls(i) = LScoeff(i, 9);
+
+	for (int i = 0; i < 46; i++)
+		angll(i) = LLcoeff(i, 0);
+
+	for (int i = 0; i < 46; i++)
+		b1ll(i) = LLcoeff(i, 1);
+
+	for (int i = 0; i < 46; i++)
+		aopll(i) = LLcoeff(i, 2);
+
+	for (int i = 0; i < 46; i++)
+		a1ll(i) = LLcoeff(i, 3);
+
+	for (int i = 0; i < 46; i++)
+		a2ll(i) = LLcoeff(i, 4);
 }
 
 void Jobs::InitProject(JobsType jt)
@@ -766,7 +845,10 @@ void Jobs::SetSimCond(Copter &C, const int ic)
 
 	//C.vel_g[0] = C.RotorV[0].vtipa*Mus(ic);
 	if (C.fuselage.si_unit)
+	{
 		C.vel_g[0] = Vfs(ic)*0.5144444;
+		//C.vel_g[1] = Vfs(ic)*0.5144444 *cos(RAD(80));
+	}
 	else
 		C.vel_g[0] = Vfs(ic);
 	//euler[1] = RAD(Pits(ic));
@@ -1274,16 +1356,13 @@ void Jobs::PostProcessMP(Copter &C, const int ic, const int s, const int e)
 		dst << src.rdbuf();
 	}
 
-	C.RotorV[0].DiskOutput(path + "//" + prefix + "_MR_" + std::to_string(ic));
-	C.RotorV[1].DiskOutput(path + "//" + prefix + "_TR_" + std::to_string(ic));
+	//C.RotorV[0].DiskOutput(path + "//" + prefix + "_MR_" + std::to_string(ic));
+	//C.RotorV[1].DiskOutput(path + "//" + prefix + "_TR_" + std::to_string(ic));
 
 
-	for (int i = C.RotorV.size() - 1; i >= 0; --i)
-		C.RotorV[i].OutPutWake(path + "//" + prefix + "_", ic);
+	//for (int i = C.RotorV.size() - 1; i >= 0; --i)
+	//	C.RotorV[i].OutPutWake(path + "//" + prefix + "_", ic);
 
-	// vel test
-	printf("Flag: %d\n", flg);
-	printf("Vel g test: %f \n", C.vel_g[0]);
 }
 
 void Jobs::PostProcessMP(Copter &C, const int ic, const int ip, const int s, const int e, const int np)
@@ -1579,15 +1658,13 @@ void LevelFlight(void)
 void LevelFlightMP(int nth)
 {
 	Jobs jobs;
-	//Model_UL496 ul496;
 	Model_BO105 bo105;
-	//Model_Puma330 puma330;
 	Copter copter;
 	CopterSolver solver;
 	int s, e, i;
 	
 	jobs.InitProject(SimTrim);
-	i = s = 0, e = jobs.nCase;
+	i = s = 4, e = 5;//jobs.nCase;
 
 	bo105.GetProb(6, 0, FreeTrim1);
 	bo105.GetModel();
@@ -1595,18 +1672,32 @@ void LevelFlightMP(int nth)
 
 #pragma omp parallel num_threads(nth) shared(s, e, jobs) firstprivate(i, solver, copter)
 	{
-		AeroDynType adytemp = copter.RotorV[0].adyna;
 #pragma omp for
 		for (i = s; i < e; i++)
 		{
-			if (i < 3)
-				copter.RotorV[0].adyna = LinearInflow;
-			else
-				copter.RotorV[0].adyna = adytemp;
-			
 			jobs.SetSimCond(copter, i);
 			solver.CopterSimulation(copter);
 			jobs.PostProcessMP(copter, i, s, e);
+
+
+#pragma omp critical
+			{
+				printf("\n*****************************************************************************\n\n");
+				printf("Vfs = %f km/h \n", 3.6*copter.vel_g[0]);
+				printf("Copter counts = %d, Copter Err = (%e, %e, %e) \n", copter.Niter, copter.sum_a1_del, copter.sum_a2_del, copter.max_c_del);
+				printf("M Rotor (u, v, w) = (%f, %f, %f) \n", copter.RotorV[0].monitor.vel[0], copter.RotorV[0].monitor.vel[1], copter.RotorV[0].monitor.vel[2]);
+				printf("M Rotor (X, Y, Z) = (%f, %f, %f) \n", copter.RotorV[0].monitor.af[0], copter.RotorV[0].monitor.af[1], copter.RotorV[0].monitor.af[2]);
+				printf("M Rotor (L, M, N) = (%f, %f, %f) \n", copter.RotorV[0].monitor.mf[0], copter.RotorV[0].monitor.mf[1], copter.RotorV[0].monitor.mf[2]);
+				printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(copter.RotorV[0].monitor.flapc[0]), DEG(copter.RotorV[0].monitor.flapc[1]), DEG(copter.RotorV[0].monitor.flapc[2]));
+				printf("M Rotor flap counts = %d, Errb2 = %e\n", copter.RotorV[0].monitor.Countsb, copter.RotorV[0].monitor.errb2);
+				printf("M Rotor vind counts = %d, Errw2 = %e\n", copter.RotorV[0].monitor.Countsw, copter.RotorV[0].monitor.errw2);
+				printf("LB model Err = %e\n", copter.RotorV[0].monitor.LBerrSum);
+				printf("Power Comp(kW): (%f, %f, %f, %f, %f) \n", copter.RotorV[0].power, copter.RotorV[0].power_i, copter.RotorV[0].power_o, copter.RotorV[0].power_f, copter.RotorV[0].power_c);
+				printf("Controls (deg): ");
+				for (int j = 0; j < 6; j++)
+					printf("%f \t", DEG(copter.controls[j]));
+				printf("\n");
+			}
 		}
 #pragma omp barrier
 	}
@@ -1629,7 +1720,7 @@ void LinearModel(int nth)
 		break;
 	case 1:
 		jobs.InitProject(SimTrim);
-		i = s = 1, e = 2;// jobs.nCase;
+		i = s = 0, e = jobs.nCase;
 
 		bo105.GetProb(6, 0, FreeTrim1);
 		bo105.GetModel();
@@ -1637,10 +1728,6 @@ void LinearModel(int nth)
 		adytemp = copter.RotorV[0].adyna;
 		for (i = s; i < e; i++)
 		{
-			/*if (i < 3)
-				copter.RotorV[0].adyna = LinearInflow;
-			else
-				copter.RotorV[0].adyna = adytemp;*/
 
 			jobs.SetSimCond(copter, i);
 			solver.CopterSimulation(copter);

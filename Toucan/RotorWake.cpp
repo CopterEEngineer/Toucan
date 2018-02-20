@@ -411,7 +411,10 @@ void Rotor::_wakeInducedVelMP(int nb)
 	int tipgeo_NI = nk;
 	int tipgeo_NJ = nf;
 	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
-	myTYPE rcros[3], _temp;
+	myTYPE rcros[3], _temp, az, _c;
+
+	int iz, ik;
+	double _dfi, df;
 
 	rc04 = rc0 * rc0 * rc0 * rc0;
 	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); 
@@ -419,9 +422,7 @@ void Rotor::_wakeInducedVelMP(int nb)
 		for (int j = 0; j < 3; ++j)
 			tempM(i, j) = tppcoord.Ttransf[i][j];
 	tipgeoexpand = tempM.transpose().matrixmultiplyTP(tipgeoexpand);
-	
-	int iz, ik;
-	double _dfi, df;
+
 	df = 2 * PI / nf;
 
 	for (int k = 0; k < 3; ++k)
@@ -434,7 +435,7 @@ void Rotor::_wakeInducedVelMP(int nb)
 			tipgeoathub(iz, ik, k) = tipgeoexpand(k, j);
 			if (k == 2)
 			{
-				tipgeoathub(iz, ik, 2) += (rtip - eflap)*(beta[0] + beta[1] * cos(_dfi) + beta[2] * sin(_dfi));
+				tipgeoathub(iz, ik, 2) += (rtip - eflap)*(beta[0] + beta[1] * cos(_dfi) + beta[2] * sin(_dfi));// -chord(0) / radius;
 				tipgeoathub(iz, ik, 2) -= 0.75*chv*(sita[0] + sita[1] * cos(_dfi) + sita[2] * sin(_dfi) + twistv - twist(0) + pitchroot);
 			}
 		}
@@ -442,6 +443,7 @@ void Rotor::_wakeInducedVelMP(int nb)
 
 	for (int iz = nf - 1; iz >= 0; iz--)
 	{	
+		az = _limitaz(iz*df);
 		for (int ir = ns - 1; ir >= 0; --ir)
 		{
 			temp_lambdi = 0;
@@ -451,6 +453,8 @@ void Rotor::_wakeInducedVelMP(int nb)
 			xblade = bladedeform(iz, ir, 0);
 			yblade = bladedeform(iz, ir, 1);
 			zblade = bladedeform(iz, ir, 2);
+
+			_c = chord(ir) / radius;
 
 			for (int ib = 0; ib < nb; ib++)
 			{
@@ -462,22 +466,26 @@ void Rotor::_wakeInducedVelMP(int nb)
 				ri0 = xblade - tipgeoathub(nk - 1, iz2, 0);
 				rj0 = yblade - tipgeoathub(nk - 1, iz2, 1);
 				rk0 = zblade - tipgeoathub(nk - 1, iz2, 2);
-				r0len = norm(ri0, rj0, rk0);
+				r0len = Norm(ri0, rj0, rk0);
 				for (int ik = nk - 2; ik >= 0; --ik)
 				{
 					ri1 = xblade - tipgeoathub(ik, iz2, 0);
 					rj1 = yblade - tipgeoathub(ik, iz2, 1);
 					rk1 = zblade - tipgeoathub(ik, iz2, 2);
-					r1len = norm(ri1, rj1, rk1);
+					r1len = Norm(ri1, rj1, rk1);
 
 					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
 					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
-					rdot = dot(ri0, rj0, rk0, ri1, rj1, rk1);
+					
+					rdot = Dot(ri0, rj0, rk0, ri1, rj1, rk1);
 					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
 					geofunc *= height2 / rootNewton(rc04 + height2*height2, height2, height2*1e-2);
 					//geofunc *= height2 / sqrt(rc04 + height2*height2);
 					geofunc *= 0.5*(tipstr(ik, iz2) + tipstr(ik + 1, iz2));
-
+					
+					if (r1len*r1len + r0len*r0len + 2 * rdot < 400 * _c*_c)
+						geofunc *= lscorr.LSCorrection(az, _c, rc0, ri0, rj0, rk0, ri1, rj1, rk1);
+					
 					_temp = 0.25 / PI * geofunc;
 
 					temp_lambdx -= rcros[0] * _temp;
@@ -503,4 +511,117 @@ void Rotor::_wakeInducedVelMP(int nb)
 	//tipgeoathub.output("DEBUG_tipgeo_athub.output", 10);
 	//DEBUG_height2.output("DEBUG_height2.output", 10);
 }
+
+double LSCorr::LSCorrection(double az, double c, double rc, double ri0, double rj0, double rk0, double ri1, double rj1, double rk1)
+{
+	//全采用以R为基准的无量纲长度
+	double r0L2, r1L2, rdot, ssq, s, s1, s2;
+	double rmx, rmy, rmz;
+	double cs, sn;
+	double jsis, cosL, sinL, angLS;
+	double binv, hLS, sgn, rsinL;
+	double b0, b1, b2, aop, a1, a2, cop, c0, c1, c2;
+	double rs2, h0, h1, h2, x0, x1;
+	double xx, hh, xh;
+	double LLS, LLL;
+	
+	
+	r0L2 = ri0*ri0 + rj0*rj0 + rk0*rk0;
+	r1L2 = ri1*ri1 + rj1*rj1 + rk1*rk1;
+	rdot = Dot(ri0, rj0, rk0, ri1, rj1, rk1);
+	ssq = r0L2 + r1L2 - 2 * rdot;
+	s = sqrt(ssq);
+	s1 = (rdot - r0L2) / (s + 1e-6);
+	s2 = s1 + s;
+	rmx = ri0*s2 - ri1*s1;
+	rmy = rj0*s2 - rj1*s1;
+	rmz = rk0*s2 - rk1*s1;
+
+	cs = cos(az);
+	sn = sin(az);
+
+	jsis = (cs*(ri0 - ri1) + sn*(rj0 - rj1)) / (s + 1e-6);
+	cosL = Max(-1, Min(0, -Abs(jsis)));
+	sinL = Max(0, Min(1, 1 - jsis*jsis));
+	sinL = sqrt(sinL);//, 0.5, 1e-3);
+	angLS = 180 - 57.29578*asin(sinL); //角度
+	angLS = Max(90.001, Min(angLS, 179.99));
+
+	if (c > 0)
+		binv = 2 / c; //注意量纲
+	else
+		binv = 0;
+	hLS = rmz*rmz;
+	if (rc > 0)
+		hLS += rc*rc;
+	//printf("Rmz = %f, rc = %f, hLS = %f, root = %f\n", rmz, rc, hLS, rootNewton(hLS, rmz, 1e-6*rmz));
+	hLS = binv * rootNewton(hLS, rmz, 1e-6*rmz);
+	
+	sgn = Sign((cs*rmx + sn*rmy)*jsis);
+	rsinL = sqrt(rmx*rmx + rmy*rmy);
+	rsinL = binv*rsinL*sgn + 0.5*cosL;
+
+	//获得升力面常数
+	cop = 5.9;
+	b0 = 8.88 - 1.88*angLS / 90;
+	b1 = b1ls.interplinear_fast(angls, angLS);
+	b2 = b2ls.interplinear_fast(angls, angLS);
+	aop = aopls.interplinear_fast(angls, angLS);
+	if (cosL < 0)
+		a2 = a2ls.interplinear_fast(angls, angLS);
+	else
+		a2 = 0.0084;
+	if (sinL < 1)
+	{
+		a1 = a1ls.interplinear_fast(angls, angLS);
+		c0 = c0ls.interplinear_fast(angls, angLS);
+		c1 = c1ls.interplinear_fast(angls, angLS);
+		c2 = c2ls.interplinear_fast(angls, angLS);
+	}
+	else
+	{
+		a1 = -0.434;
+		c0 = 1.683;
+		c1 = 1.417;
+		c2 = 0.910;
+	}
+	//升力面载荷
+	rs2 = rsinL*rsinL;
+	h0 = (hLS + cop)*(hLS + cop);
+	x0 = -rs2 + h0 + b0*b0;
+	h1 = (hLS + c1)*(hLS + c1);
+	x1 = (rsinL + b1)*(rsinL + b1);
+	h2 = (hLS + c2)*(hLS + c2);
+	xx = x1*x1;
+	hh = h2*h2;
+	xh = x1*h2;
+	cs = cos(b2);
+	sn = sin(b2);
+
+	LLS = rsinL / (rs2 + (hLS + c0)*(hLS + c0)) - aop*b0*x0 / (x0*x0 + 4 * rs2*h0);
+	LLS -= a1*(2 * (rsinL + b1)*(-x1 + 3 * h1)*cs - 2 * (hLS + c1)*(-3 * x1 + h1)*sn) / pow(x1 + h1, 3);
+	LLS -= a2*(24 * (rsinL + b1)*(-xx + 10 * xh - 5 * hh)*cs - 24 * (hLS + c2)*(-5 * xx + 10 * xh - hh)*sn) / pow(x1 + h2, 5);
+
+	//升力线常数
+	b2 = 0;
+	c0 = 1.571;
+	b1 = b1ll.interplinear_fast(angll, angLS);
+	aop = aopll.interplinear_fast(angll, angLS);
+	a1 = a1ll.interplinear_fast(angll, angLS);
+	a2 = a2ll.interplinear_fast(angll, angLS);
+	//升力线载荷
+	x1 = (rsinL + b1)*(rsinL + b1);
+	xx = x1*x1;
+	xh = x1*h2;
+	LLL = rsinL / (rs2 + (hLS + c0)*(hLS + c0)) - aop*b0*x0 / (x0*x0 + 4 * rs2*h0);
+	LLL -= a1*(2 * (rsinL + b1)*(-x1 + 3 * h1)) / pow(x1 + h1, 3);
+	LLL -= a2*(24 * (rsinL + b1)*(-xx + 10 * xh - 5 * hh)) / pow(x1 + h2, 5);
+	//printf("AZ = %f, factor = %f\n", DEG(az), LLS/LLL);
+	if (fabs(LLL) >= DBL_EPSILON && Abs(LLS/LLL) < 1)
+		return LLS / LLL;
+	else
+		return 1.0;
+
+}
+
 

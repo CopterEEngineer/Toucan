@@ -18,17 +18,17 @@ int main()
 {	
 	clock_t tStart;
 	//Optimization paraSweep;
-	LBStall lbs;
+	//LBStall lbs;
 
 	tStart = clock();
 
 	//LevelFlight();
-	//LevelFlightMP(1); //54 s, 195s
+	LevelFlightMP(8); //54 s, 195s
 	//RPMSweepMP(8); // 1043 s
 	//RPMSweep(6, 0);
 	//OPT_RPMSweep(); // 560s; 100+ s; 1219s; 2514s; 1531s
 
-	LinearModel(1);
+	//LinearModel(1);
 
 	//lbs.FuncTest();
 
