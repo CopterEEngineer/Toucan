@@ -91,6 +91,7 @@ public:
 	double errw2, errb2;
 	double LBerrSum;
 	int Countsb, Countsw;
+	double Ct_s;
 };
 
 
@@ -347,8 +348,56 @@ public:
 	Matrix1<double> angls, b0ls, b1ls, b2ls, aopls, a1ls, a2ls, copls, c0ls, c1ls, c2ls;
 	Matrix1<double> angll, b1ll, aopll, a1ll, a2ll, c0ll;
 	Matrix2<double> LScoeff, LLcoeff;
+	bool enable;
 };
 
+
+class Wake
+{
+public:
+	enum WakeType
+	{
+		Bound = 0, Trail = 1, Shed = 2
+	};
+
+	Wake() { ; }
+	~Wake() { ; }
+
+	void OutPutWake(const int ic);
+	void OutPutWake(string s, const int ic);
+	
+	void InitVariable(const int nf, const int ns, const int nk);
+	void ComputeIndVel(double &, double &, double&, const int, const int, const int, const int, double, double *);
+
+
+	void _computeIndVel(int nb, Matrix1<double> &ch);
+	bool _computeVorStr(Matrix2<double> &);
+	bool _computeGeometry(const AeroDynType aero, double *veltpp, double lambdi_ag, double b0);
+	void _airloadingPoint(Matrix2<double> &az, Matrix2<double> &ra, Matrix1<double> &ch, Matrix1<double> tw, double *b, double *s, double offset, double sr);
+
+public:
+	WakeType waketype;
+	LSCorr lscorr;
+	bool istip, isrot, isbond, isshed;
+	bool havegeo, havestr;
+	bool outputwake;
+	int nf, ns, nk;
+	double twistv, chv, rv, rc0, rc;
+	double strboard;
+
+	Monitor monitor;
+
+	double lambdx, lambdy, lambdz;
+
+	Matrix2<myTYPE> vortexstr;
+	Matrix3<myTYPE> geometry;
+	Matrix3<myTYPE> comppoint;
+
+	Matrix2<myTYPE> geoexp;
+
+	Matrix3<myTYPE> geometryathub;
+	Matrix3<myTYPE> comppointathub;
+};
 
 class Rotor
 {
@@ -489,7 +538,9 @@ public:
 
 	myTYPE sita[3];
 	AeroDynType adyna;
-	//RotorWake wake;
+	
+	std::vector<Wake> wakev;
+
 	LSCorr lscorr;
 
 
@@ -497,7 +548,7 @@ public:
 	double kwtip;
 	//int nf, ns, ni;
 	myTYPE rtip, rc0, outboard;
-	bool outputWake;
+	bool outputWake, outputDisk;
 	bool haveGeo, haveStr;
 	bool dstall;
 	myTYPE power, torque, power_i, torque_i, power_o, torque_o, power_f, torque_f, power_c, torque_c;

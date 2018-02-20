@@ -565,26 +565,6 @@ void Rotor::_hingedynamics_rt(void)
 		lambdt_ag = _aerodynamics(lambtpp[i-1], veltpp);
 		lambtpp[i] = lambdt_ag;
 
-		//_setairfm_sp(airforce, airmoment);
-		//// airforce at hub coord approx to tpp coord
-		//lambdi_ag -= airforce[2] / (2 * amb.rho*PI*radius*radius*vtipa*vtipa) / sqrt(mul * mul + lambtpp[i - 1] * lambtpp[i - 1]);
-		//lambdi_ag /= 2.0;
-		//// veltpp: tpp plane velocity with copter
-		//lambdt_ag = lambdi_ag - veltpp[2] / vtipa;
-		//lambtpp[i] = lambdt_ag;
-		//// vel: hub velocity with copter
-		//if (haveGeo && haveStr)
-		//{
-		//	_bladePosition();
-		//	//_wakeIndVelCalc();
-		//	_wakeInducedVelMP(nb);
-		//}
-		//else
-		//{
-		//	lambdh_ag = lambdi_ag * cos(beta[1]) * cos(beta[2]) - vel[2] / vtipa;
-		//	lambdh.setvalue(lambdh_ag);
-		//	lambdi.setvalue(lambdi_ag);
-		//}
 
 		iter = i;
 		if (Abs(lambdt_ag / lambtpp[i - 1] - 1) < err_w) { break; }
@@ -1219,7 +1199,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	q.allocate(nitermax);
 	dq.allocate(nitermax);
 
-	q(0) = beta[0] - sita[2];
+	q(0) = beta[0] - sita[2] + precone;
 	dq(0) = omega*sita[1];
 
 	_setairfm(dfx, dfz, dfr, 0.0, q(0), dq(0), 0);
@@ -1322,15 +1302,14 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 					qt += m1*(dvelh[2] - velh[0] * omgh[1] + velh[1] * omgh[0] - 9.8 * 0.3048 * 0.3048);
 
 				bld._GenArfTimeMarch(qt, dt, niter);
-				q(niter) = bld.q;
+				q(niter) = bld.q + precone;
 				dq(niter) = bld.dq;
 			}
 
 			// 计算桨盘平均气动力			
-		
+			err = 0;
 			if (bld.isGenArfExit(niter))
 			{			
-				err = 0;
 				for (int j = 0; j < ns; j++)
 				{
 					lbstall[j].isExit(ck, np(j));
@@ -1555,6 +1534,7 @@ bool Rotor::_hingelessflap_rt(double f[3], double m[3])
 	
 	monitor.errb2 = bld.err_b;
 	monitor.Countsb = niter;
+	monitor.Ct_s = f[2] / amb.rho / disk_A / vtipa / vtipa / sigma;
 
 	//printf("M Rotor Niter = %d, Errb2 = %e\n", niter, monitor.errb2);
 	//printf("M Rotor flap (beta0, beta1c, beta1s) = (%f, %f, %f) \n", DEG(beta[0]), DEG(beta[1]), DEG(beta[2]));
@@ -2070,10 +2050,13 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 
 		if (haveGeo && haveStr)
 		{
-			_tipVortexStr();
-			//_wakeGeoBd();
+			//_tipVortexStr();
 			_bladePosition();
-			_wakeInducedVelMP(nb);
+			//_wakeInducedVelMP(nb);
+			for (int iw = 0; iw < wakev.size(); iw++)
+				wakev[iw]._computeVorStr(cirlb);
+
+			_wakeInducedVelMP();
 		}
 		else
 		{
@@ -2081,6 +2064,7 @@ double Rotor::_aerodynamics(double lambtpp, double *veltpp)
 			lambdh.setvalue(lambdh_ag);
 			lambdi.setvalue(lambdi_ag);
 		}
+
 		break;
 	case LinearInflow:
 		// airforce at hub coord approx to tpp coord
@@ -2669,32 +2653,7 @@ double Rotor::GetLambdi(void)
 	return lambdi_ag * vtipa;
 }
 
-void Rotor::DiskOutput(string s)
-{
-	//if (lbstall.enable)
-	//{
-	//	lbstall.CNTM2.output(s + "_CNT.output", 10);
-	//	lbstall.CCfM2.output(s + "_CCf.output", 10);
-	//	lbstall.CDM2.output(s + "_CD.output", 10);
-	//	lbstall.CLM2.output(s + "_CL.output", 10);
-	//	lbstall.FlowStateSaveM2.output(s + "_FlowState.output", 2);
-	//	lbstall.VortexStateSaveM2.output(s + "_VortexState.output", 2);
-	//	lbstall.fppM2.output(s + "_fpp.output", 10);
-	//	lbstall.Circle.output(s + "_Circle.output", 2);
-	//}
-	//else
-	//{
-	//	cl.output(s + "_CL.output", 10);
-	//	cd.output(s + "_CD.output", 10);
-	//}
-	cl.output(s + "_CL.output", 10);
-	cd.output(s + "_CD.output", 10);
-	inflow.output(s + "_inflow.output", 10);
-	incidn.output(s + "_AOA.output", 10);
-	ua.output(s + "_Ma.output", 10);
-	lambdi.output(s + "_lambdi.output", 10);
-	dt.output(s + "_dt.output", 10);
-}
+
 
 void Rotor::GetStates(double v[3], double w[3])
 {

@@ -403,7 +403,7 @@ void Optimization::PostProcess(std::map<std::vector<int>, Fitness> _fitMap)
 
 void Optimization::RPMSweepMP(void)
 {
-	Model_UL496 ul496;
+	Model_BO105 ul496;
 	Copter copter;
 	CopterSolver solver;
 	int s, e, i, j, k, np, allcase, icount;
@@ -412,7 +412,7 @@ void Optimization::RPMSweepMP(void)
 	std::map<std::vector<int>, Fitness> _fitMap;
 	std::map<std::vector<int>, DesignParas> _deMap;
 
-	ul496.GetProb();
+	ul496.GetProb(6, 0, FreeTrim1);
 	ul496.GetModel();
 	copter.InitRotorCraft(ul496);
 

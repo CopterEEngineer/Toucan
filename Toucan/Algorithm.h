@@ -621,8 +621,9 @@ _Ty rootNewton(_Ty a, _Ty a0, _Ty eps)  //Å£¶Ùµü´ú·¨
 	if (fabs(a) <= DBL_EPSILON)
 		return 0.0;
 	
-	a0 = Abs(a0);
 	eps = Abs(eps);
+	a0 = Abs(a0)+1e-3*eps;
+	
 	_Ty x0 = a0, x1, xx = x0;
 	int n = 1e10;
 	int i = 0;
@@ -702,7 +703,7 @@ _Ty rootNewton(_Ty a)
 		return 0.0;
 
 	_Ty x0 = a + 0.25, x1, xx = x0;
-
+	
 	int n = 1e10;
 	int i = 0;
 	for (i = 0; i<n; i++)

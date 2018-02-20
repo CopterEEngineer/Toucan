@@ -7,12 +7,18 @@ void Rotor::_wakeInducedVel(void)
 	switch (adyna)
 	{
 	case PWake:
-		haveStr = true;// _tipVortexStr();
-		haveGeo = _wakeGeoBd();
-		break;
-	case FWake:
-		break;
-	default:
+		double veltpp[3] = { 0.0,0.0,0.0 };
+		double dveltpp[3] = { 0.0,0.0,0.0 };
+		_velTransform(veltpp, dveltpp, tppcoord);
+		for (int i = 0; i < 3; i++)
+			veltpp[i] /= vtipa;
+
+		for (int iw = 0; iw < wakev.size(); iw++)
+			wakev[iw]._computeGeometry(adyna, veltpp, lambdi_ag, beta[0]);
+		
+		haveStr = true;
+		haveGeo = true;// _wakeGeoBd();
+
 		break;
 	}
 }
@@ -45,10 +51,12 @@ void Rotor::_bladePosition()
 	//尾迹法速度计算点，目前取四分之三弦长位置
 	//有后掠角时还要调整
 	myTYPE azm, bfp, rst;
-	myTYPE ch = chord(0) / radius;
-	myTYPE twistt = twist(ns - 1) - twist(0) + pitchroot;
+	myTYPE ch;
+	myTYPE twistt;
 	for (int j = ns - 1; j >= 0; --j)
 	{
+		twistt = twist(j) - twist(0) + pitchroot;
+		ch = chord(j) / radius;
 		for (int i = nf - 1; i >= 0; --i)
 		{
 			azm = azstation(i, j);
@@ -56,7 +64,7 @@ void Rotor::_bladePosition()
 			rst = rastation(i, j);
 			bladedeform(i, j, 0) = ((rst - eflap)*cos(bfp) + eflap) * cos(azm) + ch*0.5*sin(azm);
 			bladedeform(i, j, 1) = ((rst - eflap)*cos(bfp) + eflap) * sin(azm) - ch*0.5*cos(azm);
-			bladedeform(i, j, 2) = bfp*(rst - eflap) - 0.5*ch*(sita[0] + sita[1] * cos(azm) + sita[2] * sin(azm) + twistt);
+			bladedeform(i, j, 2) = bfp*(rst - eflap) -0.5*ch*(sita[0] + sita[1] * cos(azm) + sita[2] * sin(azm) + twistt);
 		}
 	}
 	//if (bladedeform(1, ns - 1, 1) < 0)
@@ -276,130 +284,9 @@ void Rotor::_wakeIndVelCalc()
 		}	
 	}
 	lambdh = lambdi - vel[2] / vtipa;
-	lambdi.output("DEBUG_lambdi.output", 10);
+	//lambdi.output("DEBUG_lambdi.output", 10);
 }
 
-void Rotor::_wakeInducedVelMP()
-{
-	// 适用于nb = 2
-	myTYPE temp_lambdi, temp_lambdx, temp_lambdy;
-	myTYPE xblade, yblade, zblade, ri0, rj0, rk0, ri1, rj1, rk1;
-	Matrix2<myTYPE> tipgeoexpand, tempM(3, 3);
-	Matrix3<myTYPE> tipgeoathub(nk, nf, 3);
-	int tipstr_NI = tipstr.NI;
-	int tipgeo_NI = nk;
-	int tipgeo_NJ = nf;
-	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
-	myTYPE rcros[3], _temp;
-
-
-	/*if (nb != 2)
-	{
-		printf("Undefined nb != 2 in _wakeIndVelCalc() Func. \n");
-		system("pause");
-		return;
-	}*/
-
-	rc04 = rc0 * rc0 * rc0 * rc0;
-	tipgeoexpand = tipgeometry.reshape(3, 3, nk*nf); // 应该要减去在TPP坐标系下TPP原点指向HUB原点的向量
-	for (int i = 0; i < 3; ++i)
-		for (int j = 0; j < 3; ++j)
-			tempM(i, j) = tppcoord.Ttransf[i][j];
-	tipgeoexpand = tempM.transpose().matrixmultiplyTP(tipgeoexpand);
-	for (int k = 0; k < 3; ++k)
-		for (int j = 0; j < nk*nf; ++j)
-			tipgeoathub(j%nk, j / nk, k) = tipgeoexpand(k, j);
-
-	//int iz = nf - 1, iz2 = iz + nf / nb;
-//#pragma omp parallel num_threads(4) 
-	{
-//#pragma omp for 
-		for (int iz = nf - 1; iz >= 0; iz--)
-		{
-			int iz2 = iz + nf / nb;
-			if (iz2 >= nf)
-				iz2 -= nf;
-
-			for (int ir = ns - 1; ir >= 0; --ir)
-			{
-				temp_lambdi = 0;
-				temp_lambdx = 0;
-				temp_lambdy = 0;
-				xblade = bladedeform(iz, ir, 0);
-				yblade = bladedeform(iz, ir, 1);
-				zblade = bladedeform(iz, ir, 2);
-
-				// balde 1 $ik == nk - 1$ element points to blade 1 
-				ri0 = xblade - tipgeoathub(nk - 1, iz, 0);
-				rj0 = yblade - tipgeoathub(nk - 1, iz, 1);
-				rk0 = zblade - tipgeoathub(nk - 1, iz, 2);
-				r0len = norm(ri0, rj0, rk0);
-				for (int ik = nk - 2; ik >= 0; --ik)
-				{
-					ri1 = xblade - tipgeoathub(ik, iz, 0);
-					rj1 = yblade - tipgeoathub(ik, iz, 1);
-					rk1 = zblade - tipgeoathub(ik, iz, 2);
-					r1len = norm(ri1, rj1, rk1);
-
-					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
-					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
-					rdot = dot(ri0, rj0, rk0, ri1, rj1, rk1);
-					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
-					geofunc *= (1 - 0.5 * rc04 / height2 / height2);
-					geofunc *= 0.5*(tipstr(ik, iz) + tipstr(ik + 1, iz));
-
-					_temp = 0.25 / PI * geofunc;
-
-					temp_lambdx -= rcros[0] * _temp;
-					temp_lambdy -= rcros[1] * _temp;
-					temp_lambdi -= rcros[2] * _temp;
-
-					ri0 = ri1;
-					rj0 = rj1;
-					rk0 = rk1;
-					r0len = r1len;
-				}
-
-				// balde 2 $ik == nk - 1$ element points to blade 1 
-				ri0 = xblade - tipgeoathub(nk - 1, iz2, 0);
-				rj0 = yblade - tipgeoathub(nk - 1, iz2, 1);
-				rk0 = zblade - tipgeoathub(nk - 1, iz2, 2);
-				r0len = norm(ri0, rj0, rk0);
-				for (int ik = nk - 2; ik >= 0; --ik)
-				{
-					ri1 = xblade - tipgeoathub(ik, iz2, 0);
-					rj1 = yblade - tipgeoathub(ik, iz2, 1);
-					rk1 = zblade - tipgeoathub(ik, iz2, 2);
-					r1len = norm(ri1, rj1, rk1);
-
-					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
-					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
-					rdot = dot(ri0, rj0, rk0, ri1, rj1, rk1);
-					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
-					geofunc *= (1 - 0.5 * rc04 / height2 / height2);
-					geofunc *= 0.5*(tipstr(ik, iz2) + tipstr(ik + 1, iz2));
-
-					_temp = 0.25 / PI * geofunc;
-
-					temp_lambdx -= rcros[0] * _temp;
-					temp_lambdy -= rcros[1] * _temp;
-					temp_lambdi -= rcros[2] * _temp;
-
-					ri0 = ri1;
-					rj0 = rj1;
-					rk0 = rk1;
-					r0len = r1len;
-				}
-
-				lambdi(iz, ir) = temp_lambdi / radius / vtipa;
-				lambdx(iz, ir) = temp_lambdx / radius / vtipa;
-				lambdy(iz, ir) = temp_lambdy / radius / vtipa;
-			}
-		}
-	}
-	lambdh = lambdi - vel[2] / vtipa;
-	lambdi.output("DEBUG_lambdi.output", 10);
-}
 
 void Rotor::_wakeInducedVelMP(int nb)
 {
@@ -407,9 +294,7 @@ void Rotor::_wakeInducedVelMP(int nb)
 	myTYPE xblade, yblade, zblade, ri0, rj0, rk0, ri1, rj1, rk1;
 	Matrix2<myTYPE> tipgeoexpand, tempM(3, 3);
 	Matrix3<myTYPE> tipgeoathub(nk, nf, 3);
-	int tipstr_NI = tipstr.NI;
-	int tipgeo_NI = nk;
-	int tipgeo_NJ = nf;
+	
 	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
 	myTYPE rcros[3], _temp, az, _c;
 
@@ -511,6 +396,99 @@ void Rotor::_wakeInducedVelMP(int nb)
 	//tipgeoathub.output("DEBUG_tipgeo_athub.output", 10);
 	//DEBUG_height2.output("DEBUG_height2.output", 10);
 }
+
+void Rotor::_wakeInducedVelMP(void)
+{
+	Matrix2<myTYPE> tempM(3, 3);
+	Matrix2<myTYPE> geoexp;
+	double temp_lambdx, temp_lambdy, temp_lambdi;
+	double _lambdx, _lambdy, _lambdi;
+
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j)
+			tempM(i, j) = tppcoord.Ttransf[i][j];
+
+
+	for (int i = 0; i<wakev.size();i++)
+	{
+		int iz, ik, nk, nf, ns;
+		double _dfi, bfp, sth;
+
+		nk = wakev[i].nk;
+		nf = wakev[i].nf;
+		ns = wakev[i].ns;
+
+		if (wakev[i].istip || wakev[i].isrot)
+		{
+			geoexp = tempM.transpose().matrixmultiplyTP(wakev[i].geoexp);
+					
+			for (int k = 0; k < 3; ++k)
+			{
+				for (int j = 0; j < nk*nf; ++j)
+				{
+					iz = j%nk;
+					ik = j / nk;
+					_dfi = 2*PI/nf*(iz - ik);
+					bfp = beta[0] + beta[1] * cos(_dfi) + beta[2] * sin(_dfi);
+					sth = sita[0] + sita[1] * cos(_dfi) + sita[2] * sin(_dfi) + wakev[i].twistv - twist(0) + pitchroot;
+					wakev[i].geometryathub(iz, ik, k) = geoexp(k, j);
+
+					if (k == 2)
+						wakev[i].geometryathub(iz, ik, 2) += (1 - eflap)*bfp -0.75*wakev[i].chv*sth;
+				}
+			}
+		}
+		else if (wakev[i].isbond)
+		{
+			for (int iz = 0; iz < nf; iz++)
+			{  
+				_dfi = azstation(iz, 0);
+				bfp = (beta[0] + beta[1] * cos(_dfi) + beta[2] * sin(_dfi));
+				for (int ik = 0; ik < nk; ik++)
+				{
+					wakev[i].geometryathub(iz, ik, 0) = wakev[i].geometry(iz, ik, 0) * cos(_dfi);
+					wakev[i].geometryathub(iz, ik, 1) = wakev[i].geometry(iz, ik, 0) * sin(_dfi);
+					wakev[i].geometryathub(iz, ik, 2) = bfp*wakev[i].geometry(iz, ik, 0);
+				}
+			}
+		}
+		//wakev[i].geometryathub.output("DEBUG_tipgeo_athub.output", 10);
+		//wakev[i].geometry.output("DEBUG_tipgeo.output", 6);
+	}
+
+	double cp[3] = { 0,0,0 };
+	for (int iz = nf - 1; iz >= 0; iz--)
+	{
+		for (int ir = ns - 1; ir >= 0; --ir)
+		{
+			cp[0] = bladedeform(iz, ir, 0); 
+			cp[1] = bladedeform(iz, ir, 1);
+			cp[2] = bladedeform(iz, ir, 2);
+
+			temp_lambdi = temp_lambdx = temp_lambdy = 0;
+
+			for (int ib = 0; ib < nb; ib++)
+			{
+				int iz2 = iz + nf / nb*ib;
+				while (iz2 >= nf)
+					iz2 -= nf;
+				for (int iw = wakev.size() - 1; iw >= 0; --iw)
+				{					
+					wakev[iw].ComputeIndVel(_lambdx, _lambdy, _lambdi, iz, ir, iz2, ib, chord(ir) / radius, cp);
+					temp_lambdi += _lambdi;
+					temp_lambdx += _lambdx;
+					temp_lambdy += _lambdy;
+				}
+			}
+			lambdi(iz, ir) = -temp_lambdi / radius / vtipa;
+			lambdx(iz, ir) = -temp_lambdx / radius / vtipa;
+			lambdy(iz, ir) = -temp_lambdy / radius / vtipa;
+		}
+	}
+	lambdh = lambdi - vel[2] / vtipa;
+	//lambdi.output("DEBUG_lambdi.output", 10);
+}
+
 
 double LSCorr::LSCorrection(double az, double c, double rc, double ri0, double rj0, double rk0, double ri1, double rj1, double rk1)
 {
@@ -625,3 +603,298 @@ double LSCorr::LSCorrection(double az, double c, double rc, double ri0, double r
 }
 
 
+void Wake::ComputeIndVel(double &vx,double &vy,double&vz,const int iz,const int ir, const int iz2, const int ib, double ds, double *cp)
+{
+	myTYPE xblade, yblade, zblade, ri0, rj0, rk0, ri1, rj1, rk1;
+	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
+	myTYPE rcros[3], _temp, az, temp_lambdx, temp_lambdy, temp_lambdi;
+
+	temp_lambdx = temp_lambdy = temp_lambdi = 0;
+
+	az = iz * 2 * PI / nf;
+	xblade = cp[0];
+	yblade = cp[1];
+	zblade = cp[2];
+	rc04 = rc0*rc0*rc0*rc0;
+
+	ri0 = xblade - geometryathub(nk - 1, iz2, 0);
+	rj0 = yblade - geometryathub(nk - 1, iz2, 1);
+	rk0 = zblade - geometryathub(nk - 1, iz2, 2);
+	r0len = Norm(ri0, rj0, rk0);
+
+	for (int ik = nk - 2; ik >= 0; ik--)
+	{
+		if(!(isbond && ik==ir && ib==0))
+		{
+			ri1 = xblade - geometryathub(ik, iz2, 0);
+			rj1 = yblade - geometryathub(ik, iz2, 1);
+			rk1 = zblade - geometryathub(ik, iz2, 2);
+			r1len = Norm(ri1, rj1, rk1);
+			
+			cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
+			height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
+
+			rdot = Dot(ri0, rj0, rk0, ri1, rj1, rk1);
+			geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
+			if (fabs(height2) > DBL_EPSILON)
+			{
+				geofunc *= height2 / rootNewton(rc04 + height2*height2, height2, height2*1e-2);
+				geofunc *= 0.5*(vortexstr(ik, iz2) + vortexstr(ik + 1, iz2));
+
+				if (lscorr.enable && r1len*r1len + r0len*r0len + 2 * rdot < 400 * ds*ds)
+					geofunc *= lscorr.LSCorrection(az, ds, rc0, ri0, rj0, rk0, ri1, rj1, rk1);
+			}
+			else
+				geofunc = 0;
+
+			_temp = 0.25 / PI * geofunc;
+
+			temp_lambdx -= rcros[0] * _temp;
+			temp_lambdy -= rcros[1] * _temp;
+			temp_lambdi -= rcros[2] * _temp;
+
+			ri0 = ri1;
+			rj0 = rj1;
+			rk0 = rk1;
+			r0len = r1len;
+		}
+		else		
+		{
+			ri0 = ri1;
+			rj0 = rj1;
+			rk0 = rk1;
+			r0len = r1len;
+		}
+	}
+	vx = temp_lambdx;
+	vy = temp_lambdy;
+	vz = temp_lambdi;
+}
+
+void Wake::_computeIndVel(int nb, Matrix1<double> &ch)
+{
+	//ch为无量纲的弦长
+	myTYPE temp_lambdi, temp_lambdx, temp_lambdy;
+	myTYPE xblade, yblade, zblade, ri0, rj0, rk0, ri1, rj1, rk1;
+	myTYPE r0len, r1len, rdot, height, height2, rc04, geofunc;
+	myTYPE rcros[3], _temp, az, _c;
+
+	int iz, ik;
+	double _dfi, df;
+
+	rc04 = rc0 * rc0 * rc0 * rc0;
+	
+	for (int iz = nf - 1; iz >= 0; iz--)
+	{
+		az = iz * 2 * PI / nf;
+		while (az > 2 * PI)
+			az -= 2 * PI;
+		while (az < 0)
+			az += 2 * PI;
+	
+		for (int ir = ns - 1; ir >= 0; --ir)
+		{
+			temp_lambdi = 0;
+			temp_lambdx = 0;
+			temp_lambdy = 0;
+
+			xblade = comppointathub(iz, ir, 0);
+			yblade = comppointathub(iz, ir, 1);
+			zblade = comppointathub(iz, ir, 2);
+
+			_c = ch(ir);
+			for (int ib = 0; ib < nb; ib++)
+			{
+				int iz2 = iz + nf / nb*ib;
+				if (iz2 >= nf)
+					iz2 -= nf;
+
+				// balde 1 $ik == nk - 1$ element points to blade 1 
+				ri0 = xblade - geometryathub(nk - 1, iz2, 0);
+				rj0 = yblade - geometryathub(nk - 1, iz2, 1);
+				rk0 = zblade - geometryathub(nk - 1, iz2, 2);
+				r0len = Norm(ri0, rj0, rk0);
+				for (int ik = nk - 2; ik >= 0; --ik)
+				{
+					ri1 = xblade - geometryathub(ik, iz2, 0);
+					rj1 = yblade - geometryathub(ik, iz2, 1);
+					rk1 = zblade - geometryathub(ik, iz2, 2);
+					r1len = Norm(ri1, rj1, rk1);
+
+					cross(rcros, ri0, rj0, rk0, ri1, rj1, rk1);
+					height2 = (rcros[0] * rcros[0] + rcros[1] * rcros[1] + rcros[2] * rcros[2]) / ((ri0 - ri1)*(ri0 - ri1) + (rj0 - rj1)*(rj0 - rj1) + (rk0 - rk1)*(rk0 - rk1));
+
+					rdot = Dot(ri0, rj0, rk0, ri1, rj1, rk1);
+					geofunc = -(1.0 / r0len + 1.0 / r1len) / (rdot + r0len * r1len);
+					geofunc *= height2 / rootNewton(rc04 + height2*height2, height2, height2*1e-2);
+					geofunc *= 0.5*(vortexstr(ik, iz2) + vortexstr(ik + 1, iz2));
+
+					if (r1len*r1len + r0len*r0len + 2 * rdot < 400 * _c*_c)
+						geofunc *= lscorr.LSCorrection(az, _c, rc0, ri0, rj0, rk0, ri1, rj1, rk1);
+
+					_temp = 0.25 / PI * geofunc;
+
+					temp_lambdx -= rcros[0] * _temp;
+					temp_lambdy -= rcros[1] * _temp;
+					temp_lambdi -= rcros[2] * _temp;
+
+					ri0 = ri1;
+					rj0 = rj1;
+					rk0 = rk1;
+					r0len = r1len;
+				}
+			}
+		}
+	}
+	
+}
+
+bool Wake::_computeVorStr(Matrix2<double> &cirlb)
+{
+	int igen, istr;
+	Matrix1<int> idns;
+
+	istr = strboard*ns;
+	if (istip)
+	{
+		if (istr < 0)
+			istr = 0; 
+		idns.allocate(ns - istr);		
+		idns = step(istr, ns - 1);
+		for (int j = nf - 1; j >= 0; --j)
+		{
+			for (int i = nk - 1; i >= 0; --i)
+			{
+				igen = j - i;
+				while (igen < 0)
+					igen += nf;
+				vortexstr(i, j) = cirlb(igen, idns).findmax();
+			}
+		}
+	}
+	else if(isrot)
+	{
+		if (istr > ns)
+			istr = ns; 
+		idns.allocate(istr);	
+		idns = step(0, istr - 1);
+		for (int j = nf - 1; j >= 0; --j)
+		{
+			for(int i=nk-1;i>=0;--i)
+			{
+				igen = j - i;
+				while (igen<0)
+					igen += nf;
+				vortexstr(i, j) = -cirlb(igen, idns).findmax();
+			}
+		}
+	}
+	else if(isbond)
+	{
+		for (int j = nf - 1; j >= 0; --j)
+			for (int i = nk - 1; i >= 0; --i)
+				vortexstr(i, j) = cirlb(j, Max(0, Min(i, ns - 1)));
+	}
+	else if (isshed)
+	{
+		return false;
+	}
+	return true;
+}
+
+bool Wake::_computeGeometry(const AeroDynType aero, double *veltpp, double wi, double b0)
+{
+	//wi和veltpp传入的是无量纲的速度
+	//有后掠角时还要调整
+	myTYPE r0, z0, x0, xv, yv, zv, xe, df;
+	myTYPE ka, E, kx, ky, ky3, k0;
+	myTYPE _dfi;
+
+	if (istip || isrot)
+	{
+		r0 = rv*cos(b0);
+		ka = atan2(-veltpp[0], -(-veltpp[2] + wi));
+		E = ka*0.5;
+		kx = E; ky = 2 * veltpp[0]; ky3 = -kx; k0 = 1.0 - 8.0 * ky3 / 15.0 / PI;
+		df = 2.0 * PI / nf; xe = 0;
+
+		for (int j = nf - 1; j >= 0; --j)
+		{
+			for (int i = nk - 1; i >= 0; --i)
+			{
+				_dfi = df*(j - i);
+				x0 = r0*cos(_dfi) + chv*0.75*sin(_dfi);
+				xv = x0 - veltpp[0] * df*i;
+				yv = r0 * sin(_dfi) - chv*0.75*cos(_dfi);
+				if (xv * xv + yv * yv < 1.01)
+				{
+					if(istip)
+						zv = -wi * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * i*df - wi / 2.0 * kx * (x0 + xv) * i*df;
+					else if(isrot)
+						zv = -wi * (k0 + ky3 * Abs(pow(1-yv,3)) + ky * yv) * i*df - wi / 2.0 * kx * (x0 + xv) * i*df;
+				}
+				else 
+				{
+					if (yv > 1)
+						xe = 0;
+					else
+						xe = sqrt(1.0 - yv*yv);
+					if (istip)
+					{
+						zv = -wi / (-veltpp[0])  * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xe - x0) - wi / 2.0 * kx / (-veltpp[0])  * (xe*xe - x0*x0);
+						zv -= 2.0 * wi / (-veltpp[0]) * (k0 + ky3 * Abs(yv*yv*yv) + ky * yv) * (xv - xe);
+					}
+					else if (isrot)
+					{
+						zv = -wi / (-veltpp[0])  * (k0 + ky3 * Abs(pow(1 - yv, 3)) + ky * yv) * (xe - x0) - wi / 2.0 * kx / (-veltpp[0])  * (xe*xe - x0*x0);
+						zv -= 2.0 * wi / (-veltpp[0]) * (k0 + ky3 * Abs(pow(1 - yv, 3)) + ky * yv) * (xv - xe);
+					}
+				}
+				geometry(i, j, 0) = xv;
+				geometry(i, j, 1) = yv;
+				geometry(i, j, 2) = -zv - veltpp[2] * df*i; 
+			}
+		}
+		geoexp = geometry.reshape(3, 3, nk*nf);
+	}
+	else if(isbond)
+	{
+		for (int j = nf - 1; j >= 0; --j)
+		{
+			for (int i = nk - 1; i >= 0; --i)
+			{
+				geometry(i, j, 0) = rv + i * (1.0 - rv) / (nk - 1);
+				geometry(i, j, 1) = 0;
+				geometry(i, j, 2) = 0;
+			}
+		}
+	}
+	else if(isshed)
+	{
+		return false;
+	}
+	
+	return true;
+}
+
+void Wake::_airloadingPoint(Matrix2<double> &az,Matrix2<double> &ra,Matrix1<double> &ch, Matrix1<double> tw, double *b, double *s, double offset, double sr)
+{
+	//尾迹法速度计算点，目前取四分之三弦长位置
+	//有后掠角时还要调整
+	myTYPE azm, bfp, rst, chp, twp;
+	for (int j = ns - 1; j >= 0; --j)
+	{
+		chp = ch(j);
+		twp = tw(j) + sr;
+		for (int i = nf - 1; i >= 0; --i)
+		{
+			azm = az(i, j);
+			bfp = b[0] + b[1] * cos(azm) + b[2] * sin(azm);
+			rst = ra(i, j);
+
+			comppoint(i, j, 0) = ((rst - offset)*cos(bfp) + offset) * cos(azm) + chv*0.5*sin(azm);
+			comppoint(i, j, 1) = ((rst - offset)*cos(bfp) + offset) * sin(azm) - chv*0.5*cos(azm);
+			comppoint(i, j, 2) = bfp*(rst - offset) - 0.5*chp*(s[0] + s[1] * cos(azm) + s[2] * sin(azm) + twp);
+		}
+	}
+}
