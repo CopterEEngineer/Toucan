@@ -21,9 +21,9 @@
 
 #define INI 0
 
-//#ifdef _DEBUG
+#ifdef _DEBUG
 #define BOUNDS_CHECK
-//#endif // bound check
+#endif // bound check
 #ifdef USE_MKL
 #define _USE_MKL
 //#undef _USE_MKL

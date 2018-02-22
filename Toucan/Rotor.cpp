@@ -36,9 +36,8 @@ void Rotor::_allocate(void)
 	lambdt.allocate(nf, ns);
 
 	cirlb.allocate(nf, ns); // circulation
-	tipstr.allocate(nk, nf);
-	tipgeometry.allocate(nk, nf, 3);
 	bladedeform.allocate(nf, ns, 3);
+	tailposition.allocate(nf, ns, 3);
 
 	lambdi.setvalue(lambdi_ag);
 	lambdh.setvalue(lambdh_ag);

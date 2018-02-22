@@ -155,7 +155,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.teeter = false;
 	R.hingetype = Hingeless;
 	R.nb = 4;
-	R.nf = 72, R.ns = 40, R.ni = 10;
+	R.nf = 72, R.ns = 30, R.ni = 10;
 	R.amb = amb;
 	R.si_unit = true;
 
@@ -188,8 +188,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 		R.lscorr.Initvariable();*/
 
 	
-	R.kwtip = 1, R.kwrot = 1; R.nk = R.nf*R.kwtip;
-	R.haveGeo = false, R.haveStr = false, R.outputWake = true, R.outputDisk = false;
+	R.haveGeo = false, R.haveStr = false, R.outputWake = true, R.outputDisk = true;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
 	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
 
@@ -197,7 +196,7 @@ void Model_BO105::InitMainRotor(Rotor &R)
 	R.eflap = 0;
 	R.khub = 113330, R.del = 0, R.pitchroot = RAD(0);
 	R.radius = 4.91, R.bt = 0.98, R.rroot = 0.20, R.disk_A = R.radius*R.radius*PI;
-	R.precone = RAD(2.5);
+	R.precone = RAD(0);
 	R.omega0 = 44.4;
 	R.omega = R.omega0;
 	R.vtipa = R.omega*R.radius;
@@ -277,7 +276,6 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 	else
 		R.nf = 1, R.ns = 1, R.ni = 1;
 
-	R.kwtip = 0, R.kwrot = 0, R.nk = 1;
 	R.haveGeo = false, R.haveStr = false, R.outputWake = false, R.outputDisk = false;
 	R.chord.allocate(R.ns), R.sweep.allocate(R.ns), R.twist.allocate(R.ns);
 	R.azstation.allocate(R.nf, R.ns), R.rastation.allocate(R.nf, R.ns);
@@ -348,23 +346,6 @@ void Model_BO105::InitTailRotor(Rotor &R, double w)
 
 void Rotor::WakeModelPrams(const double _k)
 {
-	//kwtip = _k, kwrot = 5, nk = int(nf*kwtip);
-	//outboard = 0.6, rtip = 0.95;
-	//rc0 = 0.05*chord(0) / radius;
-	//haveGeo = false, haveStr = false;// outputWake = false;
-	//								 // update allocate
-	//tipstr.deallocate();
-	//tipstr.allocate(nk, nf);
-	//tipgeometry.deallocate();
-	//tipgeometry.allocate(nk, nf, 3);
-
-	//Matrix1<int> id_ns = step(0, ns - 1);
-	//Matrix1<double> ra(ns);
-	//ra = rastation(0, id_ns);
-	//twistv = twist.interplinear_fast(ra, rtip);
-	//chv = chord.interplinear_fast(ra, rtip) / radius;
-	
-	
 	Wake _wake;
 	Matrix1<int> id_ns = step(0, ns - 1);
 	Matrix1<double> ra(ns);
@@ -374,7 +355,7 @@ void Rotor::WakeModelPrams(const double _k)
 
 	//½°¼âÎÐ
 	_wake.istip = true, _wake.isrot = _wake.isbond = _wake.isshed = false;
-	_wake.rc0 = _wake.rc = 0.05*chord(0) / radius;
+	_wake.rc0 = 0.05*chord(0) / radius;
 	_wake.rv = 0.95;
 	_wake.twistv = twist.interplinear_fast(ra, _wake.rv);
 	_wake.chv = chord.interplinear_fast(ra, _wake.rv) / radius;
@@ -386,7 +367,7 @@ void Rotor::WakeModelPrams(const double _k)
 
 	//½°¸ùÎÐ
 	_wake.isrot = true, _wake.istip = _wake.isbond = _wake.isshed = false;
-	_wake.rc0 = _wake.rc = 0.05*chord(0) / radius;
+	_wake.rc0 = 0.05*chord(0) / radius;
 	_wake.rv = rroot + 0.5*(rastation(0, 1) - rastation(0, 0));
 	_wake.twistv = twist.interplinear_fast(ra, _wake.rv);
 	_wake.chv = chord.interplinear_fast(ra, _wake.rv) / radius;
@@ -397,14 +378,14 @@ void Rotor::WakeModelPrams(const double _k)
 		wakev.emplace_back(_wake);
 
 	//¸½×ÅÎÐ
-	_wake.isbond = false, _wake.istip = _wake.isrot = _wake.isshed = false;
-	_wake.rc0 = _wake.rc = 0.5*chord(0) / radius;
+	_wake.isbond = true, _wake.istip = _wake.isrot = _wake.isshed = false;
+	_wake.rc0 = 0.5*chord(0) / radius;
 	_wake.rv = rroot + 0.5*(rastation(0, 1) - rastation(0, 0));
 	_wake.twistv = 0;
 	_wake.chv = chord(0) / radius;
 	_wake.strboard = 0;
 
-	_wake.InitVariable(nf, ns, int(nf*_k));
+	_wake.InitVariable(nf, ns, ns);
 	if (_wake.istip || _wake.isrot || _wake.isbond || _wake.isshed)
 		wakev.emplace_back(_wake);
 }
@@ -559,7 +540,7 @@ void Wake::InitVariable(const int _nf, const int _ns, const int _nk)
 	{
 		nf = _nf;
 		ns = _ns;
-		nk = _ns - 1;
+		nk = _nk + 1;
 		lscorr.enable = false;
 		waketype = Bound;
 		istip = isrot = isshed = false;
@@ -572,13 +553,27 @@ void Wake::InitVariable(const int _nf, const int _ns, const int _nk)
 		istip = isrot = isbond = false;
 	}
 	havegeo = false, havestr = false;
+	vortexstr.deallocate();
 	vortexstr.allocate(nk, nf);
+
+	geometry.deallocate();
 	geometry.allocate(nk, nf, 3);
+
+	comppoint.deallocate();
 	comppoint.allocate(nf, ns, 3);
+
+	geometryathub.deallocate();
 	geometryathub.allocate(nk, nf, 3);
+
+	comppointathub.deallocate();
 	comppointathub.allocate(nk, ns, 3);
 
-	geoexp.allocate(3, nk*nf);
+	rc.deallocate();
+	rc.allocate(nk);
+
+	lambdx.allocate(nf, ns);
+	lambdy.allocate(nf, ns);
+	lambdz.allocate(nf, ns);
 
 	outputwake = true;
 
@@ -1417,7 +1412,6 @@ void Rotor::OutPutWake(const int ic)
 
 	if (outputWake)
 	{
-		tipgeometry.output("tipgeo_" + _im + "_" + _ic + ".output", 10);
 		lambdi.output("lambdi_" + _im + "_" + _ic + ".output", 10);
 		lambdx.output("lambdx_" + _im + "_" + _ic + ".output", 10);
 		lambdy.output("lambdy_" + _im + "_" + _ic + ".output", 10);
@@ -1440,7 +1434,8 @@ void Rotor::OutPutWake(string s, const int ic)
 		lambdx.output(s + "lambdx_"  + _ic + ".output", 10);
 		lambdy.output(s + "lambdy_" + _ic + ".output", 10);
 		lambdh.output(s + "lambdh_"  + _ic + ".output", 6);
-		bladedeform.output2(s + "bladedeform_" + "_" + _ic + ".output", 10);
+		bladedeform.output2(s + "bladedeform_" + _ic + ".output", 10);
+		tailposition.output2(s + "tailposition_" + _ic + ".output", 10);
 	}
 }
 
@@ -1489,7 +1484,14 @@ void Wake::OutPutWake(string s, const int ic)
 		_im = "shed";
 
 	if (outputwake)
-		geometryathub.output2(s + "geo_" + _im + "_" + _ic + ".output", 10);
+	{
+		geometryathub.output2(s + "geoathub_" + _im + "_" + _ic + ".output", 10);
+		geometry.output2(s + "geo_" + _im + "_" + _ic + ".output", 10);
+		rc.output(s + "rc_" + _im + "_" + _ic + ".output", 10);
+		lambdx.output(s + "lambdx_" + _im + "_" + _ic + ".output", 10);
+		lambdy.output(s + "lambdy_" + _im + "_" + _ic + ".output", 10);
+		lambdz.output(s + "lambdz_" + _im + "_" + _ic + ".output", 10);
+	}
 }
 
 void CopterSolver::InitCopterSolver(void)
@@ -1550,7 +1552,7 @@ void LevelFlightMP(int nth)
 	int s, e, i;
 	
 	jobs.InitProject(SimTrim);
-	i = s = 4, e = 5;// jobs.nCase;
+	i = s = 0, e = jobs.nCase;
 
 	bo105.GetProb(6, 0, FreeTrim1);
 	bo105.GetModel();

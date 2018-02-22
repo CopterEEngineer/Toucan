@@ -367,7 +367,7 @@ public:
 	void OutPutWake(string s, const int ic);
 	
 	void InitVariable(const int nf, const int ns, const int nk);
-	void ComputeIndVel(double &, double &, double&, const int, const int, const int, const int, double, double *);
+	void ComputeIndVel(double &, double &, double&, const int, const int, const int, const int, double, double *, double);
 
 
 	void _computeIndVel(int nb, Matrix1<double> &ch);
@@ -382,18 +382,17 @@ public:
 	bool havegeo, havestr;
 	bool outputwake;
 	int nf, ns, nk;
-	double twistv, chv, rv, rc0, rc;
+	double twistv, chv, rv, rc0;
+	Matrix1<double> rc;
 	double strboard;
 
 	Monitor monitor;
 
-	double lambdx, lambdy, lambdz;
+	Matrix2<double> lambdx, lambdy, lambdz;
 
 	Matrix2<myTYPE> vortexstr;
 	Matrix3<myTYPE> geometry;
 	Matrix3<myTYPE> comppoint;
-
-	Matrix2<myTYPE> geoexp;
 
 	Matrix3<myTYPE> geometryathub;
 	Matrix3<myTYPE> comppointathub;
@@ -502,10 +501,8 @@ private:
 	Matrix2<myTYPE> incidn, inflow, cl, cd, dt;
 	Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdy, lambdx;
 
-	Matrix2<myTYPE> tipstr, rotstr, shdstr, trlstr, cirlb;
-	Matrix3<myTYPE> bladedeform, tipgeometry;
-
-	myTYPE twistv, chv;
+	Matrix2<myTYPE> cirlb;
+	Matrix3<myTYPE> bladedeform, tailposition;
 
 	//Matrix2<myTYPE> lambdi, lambdh, lambdt, lambdx, lambdy;
 	//myTYPE beta[3];
@@ -543,8 +540,6 @@ public:
 
 	LSCorr lscorr;
 
-
-	int kwrot, nk, nbn, naf, nnr;
 	double kwtip;
 	//int nf, ns, ni;
 	myTYPE rtip, rc0, outboard;
